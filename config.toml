@@ -1,0 +1,23 @@
+# 基础服务器配置（静态配置，启动时加载）
+[server]
+host = "127.0.0.1"
+port = 8080
+cors_origins = ["*"]
+
+# 数据库配置（静态配置，启动时加载）
+[database]
+url = "postgresql://postgres:6inRdRcKG6b3BZp6@localhost:5432/epusdt_rust"
+max_connections = 10
+min_connections = 1
+
+# Redis配置（静态配置，启动时加载）
+[redis]
+url = "redis://192.168.1.128:6379"
+pool_size = 10
+
+# 注意：以下配置项将通过数据库动态管理，不在config.toml中配置：
+# - JWT配置：通过SYSTEM_CONFIGS表管理
+# - Email配置：通过EMAIL_CONFIGS表管理  
+# - Blockchain配置：通过BLOCKCHAIN_PLUGIN_CONFIGS表管理
+# - Download配置：通过DOWNLOAD_PLUGIN_CONFIGS表管理
+# - 其他业务配置：通过相应的配置表管理

@@ -1,0 +1,15 @@
+[package]
+name = "rsws_db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rsws_common = { path = "../rsws_common" }
+sqlx = { workspace = true }
+deadpool-redis = { workspace = true }
+redis = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }

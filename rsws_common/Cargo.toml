@@ -1,0 +1,17 @@
+[package]
+name = "rsws_common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+salvo = { workspace = true }
+config = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+lettre = { workspace = true }
+argon2 = { workspace = true }
+rand = { workspace = true }
+rust-snowflake = { workspace = true }

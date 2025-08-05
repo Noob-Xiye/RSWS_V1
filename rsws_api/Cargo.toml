@@ -1,0 +1,16 @@
+[package]
+name = "rsws_api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rsws_common = { path = "../rsws_common" }
+rsws_model = { path = "../rsws_model" }
+rsws_service = { path = "../rsws_service" }
+salvo = { workspace = true, features = ["full", "oapi"] }
+sqlx = { workspace = true }
+deadpool-redis = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

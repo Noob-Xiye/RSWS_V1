@@ -1,0 +1,20 @@
+[package]
+name = "rsws_bin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rsws_common = { path = "../rsws_common" }
+rsws_db = { path = "../rsws_db" }
+rsws_api = { path = "../rsws_api" }
+salvo = { workspace = true }
+sqlx = { workspace = true }
+deadpool-redis = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+config = { workspace = true }
+
+[[bin]]
+name = "rsws"
+path = "src/main.rs"

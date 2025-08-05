@@ -1,0 +1,11 @@
+[package]
+name = "rsws_model"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rsws_common = { path = "../rsws_common" }
+sqlx = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
