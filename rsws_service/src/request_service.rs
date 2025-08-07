@@ -7,6 +7,10 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
+use rsws_model::request::*;
+use rsws_db::postgres::request::*;
+use anyhow::Result;
+use tracing::{info, error};
 
 pub struct RequestService {
     db_pool: PgPool,
@@ -21,11 +25,23 @@ impl RequestService {
         }
     }
 
-    // 生成请求ID - 使用雪花ID替代UUID
-    pub fn generate_request_id() -> String {
-        snowflake::next_id().to_string()
-    }
+    pub struct RequestService;
 
+    impl RequestService {
+        pub async fn create_request(
+            &self,
+            request_data: CreateRequestData,
+        ) -> Result<RequestResponse> {
+            // 使用雪花 ID 生成请求 ID
+            let request_id = snowflake::next_id().to_string();
+            
+            info!("Creating request with ID: {}", request_id);
+            
+            Ok(RequestResponse {
+                id: request_id,
+            })
+        }
+    }
     // 记录请求开始
     pub async fn log_request_start(
         &self,

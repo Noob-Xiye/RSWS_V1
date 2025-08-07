@@ -4,12 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# 本地依赖
 rsws_common = { path = "../rsws_common" }
 rsws_model = { path = "../rsws_model" }
 rsws_db = { path = "../rsws_db" }
+
+# 工作区依赖
 sqlx = { workspace = true }
 deadpool-redis = { workspace = true }
 lettre = { workspace = true }
+reqwest = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
