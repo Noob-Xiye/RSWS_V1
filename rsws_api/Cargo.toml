@@ -7,10 +7,14 @@ edition = "2021"
 rsws_common = { path = "../rsws_common" }
 rsws_model = { path = "../rsws_model" }
 rsws_service = { path = "../rsws_service" }
-salvo = { workspace = true, features = ["full", "oapi"] }
+salvo = { workspace = true}
 sqlx = { workspace = true }
 deadpool-redis = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+[[bin]]
+name = "rsws"
+path = "src/main.rs"

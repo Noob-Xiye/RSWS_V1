@@ -8,7 +8,7 @@ use salvo::prelude::*;
 use crate::middleware::auth::AuthMiddleware;
 use crate::middleware::signature_auth::SignatureAuthMiddleware;
 use crate::middleware::unified_auth::UnifiedAuthMiddleware;
-use rsws_service::{AuthService, AdminService};
+use rsws_service::{AdminService, AuthService};
 
 pub fn create_router(config_handler: Arc<ConfigHandler>) -> Router {
     Router::new()
@@ -111,24 +111,24 @@ pub fn create_router() -> Router {
     Router::new()
         .push(Router::with_path("api").push(api_router))
         .push(doc.into_router("/openapi.json"))
-        .push(SwaggerUi::new("/swagger-ui/").into_router("/swagger-ui/*any"))
+        .push(SwaggerUi::new("/swagger-ui/").into_router("/swagger-ui/*any"));
 
     // 管理员路由（独立的认证系统）
     let admin_router = Router::with_path("admin")
-        .push(
-            Router::with_path("auth/login")
-                .post(admin_handler.login)
-        )
+        .push(Router::with_path("auth/login").post(admin_handler.login))
         .push(
             Router::new()
-                .push(Router::with_path("admins")
-                    .get(admin_handler.get_admins)
-                    .post(admin_handler.create_admin))
-                .push(Router::with_path("admins/:id")
-                    .get(admin_handler.get_admin_info)
-                    .put(admin_handler.update_admin))
-                // 其他管理员API路由
-                // ...
+                .push(
+                    Router::with_path("admins")
+                        .get(admin_handler.get_admins)
+                        .post(admin_handler.create_admin),
+                )
+                .push(
+                    Router::with_path("admins/:id")
+                        .get(admin_handler.get_admin_info)
+                        .put(admin_handler.update_admin),
+                ), // 其他管理员API路由
+                   // ...
         );
 
     Router::new()

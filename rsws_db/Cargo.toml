@@ -13,3 +13,7 @@ tracing = { workspace = true }
 serde = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
+
+[[bin]]
+name = "rsws"
+path = "src/main.rs"

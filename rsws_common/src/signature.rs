@@ -112,7 +112,8 @@ impl SignatureService {
         let value: Value = serde_json::from_str(json_str).map_err(|_| "Invalid JSON format")?;
 
         // 使用紧凑格式，确保键按字母顺序排列
-        serde_json::to_string(&value).map_err(|_| "Failed to serialize JSON")
+        let normalized = serde_json::to_string(&value).map_err(|_| "Failed to serialize JSON")?;
+        Ok(normalized)
     }
 
     // 生成随机nonce
