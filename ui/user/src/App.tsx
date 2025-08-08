@@ -1,18 +1,9 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { RouterProvider } from 'react-router-dom';
 import { ConfigProvider, theme } from 'antd';
 import styled, { createGlobalStyle } from 'styled-components';
-import { AuthProvider } from './hooks/useAuth';
-import Header from './components/Layout/header';
-import Footer from './components/Layout/Footer';
-import HomePage from './pages/HomePage';
-import ResourcesPage from './pages/ResourcesPage';
-import ResourceDetailPage from './pages/ResourceDetailPage';
-import AuthPage from './pages/AuthPage';
-import UserCenterPage from './pages/UserCenterPage';
-import UploadResourcePage from './pages/UploadResourcePage';
-import PaymentPage from './pages/PaymentPage';
-import SearchResultsPage from './pages/SearchResultsPage';
+import { AppProvider } from './store';
+import { router } from './router';
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -158,16 +149,6 @@ const GlobalStyle = createGlobalStyle`
   }
 `;
 
-const AppContainer = styled.div`
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-`;
-
-const MainContent = styled.main`
-  flex: 1;
-`;
-
 const App: React.FC = () => {
   return (
     <ConfigProvider
@@ -183,37 +164,9 @@ const App: React.FC = () => {
       }}
     >
       <GlobalStyle />
-      <AuthProvider>
-        <Router>
-          <AppContainer>
-            <Routes>
-              <Route path="/auth" element={<AuthPage />} />
-              <Route path="/payment/:resourceId" element={<PaymentPage />} />
-              <Route path="/*" element={
-                <>
-                  <Header />
-                  <MainContent>
-                    <Routes>
-                      <Route path="/" element={<HomePage />} />
-                      <Route path="/resources" element={<ResourcesPage />} />
-                      <Route path="/resources/:id" element={<ResourceDetailPage />} />
-                      <Route path="/search" element={<SearchResultsPage />} />
-                      <Route path="/upload" element={<UploadResourcePage />} />
-                      <Route path="/user-center" element={<UserCenterPage />} />
-                      // 在路由配置中添加新的路由
-                      <Routes>
-                        {/* 现有路由 */}
-                        <Route path="/orders/:orderId" element={<OrderDetailPage />} />
-                        <Route path="/transactions" element={<TransactionsPage />} />
-                      </Routes>
-                  </MainContent>
-                  <Footer />
-                </>
-              } />
-            </Routes>
-          </AppContainer>
-        </Router>
-      </AuthProvider>
+      <AppProvider>
+        <RouterProvider router={router} />
+      </AppProvider>
     </ConfigProvider>
   );
 };

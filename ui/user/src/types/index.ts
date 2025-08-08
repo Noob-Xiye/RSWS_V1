@@ -1,85 +1,85 @@
+// 用户相关类型定义
 export interface User {
   id: string;
-  username: string;
   email: string;
+  username: string;
   avatar?: string;
-  role: 'user' | 'admin';
   createdAt: string;
+  updatedAt: string;
+  wallet?: Wallet;
 }
 
+export interface Wallet {
+  id: string;
+  userId: string;
+  balance: number;
+  currency: string;
+  frozenAmount: number;
+}
+
+// 资源相关类型定义
 export interface Resource {
   id: string;
   title: string;
   description: string;
-  detailDescription?: string;
-  price: number;
-  category: ResourceCategory;
+  category: string;
   tags: string[];
-  fileName: string;
-  fileSize: number;
-  contentType: string;
+  price: number;
+  currency: string;
+  fileUrl: string;
+  thumbnailUrl?: string;
   downloadCount: number;
   rating: number;
+  authorId: string;
   author: User;
   createdAt: string;
   updatedAt: string;
-  specifications?: Record<string, any>;
-  usageGuide?: string;
-  precautions?: string;
-  displayImages?: string[];
-  previewUrl?: string;
-  thumbnailUrl?: string;
 }
 
-export interface ResourceCategory {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  parentId?: string;
-}
-
-// 添加Transaction接口
-export interface Transaction {
-  id: string;
-  orderId: string;
-  userId: string;
-  amount: number;
-  currency: string;
-  paymentMethod: string;
-  providerTransactionId?: string;
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
-  createdAt: string;
-  updatedAt: string;
-  completedAt?: string;
-}
-
-// 更新Order接口
+// 订单相关类型定义
 export interface Order {
   id: string;
   userId: string;
   resourceId: string;
   resource: Resource;
   amount: number;
-  status: 'pending' | 'paid' | 'completed' | 'cancelled' | 'refunded' | 'failed';
+  currency: string;
+  status: 'pending' | 'paid' | 'cancelled' | 'refunded';
   paymentMethod: string;
+  paymentId?: string;
   createdAt: string;
   updatedAt: string;
-  completedAt?: string;
-  expiredAt?: string;
 }
 
-export interface ApiResponse<T> {
+// 支付相关类型定义
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  type: 'crypto' | 'fiat';
+  enabled: boolean;
+  config: Record<string, any>;
+}
+
+// API响应类型定义
+export interface ApiResponse<T = any> {
   success: boolean;
-  data: T;
+  data?: T;
   message?: string;
-  code?: number;
+  error?: string;
+}
+
+// 分页类型定义
+export interface PaginationParams {
+  page: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
   page: number;
-  pageSize: number;
+  limit: number;
   totalPages: number;
 }
