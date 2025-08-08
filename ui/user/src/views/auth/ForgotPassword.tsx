@@ -2,23 +2,21 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Card, message, Result } from 'antd';
 import { MailOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { authAPI } from '../../api/auth';
+import { authAPI } from '../../api';
 
 const ForgotPassword: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [email, setEmail] = useState('');
 
   const onFinish = async (values: { email: string }) => {
     setLoading(true);
     try {
       await authAPI.forgotPassword(values.email);
-      setEmail(values.email);
       setEmailSent(true);
       message.success('重置密码邮件已发送');
-    } catch (error: any) {
-      message.error(error.response?.data?.message || '发送失败，请重试');
+    } catch (error) {
+      message.error('发送失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -26,28 +24,28 @@ const ForgotPassword: React.FC = () => {
 
   if (emailSent) {
     return (
-      <div className="forgot-password-container" style={{ padding: '50px 20px', maxWidth: 500, margin: '0 auto' }}>
-        <Result
-          icon={<MailOutlined style={{ color: '#1890ff' }} />}
-          title="邮件已发送"
-          subTitle={`我们已向 ${email} 发送了重置密码的邮件，请查收并按照邮件中的指引重置密码。`}
-          extra={[
-            <Button type="primary" key="login">
-              <Link to="/auth/login">返回登录</Link>
-            </Button>,
-            <Button key="resend" onClick={() => setEmailSent(false)}>
-              重新发送
-            </Button>,
-          ]}
-        />
+      <div className="auth-container">
+        <Card style={{ maxWidth: 400, margin: '0 auto' }}>
+          <Result
+            status="success"
+            title="邮件已发送"
+            subTitle="请检查您的邮箱，点击邮件中的链接重置密码"
+            extra={[
+              <Link to="/auth/login" key="back">
+                <Button type="primary">返回登录</Button>
+              </Link>
+            ]}
+          />
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="forgot-password-container" style={{ padding: '50px 20px', maxWidth: 400, margin: '0 auto' }}>
+    <div className="auth-container">
       <Card 
         title="忘记密码" 
+        style={{ maxWidth: 400, margin: '0 auto' }}
         extra={
           <Link to="/auth/login">
             <Button type="text" icon={<ArrowLeftOutlined />}>
@@ -71,14 +69,13 @@ const ForgotPassword: React.FC = () => {
               size="large"
             />
           </Form.Item>
-          
           <Form.Item>
             <Button 
               type="primary" 
               htmlType="submit" 
+              loading={loading}
               block 
               size="large"
-              loading={loading}
             >
               发送重置邮件
             </Button>

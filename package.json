@@ -1,0 +1,24 @@
+{
+  "name": "rsws-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "ui/user",
+    "ui/admin",
+    "ui/common"
+  ],
+  "scripts": {
+    "dev:user": "bun --cwd ui/user run dev",
+    "dev:admin": "bun --cwd ui/admin run dev",
+    "build:user": "bun --cwd ui/user run build",
+    "build:admin": "bun --cwd ui/admin run build",
+    "build:common": "bun --cwd ui/common run build",
+    "build:all": "bun run build:common && bun run build:user && bun run build:admin",
+    "test:all": "bun --cwd ui/user run test && bun --cwd ui/admin run test && bun --cwd ui/common run test",
+    "lint:all": "bun --cwd ui/user run lint && bun --cwd ui/admin run lint && bun --cwd ui/common run lint",
+    "install:all": "bun install"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}
