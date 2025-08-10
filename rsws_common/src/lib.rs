@@ -1,5 +1,5 @@
 pub mod config;
-pub mod email; // 新增
+pub mod email;
 pub mod encryption;
 pub mod error;
 pub mod password;
@@ -7,4 +7,5 @@ pub mod signature;
 pub mod snowflake;
 pub mod utils;
 
-pub use error::Error;
+// 重新导出常用类型
+pub use error::{CommonError, DbError, ServiceError};

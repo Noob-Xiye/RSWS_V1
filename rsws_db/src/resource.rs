@@ -1,6 +1,6 @@
-use sqlx::PgPool;
-use rsws_model::resource::Resource;
 use rsws_common::error::ServiceError;
+use rsws_model::resource::Resource;
+use sqlx::PgPool;
 
 pub struct ResourceRepository {
     pool: PgPool,
@@ -15,7 +15,7 @@ impl ResourceRepository {
     pub async fn get_by_id(&self, id: i64) -> Result<Option<Resource>, ServiceError> {
         let result = sqlx::query_as!(
             Resource,
-            "SELECT id, title, description, price, category_id, file_url, thumbnail_url, is_active, created_at, updated_at FROM resources WHERE id = $1 AND is_active = true",
+            "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE id = $1 AND is_active = true",
             id
         )
         .fetch_optional(&self.pool)
@@ -66,12 +66,11 @@ impl ResourceRepository {
             .await
             .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
-            let total: i64 = sqlx::query_scalar!(
-                "SELECT COUNT(*) FROM resources WHERE is_active = true"
-            )
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+            let total: i64 =
+                sqlx::query_scalar!("SELECT COUNT(*) FROM resources WHERE is_active = true")
+                    .fetch_one(&self.pool)
+                    .await
+                    .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
             (resources, total)
         };

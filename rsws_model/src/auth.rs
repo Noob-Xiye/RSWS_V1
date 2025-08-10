@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use std::collections::HashMap;
 use std::net::IpAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

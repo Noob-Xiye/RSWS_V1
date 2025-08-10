@@ -51,6 +51,7 @@ export const authAPI = {
 };
 
 // 用户相关API
+// 更新用户API路径以匹配后端路由
 export const userAPI = {
   getProfile: () => 
     apiClient.get('/api/user/profile'),
@@ -61,7 +62,7 @@ export const userAPI = {
   getOrders: (params?: any) => 
     apiClient.get('/api/user/orders', { params }),
   getOrderDetail: (orderId: string) => 
-    apiClient.get(`/api/user/orders/${orderId}`),
+    apiClient.get(`/api/orders/${orderId}`),
   getTransactions: (params?: any) => 
     apiClient.get('/api/user/transactions', { params })
 };

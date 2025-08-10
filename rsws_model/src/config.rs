@@ -68,15 +68,6 @@ pub enum ConfigValue {
     Json(serde_json::Value),
 }
 
-// JWT配置结构
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JwtConfig {
-    pub secret: String,
-    pub expires_in: i64, // seconds
-    pub refresh_expires_in: i64,
-    pub algorithm: String,
-}
-
 // 在现有配置结构体中添加
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogConfig {

@@ -8,6 +8,7 @@ const apiClient = createApiClient({
 });
 
 // 管理员认证API
+// 更新管理员API路径以匹配后端路由
 export const adminAPI = {
   login: (username: string, password: string) => 
     apiWrapper.post(apiClient, '/api/admin/auth/login', { username, password }),
@@ -19,7 +20,7 @@ export const adminAPI = {
     apiWrapper.post(apiClient, '/api/admin/auth/refresh'),
 };
 
-// 用户管理API
+// 用户管理API路径更新
 export const userManagementAPI = {
   getUsers: (params?: any) => 
     apiWrapper.get(apiClient, '/api/admin/users', { params }),

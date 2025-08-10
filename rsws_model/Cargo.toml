@@ -7,6 +7,7 @@ edition = "2021"
 rsws_common = { path = "../rsws_common" }
 sqlx = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 chrono = { workspace = true }
 rust_decimal = { workspace = true }
 
