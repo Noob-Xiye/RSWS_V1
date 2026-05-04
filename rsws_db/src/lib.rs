@@ -18,6 +18,9 @@ pub use resource::ResourceRepository;
 pub use api_key::ApiKeyRepository;
 pub use redis::RedisService;
 
+/// Redis 连接池类型别名
+pub type RedisPool = RedisService;
+
 /// 创建数据库连接池
 pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
     PgPool::connect(database_url).await

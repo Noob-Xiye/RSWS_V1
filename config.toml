@@ -15,8 +15,11 @@ min_connections = 1
 url = "redis://192.168.1.128:6379"
 pool_size = 10
 
+# 加密配置（静态配置，启动时加载）
+[encryption]
+key = "your-32-byte-encryption-key-here!!"  # 32字节密钥，用于敏感数据加密
+
 # 注意：以下配置项将通过数据库动态管理，不在config.toml中配置：
-# - JWT配置：通过SYSTEM_CONFIGS表管理
 # - Email配置：通过EMAIL_CONFIGS表管理  
 # - Blockchain配置：通过BLOCKCHAIN_PLUGIN_CONFIGS表管理
 # - Download配置：通过DOWNLOAD_PLUGIN_CONFIGS表管理
