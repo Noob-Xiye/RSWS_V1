@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "name": "RSWS",
+  "description": "数字内容付费交易平台",
+  "features": [
+    "USDT (TRC20/ERC20) 支付监听",
+    "用户资源上传",
+    "平台佣金结算",
+    "管理后台"
+  ],
+  "status": "development",
+  "release_date": "2026-05-05",
+  "author": "RSWS Team",
+  "license": "MIT"
+}

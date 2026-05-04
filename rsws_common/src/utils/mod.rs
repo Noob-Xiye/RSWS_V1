@@ -1,4 +1,8 @@
-pub mod email;
-pub mod response;
-pub mod sign;
-pub mod time;
+//! 工具函数模块
+//!
+//! 提供各种通用工具函数
+
+// 当前为空模块，工具函数已移至各专门模块
+// - 时间处理: 使用 chrono
+// - 签名: signature.rs
+// - 响应: response.rs

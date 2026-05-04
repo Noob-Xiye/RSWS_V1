@@ -1,0 +1,41 @@
+[package]
+name = "rsws_usdt"
+version = "0.1.0"
+edition = "2021"
+description = "USDT transaction monitoring service (built-in epusdt capability)"
+
+[dependencies]
+# 异步运行时
+tokio = { workspace = true, features = ["full"] }
+
+# HTTP 客户端
+reqwest = { workspace = true }
+
+# 序列化
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# 数据库
+sqlx = { workspace = true }
+
+# 时间处理
+chrono = { workspace = true }
+
+# 数值处理
+rust_decimal = { workspace = true }
+
+# 日志
+tracing = { workspace = true }
+
+# 错误处理
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# 内部模块
+rsws_common = { path = "../rsws_common" }
+rsws_model = { path = "../rsws_model" }
+rsws_db = { path = "../rsws_db" }
+
+# 加密
+aes-gcm = { workspace = true }
+base64 = { workspace = true }

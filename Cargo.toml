@@ -1,10 +1,11 @@
 [workspace]
 members = [
     "rsws_api",
-    "rsws_service", 
+    "rsws_service",
     "rsws_model",
     "rsws_db",
     "rsws_common",
+    "rsws_usdt",
     "rsws_bin"
 ]
 resolver = "2"

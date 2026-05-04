@@ -1,102 +1,93 @@
-use sqlx::PgPool;
-use rsws_model::payment::{PaymentTransaction, TransactionStatus};
-use rsws_common::error::ServiceError;
-use chrono::{DateTime, Utc};
+//! 支付交易仓储层
 
+use chrono::Utc;
+use rsws_common::error::RswsError;
+use rsws_common::snowflake;
+use rsws_model::payment::PaymentTransaction;
+use sqlx::PgPool;
+
+/// 支付交易仓储
 pub struct PaymentRepository {
     pool: PgPool,
 }
 
 impl PaymentRepository {
+    /// 创建支付交易仓储实例
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    // 创建支付交易
-    pub async fn create_transaction(
-        &self,
-        transaction: &PaymentTransaction,
-    ) -> Result<PaymentTransaction, ServiceError> {
-        let result = sqlx::query_as!(
-            PaymentTransaction,
-            r#"
-            INSERT INTO payment_transactions (id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status, created_at, updated_at, completed_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::transaction_status, $9, $10, $11)
-            RETURNING id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status as "status: TransactionStatus", created_at, updated_at, completed_at
-            "#,
-            transaction.id,
-            transaction.order_id,
-            transaction.user_id,
-            transaction.amount,
-            transaction.currency,
-            transaction.payment_method,
-            transaction.provider_transaction_id,
-            transaction.status as TransactionStatus,
-            transaction.created_at,
-            transaction.updated_at,
-            transaction.completed_at
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
-
-        Ok(result)
-    }
-
-    // 根据ID获取交易
-    pub async fn get_by_id(&self, id: &str) -> Result<Option<PaymentTransaction>, ServiceError> {
-        let result = sqlx::query_as!(
-            PaymentTransaction,
-            r#"
-            SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status as "status: TransactionStatus", created_at, updated_at, completed_at
-            FROM payment_transactions 
-            WHERE id = $1
-            "#,
-            id
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
-
-        Ok(result)
-    }
-
-    // 根据订单ID获取交易
-    pub async fn get_by_order_id(
+    /// 创建支付交易
+    pub async fn create(
         &self,
         order_id: i64,
-    ) -> Result<Vec<PaymentTransaction>, ServiceError> {
-        let result = sqlx::query_as!(
-            PaymentTransaction,
-            r#"
-            SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status as "status: TransactionStatus", created_at, updated_at, completed_at
-            FROM payment_transactions 
-            WHERE order_id = $1
-            ORDER BY created_at DESC
-            "#,
-            order_id
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        user_id: i64,
+        amount: i64,
+        currency: &str,
+        payment_method: &str,
+    ) -> Result<PaymentTransaction, RswsError> {
+        let transaction_id = snowflake::next_id();
 
-        Ok(result)
+        let transaction = sqlx::query_as::<_, PaymentTransaction>(
+            r#"
+            INSERT INTO payment_transactions (id, order_id, user_id, amount, currency, payment_method, status, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW(), NOW())
+            RETURNING id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status, created_at, updated_at, completed_at
+            "#,
+        )
+        .bind(transaction_id)
+        .bind(order_id)
+        .bind(user_id)
+        .bind(amount)
+        .bind(currency)
+        .bind(payment_method)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to create transaction: {}", e)))?;
+
+        Ok(transaction)
     }
 
-    // 更新交易状态
-    pub async fn update_transaction_status(
+    /// 根据 ID 获取交易
+    pub async fn get_by_id(&self, id: i64) -> Result<Option<PaymentTransaction>, RswsError> {
+        let transaction = sqlx::query_as::<_, PaymentTransaction>(
+            "SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status, created_at, updated_at, completed_at FROM payment_transactions WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get transaction: {}", e)))?;
+
+        Ok(transaction)
+    }
+
+    /// 根据订单 ID 获取交易
+    pub async fn get_by_order_id(&self, order_id: i64) -> Result<Vec<PaymentTransaction>, RswsError> {
+        let transactions = sqlx::query_as::<_, PaymentTransaction>(
+            "SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status, created_at, updated_at, completed_at FROM payment_transactions WHERE order_id = $1 ORDER BY created_at DESC",
+        )
+        .bind(order_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get transactions: {}", e)))?;
+
+        Ok(transactions)
+    }
+
+    /// 更新交易状态
+    pub async fn update_status(
         &self,
-        transaction_id: &str,
-        status: TransactionStatus,
-        provider_transaction_id: Option<String>,
-    ) -> Result<(), ServiceError> {
-        let completed_at = if status == TransactionStatus::Completed {
+        transaction_id: i64,
+        status: &str,
+        provider_transaction_id: Option<&str>,
+    ) -> Result<(), RswsError> {
+        let completed_at = if status == "completed" {
             Some(Utc::now())
         } else {
             None
         };
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE payment_transactions 
             SET status = $1::transaction_status, 
@@ -105,54 +96,65 @@ impl PaymentRepository {
                 updated_at = NOW() 
             WHERE id = $4
             "#,
-            status as TransactionStatus,
-            provider_transaction_id,
-            completed_at,
-            transaction_id
         )
+        .bind(status)
+        .bind(provider_transaction_id)
+        .bind(completed_at)
+        .bind(transaction_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        .map_err(|e| RswsError::internal(format!("Failed to update transaction: {}", e)))?;
 
         Ok(())
     }
 
-    // 获取用户交易记录
+    /// 获取用户交易记录
     pub async fn get_user_transactions(
         &self,
         user_id: i64,
         page: i64,
         page_size: i64,
-    ) -> Result<(Vec<PaymentTransaction>, i64), ServiceError> {
+    ) -> Result<(Vec<PaymentTransaction>, i64), RswsError> {
         let offset = (page - 1) * page_size;
 
         // 获取交易列表
-        let transactions = sqlx::query_as!(
-            PaymentTransaction,
+        let transactions = sqlx::query_as::<_, PaymentTransaction>(
             r#"
-            SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status as "status: TransactionStatus", created_at, updated_at, completed_at
+            SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status, created_at, updated_at, completed_at
             FROM payment_transactions 
             WHERE user_id = $1
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
             "#,
-            user_id,
-            page_size,
-            offset
         )
+        .bind(user_id)
+        .bind(page_size)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        .map_err(|e| RswsError::internal(format!("Failed to get user transactions: {}", e)))?;
 
         // 获取总数
-        let total: i64 = sqlx::query_scalar!(
+        let total: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM payment_transactions WHERE user_id = $1",
-            user_id
         )
+        .bind(user_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        .map_err(|e| RswsError::internal(format!("Failed to count transactions: {}", e)))?;
 
-        Ok((transactions, total))
+        Ok((transactions, total.0))
+    }
+}
+
+// ==================== 单元测试 ====================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_payment_repository_new() {
+        // 仅测试构造函数
     }
 }

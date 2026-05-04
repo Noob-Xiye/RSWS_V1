@@ -1,20 +1,100 @@
-use chrono::{DateTime, Utc};
-use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+//! 支付模型
 
-// 统一的用户支付配置结构体
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+
+// ==================== 订单 ====================
+
+/// 订单状态
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, sqlx::Type)]
+#[sqlx(type_name = "order_status", rename_all = "lowercase")]
+pub enum OrderStatus {
+    Pending,
+    Paid,
+    Completed,
+    Cancelled,
+    Refunded,
+}
+
+impl Default for OrderStatus {
+    fn default() -> Self {
+        Self::Pending
+    }
+}
+
+/// 订单
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Order {
+    pub id: i64,
+    pub user_id: i64,
+    pub resource_id: i64,
+    pub amount: i64,
+    pub status: String,
+    pub payment_method: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub expired_at: Option<DateTime<Utc>>,
+}
+
+/// 创建订单请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateOrderRequest {
+    pub resource_id: i64,
+    pub payment_method: String,
+}
+
+// ==================== 支付交易 ====================
+
+/// 交易状态
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, sqlx::Type)]
+#[sqlx(type_name = "transaction_status", rename_all = "lowercase")]
+pub enum TransactionStatus {
+    Pending,
+    Completed,
+    Failed,
+    Cancelled,
+    Refunded,
+}
+
+impl Default for TransactionStatus {
+    fn default() -> Self {
+        Self::Pending
+    }
+}
+
+/// 支付交易
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PaymentTransaction {
+    pub id: i64,
+    pub order_id: i64,
+    pub user_id: i64,
+    pub amount: i64,
+    pub currency: String,
+    pub payment_method: String,
+    pub provider_transaction_id: Option<String>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+}
+
+// ==================== 用户支付配置 ====================
+
+/// 用户支付配置
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct UserPaymentConfig {
     pub id: i64,
     pub user_id: i64,
-    pub payment_method: String,  // paypal, usdt_tron, usdt_eth
-    pub account_address: String, // PayPal邮箱或USDT地址
+    pub payment_method: String,
+    pub account_address: String,
     pub account_name: Option<String>,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
+/// 创建用户支付配置请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateUserPaymentConfigRequest {
     pub payment_method: String,
@@ -22,31 +102,10 @@ pub struct CreateUserPaymentConfigRequest {
     pub account_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserPaymentConfigResponse {
-    pub id: i64,
-    pub payment_method: String,
-    pub account_address: String,
-    pub account_name: Option<String>,
-    pub is_default: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
+// ==================== 资源支付配置 ====================
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserPaymentConfigStatsResponse {
-    pub paypal_count: i64,
-    pub usdt_tron_count: i64,
-    pub usdt_eth_count: i64,
-    pub total_count: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SetDefaultPaymentConfigRequest {
-    pub config_id: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+/// 资源支付配置
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ResourcePaymentConfig {
     pub id: i64,
     pub resource_id: i64,
@@ -55,19 +114,24 @@ pub struct ResourcePaymentConfig {
     pub created_at: DateTime<Utc>,
 }
 
-// 支付相关的其他结构体
+// ==================== 支付方式 ====================
+
+/// 支付方式
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaymentMethod {
     pub id: String,
     pub name: String,
     pub icon: Option<String>,
     pub enabled: bool,
-    pub min_amount: Option<rust_decimal::Decimal>,
-    pub max_amount: Option<rust_decimal::Decimal>,
-    pub fee_rate: Option<rust_decimal::Decimal>,
+    pub min_amount: Option<i64>,
+    pub max_amount: Option<i64>,
+    pub fee_rate: Option<i64>,
     pub description: Option<String>,
 }
 
+// ==================== 响应 ====================
+
+/// 支付订单响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PayOrderResponse {
     pub success: bool,
@@ -77,61 +141,41 @@ pub struct PayOrderResponse {
     pub qr_code: Option<String>,
 }
 
+/// 验证支付响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifyPaymentResponse {
     pub success: bool,
-    pub status: TransactionStatus,
+    pub status: String,
     pub message: String,
     pub order_id: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum TransactionStatus {
-    Pending,
-    Completed,
-    Failed,
-    Cancelled,
-    Refunded,
-}
+// ==================== 单元测试 ====================
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaymentTransaction {
-    pub id: i64,
-    pub order_id: i64,
-    pub user_id: i64,
-    pub payment_method: String,
-    pub payment_provider: String,
-    pub external_transaction_id: String,
-    pub amount: rust_decimal::Decimal,
-    pub currency: String,
-    pub status: TransactionStatus,
-    pub gateway_response: Option<serde_json::Value>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum OrderStatus {
-    Pending,
-    Completed,
-    Cancelled,
-    Refunded,
-}
+    #[test]
+    fn test_order_status_default() {
+        let status = OrderStatus::default();
+        assert_eq!(status, OrderStatus::Pending);
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Order {
-    pub id: i64,
-    pub user_id: i64,
-    pub resource_id: i64,
-    pub amount: rust_decimal::Decimal,
-    pub status: OrderStatus,
-    pub payment_method: Option<String>,
-    pub payment_id: Option<String>,
-    pub transaction_id: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
-    pub expired_at: Option<DateTime<Utc>>,
-    pub notes: Option<String>,
+    #[test]
+    fn test_transaction_status_default() {
+        let status = TransactionStatus::default();
+        assert_eq!(status, TransactionStatus::Pending);
+    }
+
+    #[test]
+    fn test_create_order_request() {
+        let req = CreateOrderRequest {
+            resource_id: 1,
+            payment_method: "paypal".to_string(),
+        };
+
+        assert_eq!(req.resource_id, 1);
+        assert_eq!(req.payment_method, "paypal");
+    }
 }

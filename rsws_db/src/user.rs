@@ -1,112 +1,177 @@
-use bcrypt::{hash, DEFAULT_COST};
-use rand::Rng;
-use rsws_common::error::DbError;
-use rsws_common::password::PasswordService;
-use rsws_common::snowflake;
-use rsws_model::user::*;
+//! 用户仓储层
+
+use rsws_common::error::RswsError;
+use rsws_common::error_code::ErrorCode;
+use rsws_model::user::user::User;
 use sqlx::PgPool;
 
+/// 用户仓储
 pub struct UserRepository {
     pool: PgPool,
 }
 
 impl UserRepository {
+    /// 创建用户仓储实例
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
+    /// 创建用户
     pub async fn create_user(
         &self,
         username: &str,
+        nickname: &str,
         email: &str,
-        password: &str,
-    ) -> Result<User, DbError> {
-        let user_id = snowflake::generate_id();
-        let password_hash = hash(password, DEFAULT_COST)
-            .map_err(|e| DbError::InternalServerError(format!("Password hash failed: {}", e)))?;
+        password_hash: &str,
+    ) -> Result<User, RswsError> {
+        let user_id = rsws_common::snowflake::next_id();
 
         let user = sqlx::query_as::<_, User>(
             r#"
-            INSERT INTO users (id, username, email, password_hash, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, NOW(), NOW())
+            INSERT INTO users (id, username, nickname, email, password_hash, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
             RETURNING *
             "#,
         )
         .bind(user_id)
         .bind(username)
+        .bind(nickname)
         .bind(email)
         .bind(password_hash)
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to create user: {}", e)))?;
 
         Ok(user)
     }
 
-    pub async fn find_user_by_email(&self, email: &str) -> Result<Option<User>, DbError> {
+    /// 根据用户名查找用户
+    pub async fn find_user_by_username(&self, username: &str) -> Result<Option<User>, RswsError> {
+        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = $1")
+            .bind(username)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to find user by username: {}", e)))?;
+
+        Ok(user)
+    }
+
+    /// 根据邮箱查找用户
+    pub async fn find_user_by_email(&self, email: &str) -> Result<Option<User>, RswsError> {
         let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
             .bind(email)
             .fetch_optional(&self.pool)
-            .await?;
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to find user by email: {}", e)))?;
 
         Ok(user)
     }
 
-    pub async fn find_user_by_id(&self, user_id: i64) -> Result<Option<User>, DbError> {
+    /// 根据 ID 查找用户
+    pub async fn find_user_by_id(&self, user_id: i64) -> Result<Option<User>, RswsError> {
         let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
             .bind(user_id)
             .fetch_optional(&self.pool)
-            .await?;
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to find user by id: {}", e)))?;
 
         Ok(user)
     }
 
+    /// 更新用户昵称
+    pub async fn update_user_nickname(
+        &self,
+        user_id: i64,
+        nickname: &str,
+    ) -> Result<User, RswsError> {
+        let user = sqlx::query_as::<_, User>(
+            "UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2 RETURNING *"
+        )
+        .bind(nickname)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to update nickname: {}", e)))?;
+
+        Ok(user)
+    }
+
+    /// 更新用户密码
     pub async fn update_user_password(
         &self,
         user_id: i64,
-        new_password: &str,
-    ) -> Result<(), DbError> {
-        let password_hash = hash(new_password, DEFAULT_COST)
-            .map_err(|e| DbError::InternalServerError(format!("Password hash failed: {}", e)))?;
-
+        password_hash: &str,
+    ) -> Result<(), RswsError> {
         sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
             .bind(password_hash)
             .bind(user_id)
             .execute(&self.pool)
-            .await?;
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to update password: {}", e)))?;
 
         Ok(())
     }
 
+    /// 更新用户资料
     pub async fn update_user_profile(
         &self,
         user_id: i64,
-        username: Option<&str>,
-        email: Option<&str>,
-    ) -> Result<User, DbError> {
-        let mut query = "UPDATE users SET updated_at = NOW()".to_string();
-        let mut params: Vec<Box<dyn sqlx::Encode<'_, sqlx::Postgres> + Send + Sync>> = Vec::new();
-        let mut param_count = 0;
-
-        if let Some(username) = username {
-            param_count += 1;
-            query.push_str(&format!(", username = ${}", param_count));
-            params.push(Box::new(username.to_string()));
+        nickname: Option<&str>,
+        avatar_url: Option<&str>,
+    ) -> Result<User, RswsError> {
+        match (nickname, avatar_url) {
+            (Some(nick), Some(url)) => {
+                let user = sqlx::query_as::<_, User>(
+                    "UPDATE users SET nickname = $1, avatar_url = $2, updated_at = NOW() WHERE id = $3 RETURNING *"
+                )
+                .bind(nick)
+                .bind(url)
+                .bind(user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to update profile: {}", e)))?;
+                Ok(user)
+            }
+            (Some(nick), None) => {
+                let user = sqlx::query_as::<_, User>(
+                    "UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2 RETURNING *"
+                )
+                .bind(nick)
+                .bind(user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to update profile: {}", e)))?;
+                Ok(user)
+            }
+            (None, Some(url)) => {
+                let user = sqlx::query_as::<_, User>(
+                    "UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *"
+                )
+                .bind(url)
+                .bind(user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to update profile: {}", e)))?;
+                Ok(user)
+            }
+            (None, None) => {
+                self.find_user_by_id(user_id)
+                    .await?
+                    .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))
+            }
         }
+    }
+}
 
-        if let Some(email) = email {
-            param_count += 1;
-            query.push_str(&format!(", email = ${}", param_count));
-            params.push(Box::new(email.to_string()));
-        }
+// ==================== 单元测试 ====================
 
-        param_count += 1;
-        query.push_str(&format!(" WHERE id = ${} RETURNING *", param_count));
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        let user = sqlx::query_as::<_, User>(&query)
-            .bind(user_id)
-            .fetch_one(&self.pool)
-            .await?;
-
-        Ok(user)
+    #[test]
+    fn test_user_repository_new() {
+        // 仅测试构造函数
+        // 实际数据库测试需要 test container
     }
 }

@@ -1,649 +1,346 @@
-use rsws_db::UserRepository;
-use rsws_model::user::*;
-use rsws_common::email::EmailService;
-use rsws_common::error::ServiceError;
-use chrono::{Duration, Utc};
-use rand::Rng;
-use sha2::{Digest, Sha256};
-use base64::{Engine as _, engine::general_purpose};
-use std::net::IpAddr;
-use rsws_common::snowflake;
+//! 用户服务
 
+use chrono::{Duration, Utc};
+use rsws_common::email::EmailService;
+use rsws_common::error::RswsError;
+use rsws_common::error_code::ErrorCode;
+use rsws_common::password::PasswordService;
+use rsws_common::snowflake;
+use rsws_db::{RedisService, UserRepository};
+use rsws_model::user::user::{User, LoginRequest, LoginResponse, UserInfo, SessionData, RegisterRequest};
+use tracing::{info, warn};
+
+/// 用户服务
 pub struct UserService {
     user_repo: UserRepository,
-    email_service: EmailService,
+    redis: Option<RedisService>,
+    email_service: Option<EmailService>,
 }
 
 impl UserService {
-    pub fn new(user_repo: UserRepository, email_service: EmailService) -> Self {
+    /// 创建用户服务实例
+    pub fn new(user_repo: UserRepository) -> Self {
         Self {
             user_repo,
-            email_service,
+            redis: None,
+            email_service: None,
         }
     }
-    
-    // 发送注册验证码
-    pub async fn send_registration_code(
-        &self,
-        request: SendVerificationCodeRequest,
-    ) -> Result<SendCodeResponse, ServiceError> {
-        // 检查邮箱是否已注册
-        if self.user_repo.email_exists(&request.email).await? {
-            return Ok(SendCodeResponse {
-                success: false,
-                message: "该邮箱已被注册".to_string(),
-                expires_in: 0,
-            });
+
+    /// 创建用户服务实例（带 Redis）
+    pub fn with_redis(user_repo: UserRepository, redis: RedisService) -> Self {
+        Self {
+            user_repo,
+            redis: Some(redis),
+            email_service: None,
         }
-        
-        // 创建验证码
-        let verification_code = self.user_repo
-            .create_verification_code(&request.email, &request.code_type)
-            .await?;
-            
-        // 发送邮件
-        self.email_service
-            .send_verification_code(
-                &request.email,
-                &verification_code.code,
-                &request.code_type,
-            )
-            .await
-            .map_err(|e| ServiceError::EmailError(e.to_string()))?;
-            
-        Ok(SendCodeResponse {
-            success: true,
-            message: "验证码已发送到您的邮箱".to_string(),
-            expires_in: 600, // 10分钟
-        })
     }
-    
-    // 验证码注册
-    pub async fn register_with_code(
-        &self,
-        request: VerifyCodeRequest,
-    ) -> Result<RegisterResponse, ServiceError> {
-        // 验证验证码
-        let is_valid = self.user_repo
-            .verify_code(&request.email, &request.code, "registration")
-            .await?;
-            
-        if !is_valid {
-            return Ok(RegisterResponse {
-                success: false,
-                message: "验证码无效或已过期".to_string(),
-                user_id: None,
-            });
+
+    /// 创建用户服务实例（完整）
+    pub fn with_services(
+        user_repo: UserRepository,
+        redis: RedisService,
+        email_service: EmailService,
+    ) -> Self {
+        Self {
+            user_repo,
+            redis: Some(redis),
+            email_service: Some(email_service),
         }
-        
-        // 再次检查邮箱和昵称是否已存在
-        if self.user_repo.email_exists(&request.email).await? {
-            return Ok(RegisterResponse {
-                success: false,
-                message: "该邮箱已被注册".to_string(),
-                user_id: None,
-            });
+    }
+
+    /// 用户注册
+    pub async fn register(&self, req: &RegisterRequest) -> Result<User, RswsError> {
+        // 检查用户名是否已存在
+        if self.user_repo.find_user_by_username(&req.username).await?.is_some() {
+            return Err(RswsError::business(ErrorCode::USER_USERNAME_EXISTS));
         }
-        
-        if self.user_repo.nickname_exists(&request.nickname).await? {
-            return Ok(RegisterResponse {
-                success: false,
-                message: "该昵称已被使用".to_string(),
-                user_id: None,
-            });
+
+        // 检查邮箱是否已存在
+        if self.user_repo.find_user_by_email(&req.email).await?.is_some() {
+            return Err(RswsError::business(ErrorCode::USER_EMAIL_EXISTS));
         }
-        
+
+        // 哈希密码
+        let password_hash = PasswordService::hash(&req.password)?;
+
         // 创建用户
         let user = self.user_repo
-            .create_user(&request.nickname, &request.email, &request.password)
-            .await?;
-            
-        Ok(RegisterResponse {
-            success: true,
-            message: "注册成功".to_string(),
-            user_id: Some(user.id),
-        })
-    }
-    
-    // 发送登录验证码
-    pub async fn send_login_code(
-        &self,
-        request: SendLoginCodeRequest,
-    ) -> Result<SendCodeResponse, ServiceError> {
-        // 验证用户凭据
-        let user = self.user_repo
-            .verify_user_credentials(&request.email, &request.password)
-            .await?
-            .ok_or_else(|| ServiceError::AuthError("邮箱或密码错误".to_string()))?;
-            
-        if !user.is_email_verified {
-            return Ok(SendCodeResponse {
-                success: false,
-                message: "邮箱未验证，请先完成邮箱验证".to_string(),
-                expires_in: 0,
-            });
-        }
-        
-        // 创建登录验证码
-        let verification_code = self.user_repo
-            .create_verification_code(&request.email, "login")
-            .await?;
-            
-        // 发送邮件
-        self.email_service
-            .send_verification_code(
-                &request.email,
-                &verification_code.code,
-                "login",
+            .create_user(
+                &req.username,
+                &req.nickname,
+                &req.email,
+                &password_hash,
             )
-            .await
-            .map_err(|e| ServiceError::EmailError(e.to_string()))?;
-            
-        Ok(SendCodeResponse {
-            success: true,
-            message: "登录验证码已发送到您的邮箱".to_string(),
-            expires_in: 600, // 10分钟
-        })
+            .await?;
+
+        info!("User registered: {} ({})", user.id, user.username);
+
+        Ok(user)
     }
-    
-    // 验证码登录
-    pub async fn login_with_code(
-        &self,
-        request: VerifyLoginCodeRequest,
-        ip_address: Option<IpAddr>,
-    ) -> Result<LoginResponse, ServiceError> {
-        // 验证用户凭据
-        let user = self.user_repo
-            .verify_user_credentials(&request.email, &request.password)
-            .await?
-            .ok_or_else(|| ServiceError::AuthError("邮箱或密码错误".to_string()))?;
-            
+
+    /// 用户登录（支持两种方式）
+    pub async fn login(&self, req: &LoginRequest) -> Result<LoginResponse, RswsError> {
+        match req.login_type.as_str() {
+            "password" => self.login_by_password(req).await,
+            "code" => self.login_by_code(req).await,
+            _ => Err(RswsError::business(ErrorCode::INVALID_PARAMETER)),
+        }
+    }
+
+    /// 用户名 + 密码登录
+    async fn login_by_password(&self, req: &LoginRequest) -> Result<LoginResponse, RswsError> {
+        let username = req.username.as_ref()
+            .ok_or_else(|| RswsError::business(ErrorCode::INVALID_PARAMETER))?;
+        let password = req.password.as_ref()
+            .ok_or_else(|| RswsError::business(ErrorCode::INVALID_PARAMETER))?;
+
+        // 先从 Redis 缓存读取
+        let user = if let Some(ref redis) = self.redis {
+            if let Some(cached) = redis.get_cached_user::<User>(0).await.ok().flatten() {
+                if cached.username == *username {
+                    info!("User {} found in Redis cache", username);
+                    cached
+                } else {
+                    self.find_and_cache_user_by_username(username, redis).await?
+                }
+            } else {
+                self.find_and_cache_user_by_username(username, redis).await?
+            }
+        } else {
+            // 无缓存，直接查数据库
+            self.user_repo
+                .find_user_by_username(username)
+                .await?
+                .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?
+        };
+
+        // 验证密码
+        let valid = PasswordService::verify(password, &user.password_hash)?;
+        if !valid {
+            warn!("Invalid password for user: {}", username);
+            return Err(RswsError::business(ErrorCode::AUTH_INVALID_CREDENTIALS));
+        }
+
+        // 检查用户状态
+        if !user.is_active {
+            return Err(RswsError::business(ErrorCode::USER_DISABLED));
+        }
+
+        self.create_login_response(user).await
+    }
+
+    /// 邮箱 + 验证码登录
+    async fn login_by_code(&self, req: &LoginRequest) -> Result<LoginResponse, RswsError> {
+        let email = req.email.as_ref()
+            .ok_or_else(|| RswsError::business(ErrorCode::INVALID_PARAMETER))?;
+        let code = req.verification_code.as_ref()
+            .ok_or_else(|| RswsError::business(ErrorCode::INVALID_PARAMETER))?;
+
         // 验证验证码
-        let is_valid = self.user_repo
-            .verify_code(&request.email, &request.code, "login")
-            .await?;
-            
-        if !is_valid {
-            return Ok(LoginResponse {
-                success: false,
-                message: "验证码无效或已过期".to_string(),
-                user_info: None,
-                session_data: None,
-            });
+        let redis = self.redis.as_ref()
+            .ok_or_else(|| RswsError::internal("Redis not configured"))?;
+
+        let (valid, remaining) = redis.verify_code(email, "login", code).await?;
+        if !valid {
+            warn!("Invalid verification code for email: {} (remaining attempts: {})", email, remaining);
+            return Err(RswsError::business_with_message(
+                ErrorCode::AUTH_INVALID_CREDENTIALS,
+                format!("验证码错误，剩余尝试次数: {}", remaining)
+            ));
         }
-        
-        // 清理过期会话
-        self.user_repo.cleanup_expired_sessions(user.id).await?;
-        
-        // 检查活跃会话数量（限制最多5个同时登录）
-        let active_sessions = self.user_repo.get_active_session_count(user.id).await?;
-        if active_sessions >= 5 {
-            return Ok(LoginResponse {
-                success: false,
-                message: "登录会话过多，请先退出其他设备".to_string(),
-                user_info: None,
-                session_data: None,
-            });
+
+        // 查找用户
+        let user = self.find_and_cache_user_by_email(email, redis).await?;
+
+        // 检查用户状态
+        if !user.is_active {
+            return Err(RswsError::business(ErrorCode::USER_DISABLED));
         }
-        
-        // 生成会话数据
-        let session_token = self.generate_session_token();
-        let (api_key, api_secret) = self.generate_api_credentials();
-        let expires_at = Utc::now() + Duration::days(7); // 7天过期
-        
-        // 创建会话
-        let _session_id = self.user_repo
-            .create_user_session(
-                user.id,
-                &session_token,
-                &api_key,
-                &api_secret,
-                request.device_info,
-                ip_address,
-                request.user_agent,
-                expires_at,
-            )
-            .await?;
-            
-        // 构建响应
-        let user_info = UserInfo {
-            id: user.id,
-            nickname: user.nickname,
-            email: user.email,
-            avatar: user.avatar,
-            is_email_verified: user.is_email_verified,
-        };
-        
-        let session_data = SessionData {
-            session_token,
-            api_key,
-            api_secret,
-            expires_at,
-            signature_info: SignatureInfo {
-                algorithm: "HMAC-SHA256".to_string(),
-                timestamp_header: "X-Timestamp".to_string(),
-                signature_header: "X-Signature".to_string(),
-                api_key_header: "X-API-Key".to_string(),
-            },
-        };
-        
+
+        self.create_login_response(user).await
+    }
+
+    /// 查找用户并缓存（按用户名）
+    async fn find_and_cache_user_by_username(
+        &self,
+        username: &str,
+        redis: &RedisService,
+    ) -> Result<User, RswsError> {
+        let user = self.user_repo
+            .find_user_by_username(username)
+            .await?
+            .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
+
+        // 缓存用户信息
+        let _ = redis.cache_user(user.id, &user).await;
+        Ok(user)
+    }
+
+    /// 查找用户并缓存（按邮箱）
+    async fn find_and_cache_user_by_email(
+        &self,
+        email: &str,
+        redis: &RedisService,
+    ) -> Result<User, RswsError> {
+        let user = self.user_repo
+            .find_user_by_email(email)
+            .await?
+            .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
+
+        // 缓存用户信息
+        let _ = redis.cache_user(user.id, &user).await;
+        Ok(user)
+    }
+
+    /// 创建登录响应
+    async fn create_login_response(&self, user: User) -> Result<LoginResponse, RswsError> {
+        // 生成会话
+        let api_key = format!("ak_{}", snowflake::next_id());
+        let api_secret = format!("sk_{}", snowflake::next_id());
+        let expires_at = Utc::now() + Duration::days(7);
+
+        info!("User logged in: {} ({})", user.id, user.username);
+
         Ok(LoginResponse {
             success: true,
             message: "登录成功".to_string(),
-            user_info: Some(user_info),
-            session_data: Some(session_data),
+            user_info: Some(UserInfo {
+                id: user.id,
+                email: user.email.clone(),
+                username: user.username.clone(),
+                nickname: user.nickname.clone(),
+                avatar_url: user.avatar_url.clone(),
+                is_active: user.is_active,
+            }),
+            session_data: Some(SessionData {
+                api_key,
+                api_secret,
+                expires_at,
+            }),
         })
     }
-    
-    // 生成会话令牌
-    fn generate_session_token(&self) -> String {
-        let mut rng = rand::thread_rng();
-        let random_bytes: [u8; 32] = rng.gen();
-        let timestamp = Utc::now().timestamp();
-        
-        let mut hasher = Sha256::new();
-        hasher.update(&random_bytes);
-        hasher.update(timestamp.to_be_bytes());
-        let hash = hasher.finalize();
-        
-        general_purpose::URL_SAFE_NO_PAD.encode(hash)
-    }
-    
-    // 生成API凭据
-    fn generate_api_credentials(&self) -> (String, String) {
-        let mut rng = rand::thread_rng();
-        
-        // 生成API Key (32字节)
-        let api_key_bytes: [u8; 32] = rng.gen();
-        let api_key = general_purpose::URL_SAFE_NO_PAD.encode(api_key_bytes);
-        
-        // 生成API Secret (64字节)
-        let api_secret_bytes: [u8; 64] = rng.gen();
-        let api_secret = general_purpose::URL_SAFE_NO_PAD.encode(api_secret_bytes);
-        
-        (api_key, api_secret)
-    }
-    
-    // 在 UserService 中添加以下方法
-    
-    // 检查用户资料完整性
-    pub async fn check_profile_completion(
-        &self,
-        user_id: i64,
-    ) -> Result<ProfileCompletionResponse, ServiceError> {
-        // 获取用户信息
-        let user = self.user_repo.get_user_by_id(user_id).await?
-            .ok_or_else(|| ServiceError::NotFound("用户不存在".to_string()))?;
-        
-        let mut missing_fields = Vec::new();
-        let mut suggestions = Vec::new();
-        
-        // 检查昵称
-        if user.nickname.trim().is_empty() {
-            missing_fields.push("昵称".to_string());
-            suggestions.push("请设置您的昵称".to_string());
+
+    /// 发送登录验证码
+    pub async fn send_login_code(&self, email: &str) -> Result<i64, RswsError> {
+        let redis = self.redis.as_ref()
+            .ok_or_else(|| RswsError::internal("Redis not configured"))?;
+
+        // 检查用户是否存在
+        let user = self.user_repo.find_user_by_email(email).await?
+            .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
+
+        if !user.is_active {
+            return Err(RswsError::business(ErrorCode::USER_DISABLED));
         }
-        
-        // 检查头像
-        if user.avatar.is_none() {
-            missing_fields.push("头像".to_string());
-            suggestions.push("上传一个头像可以让您的个人资料更加完整".to_string());
+
+        // 检查是否已有验证码（防止频繁发送）
+        if redis.has_verification_code(email, "login").await? {
+            return Err(RswsError::business_with_message(
+                ErrorCode::RATE_LIMIT_EXCEEDED,
+                "验证码已发送，请稍后再试"
+            ));
         }
-        
-        // 检查邮箱验证
-        if !user.is_email_verified {
-            missing_fields.push("邮箱验证".to_string());
-            suggestions.push("请验证您的邮箱以确保账号安全".to_string());
+
+        // 生成 6 位验证码
+        let code = format!("{:06}", rand::random::<u32>() % 1_000_000);
+
+        // 存储验证码
+        redis.set_verification_code(email, "login", &code).await?;
+
+        // 发送邮件
+        if let Some(ref email_service) = self.email_service {
+            email_service.send_verification_code(email, &code, "login").await?;
         }
-        
-        // 计算完整度百分比
-        let total_fields = 3; // 昵称、头像、邮箱验证
-        let completed_fields = total_fields - missing_fields.len();
-        let completion_percentage = (completed_fields as f32 / total_fields as f32) * 100.0;
-        
-        Ok(ProfileCompletionResponse {
-            completion_percentage,
-            missing_fields,
-            suggestions,
-        })
+
+        info!("Login verification code sent to: {}", email);
+        Ok(300) // 返回有效期（秒）
     }
-    
-    // 获取用户资料
-    pub async fn get_user_profile(&self, user_id: i64) -> Result<UserProfile, ServiceError> {
-        let user = self.user_repo.get_user_by_id(user_id).await?
-            .ok_or_else(|| ServiceError::NotFound("User not found".to_string()))?;
-            
-        Ok(UserProfile {
-            id: user.id,
-            nickname: user.nickname,
-            email: user.email,
-            avatar: user.avatar,
-            is_email_verified: user.is_email_verified,
-            created_at: user.created_at,
-        })
-    }
-    
-    // 更新用户资料
-    pub async fn update_user_profile(
-        &self,
-        user_id: i64,
-        request: UpdateProfileRequest,
-    ) -> Result<(), ServiceError> {
-        // 检查昵称是否已被使用（如果要更改昵称）
-        if let Some(nickname) = &request.nickname {
-            let current_user = self.user_repo.get_user_by_id(user_id).await?
-                .ok_or_else(|| ServiceError::NotFound("User not found".to_string()))?;
-                
-            if nickname != &current_user.nickname && self.user_repo.nickname_exists(nickname).await? {
-                return Err(ServiceError::ValidationError("Nickname already exists".to_string()));
+
+    /// 获取用户信息
+    pub async fn get_user(&self, user_id: i64) -> Result<User, RswsError> {
+        // 先从 Redis 读取
+        if let Some(ref redis) = self.redis {
+            if let Some(user) = redis.get_cached_user::<User>(user_id).await? {
+                return Ok(user);
             }
         }
-        
-        // 更新用户资料
-        self.user_repo.update_user_profile(user_id, request).await?;
-        
-        Ok(())
+
+        // 从数据库读取
+        let user = self.user_repo
+            .find_user_by_id(user_id)
+            .await?
+            .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
+
+        // 缓存
+        if let Some(ref redis) = self.redis {
+            let _ = redis.cache_user(user_id, &user).await;
+        }
+
+        Ok(user)
     }
-    
-    // 上传用户头像
-    pub async fn upload_avatar(
+
+    /// 更新用户昵称
+    pub async fn update_nickname(
         &self,
         user_id: i64,
-        file_data: Vec<u8>,
-        file_name: String,
-        content_type: String,
-    ) -> Result<String, ServiceError> {
-        // 验证文件类型
-        if !content_type.starts_with("image/") {
-            return Err(ServiceError::ValidationError("只支持上传图片文件".to_string()));
+        nickname: &str,
+    ) -> Result<User, RswsError> {
+        let user = self.user_repo
+            .update_user_nickname(user_id, nickname)
+            .await?;
+
+        // 清除缓存
+        if let Some(ref redis) = self.redis {
+            let _ = redis.clear_user_cache(user_id).await;
         }
-        
-        // 获取文件扩展名
-        let extension = match file_name.split('.').last() {
-            Some(ext) => ext.to_lowercase(),
-            None => return Err(ServiceError::ValidationError("无效的文件名".to_string())),
-        };
-        
-        // 验证文件扩展名
-        if !vec!["jpg", "jpeg", "png", "gif"].contains(&extension.as_str()) {
-            return Err(ServiceError::ValidationError("只支持jpg、jpeg、png、gif格式的图片".to_string()));
-        }
-        
-        // 验证文件大小（最大2MB）
-        if file_data.len() > 2 * 1024 * 1024 {
-            return Err(ServiceError::ValidationError("文件大小不能超过2MB".to_string()));
-        }
-        
-        // 生成唯一文件名
-        let unique_filename = format!("{}_{}_{}.{}", user_id, Utc::now().timestamp(), rand::thread_rng().gen_range(1000..9999), extension);
-        
-        // 保存文件到本地存储（实际项目中可能会使用云存储服务）
-        let avatar_dir = "uploads/avatars";
-        std::fs::create_dir_all(avatar_dir).map_err(|e| ServiceError::IOError(format!("Failed to create avatar directory: {}", e)))?;
-        
-        let file_path = format!("{}/{}", avatar_dir, unique_filename);
-        std::fs::write(&file_path, &file_data).map_err(|e| ServiceError::IOError(format!("Failed to save avatar file: {}", e)))?;
-        
-        // 生成头像URL
-        let avatar_url = format!("/avatars/{}", unique_filename);
-        
-        // 更新用户头像
-        let update_req = UpdateProfileRequest {
-            nickname: None,
-            avatar: Some(avatar_url.clone()),
-        };
-        
-        self.user_repo.update_user_profile(user_id, update_req).await?;
-        
-        Ok(avatar_url)
-    }
-}
 
-// 在 UserService 中添加以下方法
-
-// 发送邮箱修改验证码
-pub async fn send_email_change_code(
-    &self,
-    user_id: i64,
-    request: SendEmailChangeCodeRequest,
-) -> Result<SendEmailChangeCodeResponse, ServiceError> {
-    // 获取用户信息
-    let user = self.user_repo.get_user_by_id(user_id).await?
-        .ok_or_else(|| ServiceError::NotFound("用户不存在".to_string()))?;
-    
-    // 检查新邮箱是否与当前邮箱相同
-    if user.email == request.new_email {
-        return Ok(SendEmailChangeCodeResponse {
-            success: false,
-            message: "新邮箱与当前邮箱相同".to_string(),
-            expires_in: 0,
-        });
+        info!("User {} nickname updated to: {}", user_id, nickname);
+        Ok(user)
     }
-    
-    // 检查新邮箱是否已被使用
-    if self.user_repo.email_exists(&request.new_email).await? {
-        return Ok(SendEmailChangeCodeResponse {
-            success: false,
-            message: "该邮箱已被使用".to_string(),
-            expires_in: 0,
-        });
-    }
-    
-    // 创建邮箱修改验证码
-    let verification_code = self.user_repo
-        .create_verification_code(&request.new_email, "email_change")
-        .await?;
-        
-    // 发送邮件
-    self.email_service
-        .send_verification_code(
-            &request.new_email,
-            &verification_code.code,
-            "email_change",
-        )
-        .await
-        .map_err(|e| ServiceError::EmailError(e.to_string()))?;
-        
-    Ok(SendEmailChangeCodeResponse {
-        success: true,
-        message: "邮箱修改验证码已发送到新邮箱".to_string(),
-        expires_in: 600, // 10分钟
-    })
-}
 
-// 验证邮箱修改
-pub async fn verify_email_change(
-    &self,
-    user_id: i64,
-    request: VerifyEmailChangeRequest,
-) -> Result<(), ServiceError> {
-    // 获取用户信息
-    let user = self.user_repo.get_user_by_id(user_id).await?
-        .ok_or_else(|| ServiceError::NotFound("用户不存在".to_string()))?;
-    
-    // 检查新邮箱是否与当前邮箱相同
-    if user.email == request.new_email {
-        return Err(ServiceError::ValidationError("新邮箱与当前邮箱相同".to_string()));
-    }
-    
-    // 检查新邮箱是否已被使用
-    if self.user_repo.email_exists(&request.new_email).await? {
-        return Err(ServiceError::ValidationError("该邮箱已被使用".to_string()));
-    }
-    
-    // 验证验证码
-    let is_valid = self.user_repo
-        .verify_code(&request.new_email, &request.code, "email_change")
-        .await?;
-        
-    if !is_valid {
-        return Err(ServiceError::ValidationError("验证码无效或已过期".to_string()));
-    }
-    
-    // 更新邮箱
-    self.user_repo.update_email(user_id, &request.new_email).await?;
-    
-    Ok(())
-}
-
-// 在 UserService 中添加以下方法
-
-// 修改密码
-// 移除所有 bcrypt 相关导入，使用 PasswordService
-use rsws_common::password::PasswordService;
-
-impl UserService {
-    // 修改密码验证逻辑
+    /// 修改密码
     pub async fn change_password(
         &self,
         user_id: i64,
-        request: ChangePasswordRequest,
-    ) -> Result<(), ServiceError> {
-        if request.new_password != request.confirm_password {
-            return Err(ServiceError::ValidationError("新密码和确认密码不一致".to_string()));
+        old_password: &str,
+        new_password: &str,
+    ) -> Result<(), RswsError> {
+        // 获取用户
+        let user = self.get_user(user_id).await?;
+
+        // 验证旧密码
+        let valid = PasswordService::verify(old_password, &user.password_hash)?;
+        if !valid {
+            return Err(RswsError::business(ErrorCode::AUTH_INVALID_CREDENTIALS));
         }
-        
-        let user = self.user_repo.get_user_by_id(user_id).await?
-            .ok_or_else(|| ServiceError::NotFound("用户不存在".to_string()))?;
-        
-        // 使用Argon2验证当前密码
-        let is_valid = PasswordService::verify_password(&request.current_password, &user.password_hash)
-            .map_err(|e| ServiceError::HashError(format!("密码验证失败: {}", e)))?;
-        
-        if !is_valid {
-            return Err(ServiceError::AuthError("当前密码错误".to_string()));
-        }
-        
+
+        // 哈希新密码
+        let new_hash = PasswordService::hash(new_password)?;
+
         // 更新密码
-        self.user_repo.update_password(user_id, &request.new_password).await?;
-        
+        self.user_repo
+            .update_user_password(user_id, &new_hash)
+            .await?;
+
+        // 清除缓存
+        if let Some(ref redis) = self.redis {
+            let _ = redis.clear_user_cache(user_id).await;
+        }
+
+        info!("Password changed for user: {}", user_id);
         Ok(())
     }
 }
 
-// 传统邮箱/密码登录
-pub async fn traditional_login(
-    &self,
-    request: LoginRequest,
-    ip_address: Option<IpAddr>,
-) -> Result<TraditionalLoginResponse, ServiceError> {
-    // 验证用户凭据
-    let user = self.user_repo
-        .verify_user_credentials(&request.email, &request.password)
-        .await?
-        .ok_or_else(|| ServiceError::AuthError("邮箱或密码错误".to_string()))?;
-        
-    if !user.is_active {
-        return Ok(TraditionalLoginResponse {
-            success: false,
-            message: "账户已被禁用".to_string(),
-            user_info: None,
-            session_data: None,
-        });
-    }
-    
-    if !user.is_email_verified {
-        return Ok(TraditionalLoginResponse {
-            success: false,
-            message: "邮箱未验证，请先完成邮箱验证".to_string(),
-            user_info: None,
-            session_data: None,
-        });
-    }
-    
-    // 清理过期会话
-    self.user_repo.cleanup_expired_sessions(user.id).await?;
-    
-    // 检查活跃会话数量（限制最多5个同时登录）
-    let active_sessions = self.user_repo.get_active_session_count(user.id).await?;
-    if active_sessions >= 5 {
-        return Ok(TraditionalLoginResponse {
-            success: false,
-            message: "登录会话过多，请先退出其他设备".to_string(),
-            user_info: None,
-            session_data: None,
-        });
-    }
-    
-    // 生成会话数据
-    let session_token = self.generate_session_token();
-    let (api_key, api_secret) = self.generate_api_credentials();
-    let expires_at = Utc::now() + Duration::days(7); // 7天过期
-    
-    // 创建会话
-    let _session_id = self.user_repo
-        .create_user_session(
-            user.id,
-            &session_token,
-            &api_key,
-            &api_secret,
-            request.device_info,
-            ip_address,
-            request.user_agent,
-            expires_at,
-        )
-        .await?;
-        
-    Ok(TraditionalLoginResponse {
-        success: true,
-        message: "登录成功".to_string(),
-        user_info: Some(UserInfo {
-            id: user.id,
-            nickname: user.nickname,
-            email: user.email,
-            avatar: user.avatar,
-            is_email_verified: user.is_email_verified,
-        }),
-        session_data: Some(SessionData {
-            session_token,
-            api_key,
-            api_secret,
-            expires_at,
-            signature_info: SignatureInfo {
-                algorithm: "HMAC-SHA256".to_string(),
-                timestamp_header: "X-Timestamp".to_string(),
-                signature_header: "X-Signature".to_string(),
-                api_key_header: "X-API-Key".to_string(),
-            },
-        }),
-    })
-}
+// ==================== 单元测试 ====================
 
-// 用户登出
-pub async fn logout(
-    &self,
-    user_id: i64,
-    request: LogoutRequest,
-) -> Result<LogoutResponse, ServiceError> {
-    if request.logout_all_devices {
-        // 登出所有设备
-        self.user_repo.deactivate_all_sessions(user_id).await?;
-    } else if let Some(session_token) = request.session_token {
-        // 登出指定会话
-        self.user_repo.deactivate_session_by_token(&session_token).await?;
-    }
-    
-    Ok(LogoutResponse {
-        success: true,
-        message: "登出成功".to_string(),
-    })
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-// 获取用户购买记录
-pub async fn get_user_purchases(
-    &self,
-    user_id: i64,
-    page: u32,
-    page_size: u32,
-) -> Result<PaginatedResponse<Order>, ServiceError> {
-    // 这里需要调用订单服务获取用户购买记录
-    // 暂时返回空结果，等订单服务实现后再完善
-    Ok(PaginatedResponse {
-        data: vec![],
-        total: 0,
-        page,
-        page_size,
-        total_pages: 0,
-    })
-}
+    #[test]
+    fn test_user_service_new() {
+        // 仅测试构造函数
+    }
 }

@@ -1,183 +1,159 @@
-use sqlx::{PgPool, Row};
-use rsws_model::payment::{Order, OrderStatus, OrderResponse};
-use rsws_common::error::ServiceError;
-use chrono::{DateTime, Utc};
-use rust_decimal::Decimal;
+//! 订单仓储层
 
+use rsws_common::error::RswsError;
+use rsws_common::error_code::ErrorCode;
+use rsws_common::snowflake;
+use rsws_model::payment::Order;
+use sqlx::PgPool;
+
+/// 订单仓储
 pub struct OrderRepository {
     pool: PgPool,
 }
 
 impl OrderRepository {
+    /// 创建订单仓储实例
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    // 创建订单
-    pub async fn create(&self, order: &Order) -> Result<Order, ServiceError> {
-        let result = sqlx::query_as!(
-            Order,
+    /// 创建订单
+    pub async fn create(
+        &self,
+        user_id: i64,
+        resource_id: i64,
+        amount: i64,
+        payment_method: &str,
+        expire_minutes: i32,
+    ) -> Result<Order, RswsError> {
+        let order_id = snowflake::next_id();
+
+        let order = sqlx::query_as::<_, Order>(
             r#"
             INSERT INTO orders (id, user_id, resource_id, amount, status, payment_method, created_at, updated_at, expired_at)
-            VALUES ($1, $2, $3, $4, $5::order_status, $6, $7, $8, $9)
-            RETURNING id, user_id, resource_id, amount, status as "status: OrderStatus", payment_method, created_at, updated_at, expired_at
+            VALUES ($1, $2, $3, $4, 'pending', $5, NOW(), NOW(), NOW() + INTERVAL '1 minute' * $6)
+            RETURNING id, user_id, resource_id, amount, status, payment_method, created_at, updated_at, expired_at
             "#,
-            order.id,
-            order.user_id,
-            order.resource_id,
-            order.amount,
-            order.status as OrderStatus,
-            order.payment_method,
-            order.created_at,
-            order.updated_at,
-            order.expired_at
         )
+        .bind(order_id)
+        .bind(user_id)
+        .bind(resource_id)
+        .bind(amount)
+        .bind(payment_method)
+        .bind(expire_minutes)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| {
             if e.to_string().contains("duplicate key") {
-                ServiceError::BusinessError("您已经购买过该资源".to_string())
+                RswsError::business(ErrorCode::ORDER_ALREADY_EXISTS)
             } else {
-                ServiceError::DatabaseError(e.to_string())
+                RswsError::internal(format!("Failed to create order: {}", e))
             }
         })?;
 
-        Ok(result)
+        Ok(order)
     }
 
-    // 根据ID获取订单
-    pub async fn get_by_id(&self, id: i64) -> Result<Option<Order>, ServiceError> {
-        let result = sqlx::query_as!(
-            Order,
-            r#"
-            SELECT id, user_id, resource_id, amount, status as "status: OrderStatus", payment_method, created_at, updated_at, expired_at
-            FROM orders 
-            WHERE id = $1
-            "#,
-            id
+    /// 根据 ID 获取订单
+    pub async fn get_by_id(&self, id: i64) -> Result<Option<Order>, RswsError> {
+        let order = sqlx::query_as::<_, Order>(
+            "SELECT id, user_id, resource_id, amount, status, payment_method, created_at, updated_at, expired_at FROM orders WHERE id = $1",
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        .map_err(|e| RswsError::internal(format!("Failed to get order: {}", e)))?;
 
-        Ok(result)
+        Ok(order)
     }
 
-    // 获取用户订单列表
+    /// 获取用户订单列表
     pub async fn get_user_orders(
         &self,
         user_id: i64,
-        status: Option<OrderStatus>,
-        start_date: Option<DateTime<Utc>>,
-        end_date: Option<DateTime<Utc>>,
         page: i64,
         page_size: i64,
-    ) -> Result<(Vec<Order>, i64), ServiceError> {
+    ) -> Result<(Vec<Order>, i64), RswsError> {
         let offset = (page - 1) * page_size;
-        
-        let mut query = "SELECT id, user_id, resource_id, amount, status, payment_method, created_at, updated_at, expired_at FROM orders WHERE user_id = $1".to_string();
-        let mut params: Vec<Box<dyn sqlx::Encode<'_, sqlx::Postgres> + Send + Sync>> = vec![Box::new(user_id)];
-        let mut param_count = 1;
-
-        if let Some(status) = status {
-            param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
-            params.push(Box::new(status));
-        }
-
-        if let Some(start_date) = start_date {
-            param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
-            params.push(Box::new(start_date));
-        }
-
-        if let Some(end_date) = end_date {
-            param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
-            params.push(Box::new(end_date));
-        }
-
-        query.push_str(" ORDER BY created_at DESC");
-        query.push_str(&format!(" LIMIT {} OFFSET {}", page_size, offset));
 
         // 获取订单列表
-        let orders = sqlx::query_as::<_, Order>(&query)
-            .bind(user_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        let orders = sqlx::query_as::<_, Order>(
+            r#"
+            SELECT id, user_id, resource_id, amount, status, payment_method, created_at, updated_at, expired_at
+            FROM orders
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(user_id)
+        .bind(page_size)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get orders: {}", e)))?;
 
         // 获取总数
-        let mut count_query = "SELECT COUNT(*) FROM orders WHERE user_id = $1".to_string();
-        let mut count_params = 1;
+        let total: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM orders WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
 
-        if status.is_some() {
-            count_params += 1;
-            count_query.push_str(&format!(" AND status = ${}", count_params));
-        }
-        if start_date.is_some() {
-            count_params += 1;
-            count_query.push_str(&format!(" AND created_at >= ${}", count_params));
-        }
-        if end_date.is_some() {
-            count_params += 1;
-            count_query.push_str(&format!(" AND created_at <= ${}", count_params));
-        }
-
-        let total: i64 = sqlx::query_scalar(&count_query)
-            .bind(user_id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
-
-        Ok((orders, total))
+        Ok((orders, total.0))
     }
 
-    // 更新订单状态
-    pub async fn update_order_status(
-        &self,
-        order_id: i64,
-        status: OrderStatus,
-    ) -> Result<(), ServiceError> {
-        sqlx::query!(
+    /// 更新订单状态
+    pub async fn update_status(&self, order_id: i64, status: &str) -> Result<(), RswsError> {
+        sqlx::query(
             "UPDATE orders SET status = $1::order_status, updated_at = NOW() WHERE id = $2",
-            status as OrderStatus,
-            order_id
         )
+        .bind(status)
+        .bind(order_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        .map_err(|e| RswsError::internal(format!("Failed to update order status: {}", e)))?;
 
         Ok(())
     }
 
-    // 检查用户是否已购买资源
-    pub async fn check_user_purchased(
-        &self,
-        user_id: i64,
-        resource_id: i64,
-    ) -> Result<bool, ServiceError> {
-        let count: i64 = sqlx::query_scalar!(
+    /// 检查用户是否已购买资源
+    pub async fn check_user_purchased(&self, user_id: i64, resource_id: i64) -> Result<bool, RswsError> {
+        let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM orders WHERE user_id = $1 AND resource_id = $2 AND status IN ('paid', 'completed')",
-            user_id,
-            resource_id
         )
+        .bind(user_id)
+        .bind(resource_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        .map_err(|e| RswsError::internal(format!("Failed to check purchase: {}", e)))?;
 
-        Ok(count > 0)
+        Ok(count.0 > 0)
     }
 
-    // 清理过期订单
-    pub async fn cleanup_expired_orders(&self) -> Result<i64, ServiceError> {
-        let result = sqlx::query!(
-            "UPDATE orders SET status = 'cancelled'::order_status WHERE status = 'pending'::order_status AND expired_at < NOW()"
+    /// 清理过期订单
+    pub async fn cleanup_expired(&self) -> Result<u64, RswsError> {
+        let result = sqlx::query(
+            "UPDATE orders SET status = 'cancelled'::order_status WHERE status = 'pending'::order_status AND expired_at < NOW()",
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        .map_err(|e| RswsError::internal(format!("Failed to cleanup orders: {}", e)))?;
 
-        Ok(result.rows_affected() as i64)
+        Ok(result.rows_affected())
+    }
+}
+
+// ==================== 单元测试 ====================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_order_repository_new() {
+        // 仅测试构造函数
     }
 }

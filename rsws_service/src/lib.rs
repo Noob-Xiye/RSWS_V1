@@ -1,3 +1,7 @@
+//! 服务层
+//!
+//! 提供各业务模块的服务逻辑
+
 pub mod api_key_service;
 pub mod auth_service;
 pub mod blockchain_service;
@@ -30,6 +34,3 @@ pub use resource_service::ResourceService;
 pub use user_payment_service::UserPaymentService;
 pub use user_service::UserService;
 pub use webhook_service::WebhookService;
-pub mod user_service; // 新增
-
-pub use user_service::UserService;

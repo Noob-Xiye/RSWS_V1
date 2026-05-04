@@ -1,10 +1,7 @@
-pub mod config;
-pub mod config_handler;
-pub mod log;
-pub mod middleware;
-pub mod order;
-pub mod request;
-pub mod resource;
+//! API 层
+//!
+//! 提供 HTTP 路由和处理器
+
 pub mod router;
-pub mod user;
-pub mod user_handler; // 新增
+pub mod handler;
+pub mod middleware;

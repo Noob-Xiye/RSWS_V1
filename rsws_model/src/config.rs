@@ -1,8 +1,12 @@
+//! 配置模型
+//!
+//! 系统配置、邮件配置、区块链配置等
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use std::collections::HashMap;
 
+/// 系统配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SystemConfig {
     pub id: i32,
@@ -15,6 +19,7 @@ pub struct SystemConfig {
     pub updated_at: DateTime<Utc>,
 }
 
+/// 邮件配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct EmailConfig {
     pub id: i32,
@@ -31,6 +36,7 @@ pub struct EmailConfig {
     pub updated_at: DateTime<Utc>,
 }
 
+/// 区块链插件配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct BlockchainPluginConfig {
     pub id: i32,
@@ -45,6 +51,7 @@ pub struct BlockchainPluginConfig {
     pub updated_at: DateTime<Utc>,
 }
 
+/// 下载插件配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DownloadPluginConfig {
     pub id: i32,
@@ -58,7 +65,7 @@ pub struct DownloadPluginConfig {
     pub updated_at: DateTime<Utc>,
 }
 
-// 动态配置值的枚举类型
+/// 动态配置值的枚举类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ConfigValue {
@@ -68,7 +75,34 @@ pub enum ConfigValue {
     Json(serde_json::Value),
 }
 
-// 在现有配置结构体中添加
+/// API Key 认证配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiKeyConfig {
+    /// 会话有效期 (天)
+    pub session_expire_days: i32,
+    /// 签名有效期 (秒，防重放)
+    pub signature_expire_seconds: i32,
+    /// 每用户最大会话数
+    pub max_sessions_per_user: i32,
+    /// 是否启用速率限制
+    pub enable_rate_limit: bool,
+    /// 默认速率限制 (次/分钟)
+    pub default_rate_limit: i32,
+}
+
+impl Default for ApiKeyConfig {
+    fn default() -> Self {
+        Self {
+            session_expire_days: 7,
+            signature_expire_seconds: 300,
+            max_sessions_per_user: 5,
+            enable_rate_limit: true,
+            default_rate_limit: 100,
+        }
+    }
+}
+
+/// 日志配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogConfig {
     pub level: String,
@@ -92,6 +126,7 @@ impl Default for LogConfig {
     }
 }
 
+/// 更新日志配置请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateLogConfigRequest {
     pub level: Option<String>,
@@ -103,4 +138,48 @@ pub struct UpdateLogConfigRequest {
     pub enable_error_logging: Option<bool>,
     pub enable_operation_logging: Option<bool>,
     pub enable_payment_logging: Option<bool>,
+}
+
+// ==================== 单元测试 ====================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_api_key_config_default() {
+        let config = ApiKeyConfig::default();
+        assert_eq!(config.session_expire_days, 7);
+        assert_eq!(config.signature_expire_seconds, 300);
+        assert!(config.enable_rate_limit);
+    }
+
+    #[test]
+    fn test_log_config_default() {
+        let config = LogConfig::default();
+        assert_eq!(config.level, "info");
+        assert!(config.enable_database);
+        assert!(!config.enable_file);
+    }
+
+    #[test]
+    fn test_config_value_string() {
+        let value = ConfigValue::String("test".to_string());
+        let json = serde_json::to_string(&value).unwrap();
+        assert_eq!(json, "\"test\"");
+    }
+
+    #[test]
+    fn test_config_value_number() {
+        let value = ConfigValue::Number(42.5);
+        let json = serde_json::to_string(&value).unwrap();
+        assert_eq!(json, "42.5");
+    }
+
+    #[test]
+    fn test_config_value_boolean() {
+        let value = ConfigValue::Boolean(true);
+        let json = serde_json::to_string(&value).unwrap();
+        assert_eq!(json, "true");
+    }
 }

@@ -4,25 +4,48 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# Web 框架
 salvo = { workspace = true }
+
+# 配置
 config = { workspace = true }
+
+# 数据库
+sqlx = { workspace = true }
 redis = { workspace = true }
 
+# HTTP 客户端
+reqwest = { workspace = true }
+
+# 序列化
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+# 错误处理
 thiserror = { workspace = true }
 anyhow = { workspace = true }
+
+# 时间
 chrono = { workspace = true }
+
+# 邮件
 lettre = { workspace = true }
+
+# 加密
 argon2 = { workspace = true }
-rand = { workspace = true }
-rust-snowflake = { workspace = true }
 sha2 = { workspace = true }
 aes-gcm = { workspace = true }
 base64 = { workspace = true }
 hmac = { workspace = true }
-once_cell = { workspace = true }
-sqlx = { workspace = true }
+
+# 随机数
+rand = { workspace = true }
+
+# ID 生成
+rust-snowflake = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng"] }
+
+# 其他
+once_cell = { workspace = true }
 
 

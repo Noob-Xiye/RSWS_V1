@@ -1,20 +1,25 @@
+//! 用户模型
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow, schemars::JsonSchema)]
+/// 用户
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
-    pub id: i64, // 雪花ID
+    pub id: i64,
     pub email: String,
     pub password_hash: String,
-    pub username: Option<String>,
+    pub username: String,        // 登录用用户名（唯一）
+    pub nickname: String,        // 显示名称（可修改）
     pub avatar_url: Option<String>,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow, schemars::JsonSchema)]
+/// 邮箱验证码
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct EmailVerificationCode {
     pub id: i64,
     pub email: String,
@@ -26,20 +31,24 @@ pub struct EmailVerificationCode {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
+/// 注册请求
+#[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
-    pub nickname: String,
+    pub username: String,        // 登录用用户名
+    pub nickname: String,        // 显示名称
     pub email: String,
     pub password: String,
 }
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
+/// 发送验证码请求
+#[derive(Debug, Deserialize)]
 pub struct SendVerificationCodeRequest {
     pub email: String,
-    pub code_type: String, // "registration"
+    pub code_type: String,
 }
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
+/// 验证码请求
+#[derive(Debug, Deserialize)]
 pub struct VerifyCodeRequest {
     pub email: String,
     pub code: String,
@@ -47,114 +56,41 @@ pub struct VerifyCodeRequest {
     pub password: String,
 }
 
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+/// 注册响应
+#[derive(Debug, Serialize)]
 pub struct RegisterResponse {
     pub success: bool,
     pub message: String,
     pub user_id: Option<i64>,
 }
 
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+/// 发送验证码响应
+#[derive(Debug, Serialize)]
 pub struct SendCodeResponse {
-    pub success: bool,
-    pub message: String,
-    pub expires_in: i64, // 过期时间（秒）
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct LoginRequest {
-    pub email: String,
-    pub password: String,
-    pub device_info: Option<serde_json::Value>,
-    pub user_agent: Option<String>,
-}
-
-// 添加传统登录响应结构
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct TraditionalLoginResponse {
-    pub success: bool,
-    pub message: String,
-    pub user_info: Option<UserInfo>,
-    pub session_data: Option<SessionData>,
-}
-
-// 添加用户资料相关结构体
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct UserProfile {
-    pub id: i64,
-    pub nickname: String,
-    pub email: String,
-    pub avatar: Option<String>,
-    pub is_email_verified: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct UpdateProfileRequest {
-    pub nickname: Option<String>,
-    pub avatar: Option<String>,
-}
-
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct ProfileCompletionResponse {
-    pub completion_percentage: f32,
-    pub missing_fields: Vec<String>,
-    pub suggestions: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct ChangePasswordRequest {
-    pub current_password: String,
-    pub new_password: String,
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct SendEmailChangeCodeRequest {
-    pub new_email: String,
-}
-
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct SendEmailChangeCodeResponse {
     pub success: bool,
     pub message: String,
     pub expires_in: i64,
 }
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct VerifyEmailChangeRequest {
-    pub new_email: String,
-    pub code: String,
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct LogoutRequest {
-    pub session_token: Option<String>,
-    pub logout_all_devices: bool,
-}
-
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct LogoutResponse {
-    pub success: bool,
-    pub message: String,
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct SendLoginCodeRequest {
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct VerifyLoginCodeRequest {
-    pub email: String,
-    pub password: String,
-    pub code: String,
+/// 登录请求（两种方式）
+#[derive(Debug, Deserialize)]
+pub struct LoginRequest {
+    /// 登录方式: "password" | "code"
+    pub login_type: String,
+    /// 用户名（password 方式必填）
+    pub username: Option<String>,
+    /// 密码（password 方式必填）
+    pub password: Option<String>,
+    /// 邮箱（code 方式必填）
+    pub email: Option<String>,
+    /// 验证码（code 方式必填）
+    pub verification_code: Option<String>,
     pub device_info: Option<serde_json::Value>,
     pub user_agent: Option<String>,
 }
 
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+/// 登录响应
+#[derive(Debug, Serialize)]
 pub struct LoginResponse {
     pub success: bool,
     pub message: String,
@@ -162,28 +98,90 @@ pub struct LoginResponse {
     pub session_data: Option<SessionData>,
 }
 
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+/// 用户信息
+#[derive(Debug, Serialize)]
 pub struct UserInfo {
     pub id: i64,
-    pub nickname: String,
     pub email: String,
-    pub avatar: Option<String>,
-    pub is_email_verified: bool,
+    pub username: String,        // 登录用用户名
+    pub nickname: String,        // 显示名称
+    pub avatar_url: Option<String>,
+    pub is_active: bool,
 }
 
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+/// 会话数据
+#[derive(Debug, Serialize)]
 pub struct SessionData {
-    pub session_token: String,
     pub api_key: String,
     pub api_secret: String,
     pub expires_at: DateTime<Utc>,
-    pub signature_info: SignatureInfo,
 }
 
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct SignatureInfo {
-    pub algorithm: String,        // "HMAC-SHA256"
-    pub timestamp_header: String, // "X-Timestamp"
-    pub signature_header: String, // "X-Signature"
-    pub api_key_header: String,   // "X-API-Key"
+// ==================== 单元测试 ====================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_register_request() {
+        let req = RegisterRequest {
+            username: "testuser".to_string(),
+            nickname: "Test User".to_string(),
+            email: "test@example.com".to_string(),
+            password: "Password123".to_string(),
+        };
+
+        assert_eq!(req.username, "testuser");
+        assert_eq!(req.nickname, "Test User");
+        assert!(!req.email.is_empty());
+    }
+
+    #[test]
+    fn test_login_request() {
+        // 密码登录
+        let req = LoginRequest {
+            login_type: "password".to_string(),
+            username: Some("testuser".to_string()),
+            password: Some("Password123".to_string()),
+            email: None,
+            verification_code: None,
+            device_info: None,
+            user_agent: Some("Mozilla/5.0".to_string()),
+        };
+
+        assert_eq!(req.login_type, "password");
+        assert!(req.username.is_some());
+
+        // 验证码登录
+        let req2 = LoginRequest {
+            login_type: "code".to_string(),
+            username: None,
+            password: None,
+            email: Some("test@example.com".to_string()),
+            verification_code: Some("123456".to_string()),
+            device_info: None,
+            user_agent: Some("Mozilla/5.0".to_string()),
+        };
+
+        assert_eq!(req2.login_type, "code");
+        assert!(req2.email.is_some());
+    }
+
+    #[test]
+    fn test_user_info() {
+        let info = UserInfo {
+            id: 1,
+            email: "test@example.com".to_string(),
+            username: "testuser".to_string(),
+            nickname: "Test User".to_string(),
+            avatar_url: None,
+            is_active: true,
+        };
+
+        assert_eq!(info.id, 1);
+        assert_eq!(info.username, "testuser");
+        assert_eq!(info.nickname, "Test User");
+        assert!(info.is_active);
+    }
 }
