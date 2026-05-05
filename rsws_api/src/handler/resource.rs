@@ -1,13 +1,14 @@
 //! 资源处理器
 
 use salvo::prelude::*;
+use salvo_oapi::endpoint;
 use rsws_common::response::ApiResponse;
 use rsws_common::error_code::ErrorCode;
 use serde::Deserialize;
 use crate::state::{get_state, require_user_id};
 
 /// 资源列表查询参数
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
 pub struct ResourceQuery {
     pub page: Option<i64>,
     pub page_size: Option<i64>,
@@ -16,7 +17,17 @@ pub struct ResourceQuery {
 }
 
 /// 获取资源列表
-#[handler]
+#[endpoint(
+    parameters(
+        ("page", Query, description = "页码"),
+        ("page_size", Query, description = "每页数量"),
+        ("category_id", Query, description = "分类ID"),
+        ("search", Query, description = "搜索关键词"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+    )
+)]
 pub async fn list_resources(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let query: ResourceQuery = req.parse_queries().unwrap_or(ResourceQuery {
         page: Some(1),
@@ -52,7 +63,15 @@ pub async fn list_resources(req: &mut Request, depot: &mut Depot, res: &mut Resp
 }
 
 /// 获取资源详情
-#[handler]
+#[endpoint(
+    parameters(
+        ("id", description = "资源ID"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 404, description = "资源不存在"),
+    )
+)]
 pub async fn get_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
 
@@ -86,7 +105,12 @@ pub async fn get_resource(req: &mut Request, depot: &mut Depot, res: &mut Respon
 }
 
 /// 创建资源
-#[handler]
+#[endpoint(
+    responses(
+        (status_code = 501, description = "暂未实现"),
+        (status_code = 401, description = "未认证"),
+    )
+)]
 pub async fn create_resource(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let _user_id = match require_user_id(depot) {
         Ok(id) => id,
@@ -105,7 +129,15 @@ pub async fn create_resource(_req: &mut Request, depot: &mut Depot, res: &mut Re
 }
 
 /// 更新资源
-#[handler]
+#[endpoint(
+    parameters(
+        ("id", description = "资源ID"),
+    ),
+    responses(
+        (status_code = 501, description = "暂未实现"),
+        (status_code = 401, description = "未认证"),
+    )
+)]
 pub async fn update_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let _id: i64 = req.param("id").unwrap_or(0);
     let _user_id = match require_user_id(depot) {
@@ -125,7 +157,15 @@ pub async fn update_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
 }
 
 /// 删除资源
-#[handler]
+#[endpoint(
+    parameters(
+        ("id", description = "资源ID"),
+    ),
+    responses(
+        (status_code = 501, description = "暂未实现"),
+        (status_code = 401, description = "未认证"),
+    )
+)]
 pub async fn delete_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let _id: i64 = req.param("id").unwrap_or(0);
     let _user_id = match require_user_id(depot) {

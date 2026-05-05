@@ -6,9 +6,10 @@ pub mod order;
 pub mod payment;
 
 use salvo::prelude::*;
+use salvo_oapi::endpoint;
 
 /// 健康检查
-#[handler]
+#[endpoint]
 pub async fn health(res: &mut Response) {
     res.render(Json(rsws_common::response::ApiResponse::success("OK")));
 }

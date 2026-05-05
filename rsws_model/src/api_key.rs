@@ -2,10 +2,11 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use salvo_oapi::ToSchema;
 use sqlx::FromRow;
 
 /// API Key
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct ApiKey {
     pub id: i64,
     pub user_id: i64,
@@ -22,7 +23,7 @@ pub struct ApiKey {
 }
 
 /// API Key 使用日志
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct ApiKeyUsageLog {
     pub id: i64,
     pub api_key_id: i64,
@@ -36,7 +37,7 @@ pub struct ApiKeyUsageLog {
 }
 
 /// 创建 API Key 请求
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateApiKeyRequest {
     pub name: String,
     pub permissions: Vec<String>,
@@ -45,7 +46,7 @@ pub struct CreateApiKeyRequest {
 }
 
 /// API Key 响应
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiKeyResponse {
     pub id: i64,
     pub name: String,
@@ -60,7 +61,7 @@ pub struct ApiKeyResponse {
 }
 
 /// API Key 会话（Redis 存储）
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiKeySession {
     pub user_id: i64,
     pub api_key_id: i64,
@@ -70,7 +71,7 @@ pub struct ApiKeySession {
 }
 
 /// 权限枚举
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub enum Permission {
     #[serde(rename = "read")]
     Read,

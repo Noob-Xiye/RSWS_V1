@@ -1,13 +1,22 @@
 //! 用户处理器
 
 use salvo::prelude::*;
+use salvo_oapi::endpoint;
 use rsws_common::response::ApiResponse;
 use rsws_common::error_code::ErrorCode;
 use rsws_model::user::user::{RegisterRequest, LoginRequest, ChangePasswordRequest, UpdateProfileRequest};
 use crate::state::{get_state, require_user_id};
 
 /// 获取用户信息（按 ID）
-#[handler]
+#[endpoint(
+    parameters(
+        ("id", description = "用户ID"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 404, description = "用户不存在"),
+    )
+)]
 pub async fn get_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
     let state = get_state(depot);
@@ -37,7 +46,14 @@ pub async fn get_user(req: &mut Request, depot: &mut Depot, res: &mut Response) 
 }
 
 /// 用户注册
-#[handler]
+#[endpoint(
+    request_body = RegisterRequest,
+    responses(
+        (status_code = 200, description = "注册成功"),
+        (status_code = 400, description = "请求格式错误"),
+        (status_code = 409, description = "用户已存在"),
+    )
+)]
 pub async fn register(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let body = req.parse_json::<RegisterRequest>().await;
 
@@ -75,7 +91,14 @@ pub async fn register(req: &mut Request, depot: &mut Depot, res: &mut Response) 
 }
 
 /// 用户登录
-#[handler]
+#[endpoint(
+    request_body = LoginRequest,
+    responses(
+        (status_code = 200, description = "登录成功"),
+        (status_code = 400, description = "请求格式错误"),
+        (status_code = 401, description = "认证失败"),
+    )
+)]
 pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let body = req.parse_json::<LoginRequest>().await;
 
@@ -107,9 +130,13 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
 }
 
 /// 获取当前用户信息
-#[handler]
-pub async fn get_current_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let _ = req; // 不使用 req，但 Salvo handler 签名可能需要
+#[endpoint(
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 401, description = "未认证"),
+    )
+)]
+pub async fn get_current_user(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let user_id = match require_user_id(depot) {
         Ok(id) => id,
         Err(_) => {
@@ -147,7 +174,14 @@ pub async fn get_current_user(req: &mut Request, depot: &mut Depot, res: &mut Re
 }
 
 /// 更新用户资料
-#[handler]
+#[endpoint(
+    request_body = UpdateProfileRequest,
+    responses(
+        (status_code = 200, description = "更新成功"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 400, description = "请求格式错误"),
+    )
+)]
 pub async fn update_profile(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let user_id = match require_user_id(depot) {
         Ok(id) => id,
@@ -202,7 +236,14 @@ pub async fn update_profile(req: &mut Request, depot: &mut Depot, res: &mut Resp
 }
 
 /// 修改密码
-#[handler]
+#[endpoint(
+    request_body = ChangePasswordRequest,
+    responses(
+        (status_code = 200, description = "修改成功"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 400, description = "旧密码错误"),
+    )
+)]
 pub async fn change_password(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let user_id = match require_user_id(depot) {
         Ok(id) => id,

@@ -19,7 +19,7 @@ salvo-cors = { git = "https://github.com/salvo-rs/salvo", default-features = fal
 salvo-csrf = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-flash = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-jwt-auth = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
-salvo-oapi = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
+salvo-oapi = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["swagger-ui", "chrono", "decimal", "uuid", "url"] }
 salvo-otel = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-proxy = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-rate-limiter = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }

@@ -2,10 +2,11 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use salvo_oapi::ToSchema;
 use sqlx::FromRow;
 
 /// 资源
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Resource {
     pub id: i64,
     pub user_id: i64,
@@ -29,7 +30,7 @@ pub struct Resource {
 }
 
 /// 创建资源请求
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateResourceRequest {
     pub title: String,
     pub description: Option<String>,
@@ -45,7 +46,7 @@ pub struct CreateResourceRequest {
 }
 
 /// 更新资源请求
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateResourceRequest {
     pub title: Option<String>,
     pub description: Option<String>,
@@ -62,7 +63,7 @@ pub struct UpdateResourceRequest {
 }
 
 /// 资源列表响应
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ResourceListResponse {
     pub items: Vec<Resource>,
     pub total: i64,

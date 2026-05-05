@@ -3,11 +3,12 @@
 //! 所有 API 返回统一的响应结构
 
 use serde::{Deserialize, Serialize};
+use salvo_oapi::ToSchema;
 use salvo::prelude::*;
 use super::error_code::ErrorCode;
 
 /// 统一 API 响应格式
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApiResponse<T> {
     /// 错误码 (0 = 成功)
     pub code: i32,
@@ -121,7 +122,7 @@ impl ApiResponse<()> {
 // ==================== 分页响应 ====================
 
 /// 分页数据
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PaginatedData<T> {
     /// 数据列表
     pub items: Vec<T>,
@@ -158,7 +159,7 @@ pub type PaginatedResponse<T> = ApiResponse<PaginatedData<T>>;
 // ==================== 列表响应 ====================
 
 /// 列表数据 (无分页)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListData<T> {
     /// 数据列表
     pub items: Vec<T>,

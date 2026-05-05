@@ -1,20 +1,31 @@
 //! 订单处理器
 
 use salvo::prelude::*;
+use salvo_oapi::endpoint;
 use rsws_common::response::ApiResponse;
 use rsws_common::error_code::ErrorCode;
 use serde::Deserialize;
+use salvo_oapi::ToSchema;
 use crate::state::{get_state, require_user_id};
 
 /// 订单创建请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateOrderRequest {
     pub resource_id: i64,
     pub payment_method: String, // "paypal" | "usdt_trc20" | "usdt_erc20"
 }
 
 /// 获取订单列表
-#[handler]
+#[endpoint(
+    parameters(
+        ("page", Query, description = "页码"),
+        ("limit", Query, description = "每页数量"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 401, description = "未认证"),
+    )
+)]
 pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let user_id = match require_user_id(depot) {
         Ok(id) => id,
@@ -52,7 +63,15 @@ pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Respons
 }
 
 /// 获取订单详情
-#[handler]
+#[endpoint(
+    parameters(
+        ("id", description = "订单ID"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 404, description = "订单不存在"),
+    )
+)]
 pub async fn get_order(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
 
@@ -86,7 +105,15 @@ pub async fn get_order(req: &mut Request, depot: &mut Depot, res: &mut Response)
 }
 
 /// 创建订单
-#[handler]
+#[endpoint(
+    request_body = CreateOrderRequest,
+    responses(
+        (status_code = 201, description = "创建成功"),
+        (status_code = 400, description = "请求格式错误"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 404, description = "资源不存在"),
+    )
+)]
 pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let user_id = match require_user_id(depot) {
         Ok(id) => id,
@@ -167,7 +194,16 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
 }
 
 /// 取消订单
-#[handler]
+#[endpoint(
+    parameters(
+        ("id", description = "订单ID"),
+    ),
+    responses(
+        (status_code = 200, description = "取消成功"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 404, description = "订单不存在"),
+    )
+)]
 pub async fn cancel_order(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
 
@@ -210,7 +246,15 @@ pub async fn cancel_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
 }
 
 /// 检查订单状态（USDT 支付轮询）
-#[handler]
+#[endpoint(
+    parameters(
+        ("id", description = "订单ID"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 404, description = "订单不存在"),
+    )
+)]
 pub async fn check_order_status(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
 

@@ -2,14 +2,15 @@
 
 use salvo::prelude::*;
 use salvo::affix_state;
+use salvo::oapi::OpenApi;
+use salvo_oapi::swagger_ui::SwaggerUi;
 use crate::handler;
 use crate::middleware::auth::api_key_auth;
 use crate::state::AppState;
 
-/// 创建路由（带 State 注入）
+/// 创建路由（带 State 注入 + OpenAPI 文档）
 pub fn create_router(state: AppState) -> Router {
-    Router::new()
-        .hoop(affix_state::inject(state))
+    let api_routes = Router::new()
         // 健康检查（无需认证）
         .push(Router::with_path("health").get(handler::health))
 
@@ -69,5 +70,17 @@ pub fn create_router(state: AppState) -> Router {
             Router::with_path("api/v1/webhook")
                 .push(Router::with_path("paypal").post(handler::payment::paypal_webhook))
                 .push(Router::with_path("usdt").post(handler::payment::usdt_webhook))
-        )
+        );
+
+    // OpenAPI 文档生成
+    let doc = OpenApi::new("RSWS API", "0.1.0")
+        .merge_router(&api_routes);
+
+    Router::new()
+        .hoop(affix_state::inject(state))
+        // Swagger UI（访问 /swagger-ui 查看）
+        .push(doc.into_router("/api-doc/openapi.json"))
+        .push(SwaggerUi::new("/swagger-ui").into_router("/api-doc/openapi.json"))
+        // 业务路由
+        .push(api_routes)
 }

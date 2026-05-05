@@ -2,10 +2,11 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use salvo_oapi::ToSchema;
 use sqlx::FromRow;
 
 /// 用户
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct User {
     pub id: i64,
     pub email: String,
@@ -19,7 +20,7 @@ pub struct User {
 }
 
 /// 邮箱验证码
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct EmailVerificationCode {
     pub id: i64,
     pub email: String,
@@ -32,21 +33,21 @@ pub struct EmailVerificationCode {
 }
 
 /// 修改密码请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ChangePasswordRequest {
     pub old_password: String,
     pub new_password: String,
 }
 
 /// 更新资料请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateProfileRequest {
     pub nickname: Option<String>,
     pub avatar_url: Option<String>,
 }
 
 /// 注册请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterRequest {
     pub username: String,        // 登录用用户名
     pub nickname: String,        // 显示名称
@@ -55,14 +56,14 @@ pub struct RegisterRequest {
 }
 
 /// 发送验证码请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct SendVerificationCodeRequest {
     pub email: String,
     pub code_type: String,
 }
 
 /// 验证码请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VerifyCodeRequest {
     pub email: String,
     pub code: String,
@@ -71,7 +72,7 @@ pub struct VerifyCodeRequest {
 }
 
 /// 注册响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct RegisterResponse {
     pub success: bool,
     pub message: String,
@@ -79,7 +80,7 @@ pub struct RegisterResponse {
 }
 
 /// 发送验证码响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct SendCodeResponse {
     pub success: bool,
     pub message: String,
@@ -87,7 +88,7 @@ pub struct SendCodeResponse {
 }
 
 /// 登录请求（两种方式）
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
     /// 登录方式: "password" | "code"
     pub login_type: String,
@@ -104,7 +105,7 @@ pub struct LoginRequest {
 }
 
 /// 登录响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct LoginResponse {
     pub success: bool,
     pub message: String,
@@ -113,7 +114,7 @@ pub struct LoginResponse {
 }
 
 /// 用户信息
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct UserInfo {
     pub id: i64,
     pub email: String,
@@ -124,7 +125,7 @@ pub struct UserInfo {
 }
 
 /// 会话数据
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct SessionData {
     pub api_key: String,
     pub api_secret: String,

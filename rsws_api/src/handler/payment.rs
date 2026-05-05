@@ -1,11 +1,17 @@
 //! 支付处理器
 
 use salvo::prelude::*;
+use salvo_oapi::endpoint;
 use rsws_common::response::ApiResponse;
 
 /// PayPal Webhook
-#[handler]
-pub async fn paypal_webhook(req: &mut Request, res: &mut Response) {
+#[endpoint(
+    responses(
+        (status_code = 200, description = "处理成功"),
+        (status_code = 400, description = "无效载荷"),
+    )
+)]
+pub async fn paypal_webhook(req: &mut Request, _depot: &mut Depot, res: &mut Response) {
     let body = req.parse_json::<serde_json::Value>().await;
 
     match body {
@@ -27,8 +33,13 @@ pub async fn paypal_webhook(req: &mut Request, res: &mut Response) {
 }
 
 /// USDT 支付确认 Webhook (内部)
-#[handler]
-pub async fn usdt_webhook(req: &mut Request, res: &mut Response) {
+#[endpoint(
+    responses(
+        (status_code = 200, description = "处理成功"),
+        (status_code = 400, description = "无效载荷"),
+    )
+)]
+pub async fn usdt_webhook(req: &mut Request, _depot: &mut Depot, res: &mut Response) {
     let body = req.parse_json::<serde_json::Value>().await;
 
     match body {
@@ -50,8 +61,15 @@ pub async fn usdt_webhook(req: &mut Request, res: &mut Response) {
 }
 
 /// 获取 USDT 收款地址
-#[handler]
-pub async fn get_usdt_address(req: &mut Request, res: &mut Response) {
+#[endpoint(
+    parameters(
+        ("network", description = "网络类型: tron/ethereum"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+    )
+)]
+pub async fn get_usdt_address(req: &mut Request, _depot: &mut Depot, res: &mut Response) {
     let network: String = req.param("network").unwrap_or_else(|| "tron".to_string());
 
     // TODO: 为用户生成或获取 USDT 收款地址
@@ -74,8 +92,12 @@ pub async fn get_usdt_address(req: &mut Request, res: &mut Response) {
 }
 
 /// PayPal 支付成功回调
-#[handler]
-pub async fn paypal_success(req: &mut Request, res: &mut Response) {
+#[endpoint(
+    responses(
+        (status_code = 302, description = "重定向到前端"),
+    )
+)]
+pub async fn paypal_success(req: &mut Request, _depot: &mut Depot, res: &mut Response) {
     let _order_id: i64 = req.query("order_id").unwrap_or(0);
     let _token: Option<String> = req.query("token");
 
@@ -87,8 +109,12 @@ pub async fn paypal_success(req: &mut Request, res: &mut Response) {
 }
 
 /// PayPal 支付取消回调
-#[handler]
-pub async fn paypal_cancel(req: &mut Request, res: &mut Response) {
+#[endpoint(
+    responses(
+        (status_code = 302, description = "重定向到前端"),
+    )
+)]
+pub async fn paypal_cancel(req: &mut Request, _depot: &mut Depot, res: &mut Response) {
     let _order_id: i64 = req.query("order_id").unwrap_or(0);
 
     // TODO: 更新订单状态为取消

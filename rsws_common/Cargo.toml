@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 # Web 框架
 salvo = { workspace = true }
+salvo-oapi = { workspace = true }
 
 # 配置
 config = { workspace = true }
