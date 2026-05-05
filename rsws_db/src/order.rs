@@ -119,6 +119,16 @@ impl OrderRepository {
         Ok(())
     }
 
+    /// 获取用户订单列表
+    pub async fn list_by_user(
+        &self,
+        user_id: i64,
+        page: i32,
+        limit: i32,
+    ) -> Result<(Vec<Order>, i64), RswsError> {
+        self.get_user_orders(user_id, page as i64, limit as i64).await
+    }
+
     /// 检查用户是否已购买资源
     pub async fn check_user_purchased(&self, user_id: i64, resource_id: i64) -> Result<bool, RswsError> {
         let count: (i64,) = sqlx::query_as(

@@ -31,6 +31,20 @@ pub struct EmailVerificationCode {
     pub created_at: DateTime<Utc>,
 }
 
+/// 修改密码请求
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub old_password: String,
+    pub new_password: String,
+}
+
+/// 更新资料请求
+#[derive(Debug, Deserialize)]
+pub struct UpdateProfileRequest {
+    pub nickname: Option<String>,
+    pub avatar_url: Option<String>,
+}
+
 /// 注册请求
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {

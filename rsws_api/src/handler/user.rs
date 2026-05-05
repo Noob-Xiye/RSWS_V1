@@ -2,53 +2,72 @@
 
 use salvo::prelude::*;
 use rsws_common::response::ApiResponse;
-use rsws_common::error::RswsError;
-use rsws_model::user::user::{RegisterRequest, LoginRequest};
-use serde::Deserialize;
+use rsws_common::error_code::ErrorCode;
+use rsws_model::user::user::{RegisterRequest, LoginRequest, ChangePasswordRequest, UpdateProfileRequest};
+use crate::state::{get_state, require_user_id};
 
-/// 用户路径参数
-#[derive(Debug, Deserialize)]
-pub struct UserPath {
-    pub id: i64,
-}
-
-/// 获取用户信息
+/// 获取用户信息（按 ID）
 #[handler]
-pub async fn get_user(req: &mut Request, res: &mut Response) {
+pub async fn get_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
+    let state = get_state(depot);
 
-    // TODO: 从数据库获取用户
-    // let user = user_service.get_user(id).await?;
-
-    res.render(Json(ApiResponse::success(serde_json::json!({
-        "id": id,
-        "email": "user@example.com",
-        "username": "user",
-        "avatar": null,
-        "created_at": "2026-05-05T00:00:00Z"
-    }))));
+    match state.user_service.get_user(id).await {
+        Ok(user) => {
+            res.render(Json(ApiResponse::success(serde_json::json!({
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "nickname": user.nickname,
+                "avatar_url": user.avatar_url,
+                "is_active": user.is_active,
+                "created_at": user.created_at,
+                "updated_at": user.updated_at,
+            }))));
+        }
+        Err(e) => {
+            let code = e.error_code();
+            let msg = e.to_string();
+            let status = salvo::http::StatusCode::from_u16(code.http_status())
+                .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
+            res.status_code(status);
+            res.render(Json(ApiResponse::<()>::error_with_message(code, msg)));
+        }
+    }
 }
 
 /// 用户注册
 #[handler]
-pub async fn register(req: &mut Request, res: &mut Response) {
+pub async fn register(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let body = req.parse_json::<RegisterRequest>().await;
 
     match body {
         Ok(data) => {
-            // TODO: 调用用户服务注册
-            // let user = user_service.register(&data.email, &data.password, data.username.as_deref()).await?;
+            let state = get_state(depot);
 
-            res.render(Json(ApiResponse::success(serde_json::json!({
-                "id": 1,
-                "email": data.email,
-                "username": data.nickname,
-                "message": "Registration successful, please check your email to verify"
-            }))));
+            match state.user_service.register(&data).await {
+                Ok(user) => {
+                    res.render(Json(ApiResponse::success(serde_json::json!({
+                        "id": user.id,
+                        "email": user.email,
+                        "username": user.username,
+                        "nickname": user.nickname,
+                        "message": "Registration successful"
+                    }))));
+                }
+                Err(e) => {
+                    let code = e.error_code();
+                    let status = salvo::http::StatusCode::from_u16(code.http_status())
+                        .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
+                    res.status_code(status);
+                    res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                }
+            }
         }
         Err(e) => {
+            res.status_code(StatusCode::BAD_REQUEST);
             res.render(Json(ApiResponse::<()>::error_with_message(
-                rsws_common::error_code::ErrorCode::INVALID_REQUEST_FORMAT,
+                ErrorCode::INVALID_REQUEST_FORMAT,
                 format!("Invalid request: {}", e)
             )));
         }
@@ -57,28 +76,30 @@ pub async fn register(req: &mut Request, res: &mut Response) {
 
 /// 用户登录
 #[handler]
-pub async fn login(req: &mut Request, res: &mut Response) {
+pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let body = req.parse_json::<LoginRequest>().await;
 
     match body {
         Ok(data) => {
-            // TODO: 调用用户服务登录
-            // let login_response = user_service.login(&data.email, &data.password).await?;
+            let state = get_state(depot);
 
-            res.render(Json(ApiResponse::success(serde_json::json!({
-                "api_key": "ak_example",
-                "api_secret": "sk_example",
-                "expires_at": "2026-05-12T00:00:00Z",
-                "user": {
-                    "id": 1,
-                    "email": data.email,
-                    "username": "user"
+            match state.user_service.login(&data).await {
+                Ok(response) => {
+                    res.render(Json(ApiResponse::success(response)));
                 }
-            }))));
+                Err(e) => {
+                    let code = e.error_code();
+                    let status = salvo::http::StatusCode::from_u16(code.http_status())
+                        .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
+                    res.status_code(status);
+                    res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                }
+            }
         }
         Err(e) => {
+            res.status_code(StatusCode::BAD_REQUEST);
             res.render(Json(ApiResponse::<()>::error_with_message(
-                rsws_common::error_code::ErrorCode::INVALID_REQUEST_FORMAT,
+                ErrorCode::INVALID_REQUEST_FORMAT,
                 format!("Invalid request: {}", e)
             )));
         }
@@ -87,36 +108,93 @@ pub async fn login(req: &mut Request, res: &mut Response) {
 
 /// 获取当前用户信息
 #[handler]
-pub async fn get_current_user(_req: &mut Request, res: &mut Response) {
-    // TODO: 从认证中间件获取用户 ID
-    // let user_id = req.get_user_id()?;
+pub async fn get_current_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let _ = req; // 不使用 req，但 Salvo handler 签名可能需要
+    let user_id = match require_user_id(depot) {
+        Ok(id) => id,
+        Err(_) => {
+            res.status_code(StatusCode::UNAUTHORIZED);
+            res.render(Json(ApiResponse::<()>::error(
+                ErrorCode::AUTH_MISSING_CREDENTIALS
+            )));
+            return;
+        }
+    };
 
-    res.render(Json(ApiResponse::success(serde_json::json!({
-        "id": 1,
-        "email": "current@example.com",
-        "username": "current_user",
-        "avatar": null,
-        "balance": "0.00",
-        "created_at": "2026-05-05T00:00:00Z"
-    }))));
+    let state = get_state(depot);
+
+    match state.user_service.get_user(user_id).await {
+        Ok(user) => {
+            res.render(Json(ApiResponse::success(serde_json::json!({
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "nickname": user.nickname,
+                "avatar_url": user.avatar_url,
+                "is_active": user.is_active,
+                "created_at": user.created_at,
+                "updated_at": user.updated_at,
+            }))));
+        }
+        Err(e) => {
+            let code = e.error_code();
+            let status = salvo::http::StatusCode::from_u16(code.http_status())
+                .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
+            res.status_code(status);
+            res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+        }
+    }
 }
 
 /// 更新用户资料
 #[handler]
-pub async fn update_profile(req: &mut Request, res: &mut Response) {
-    let body = req.parse_json::<serde_json::Value>().await;
+pub async fn update_profile(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let user_id = match require_user_id(depot) {
+        Ok(id) => id,
+        Err(_) => {
+            res.status_code(StatusCode::UNAUTHORIZED);
+            res.render(Json(ApiResponse::<()>::error(
+                ErrorCode::AUTH_MISSING_CREDENTIALS
+            )));
+            return;
+        }
+    };
+
+    let body = req.parse_json::<UpdateProfileRequest>().await;
 
     match body {
-        Ok(_data) => {
-            // TODO: 调用用户服务更新资料
+        Ok(data) => {
+            let state = get_state(depot);
 
-            res.render(Json(ApiResponse::success(serde_json::json!({
-                "message": "Profile updated successfully"
-            }))));
+            if let Some(nickname) = data.nickname {
+                match state.user_service.update_nickname(user_id, &nickname).await {
+                    Ok(user) => {
+                        res.render(Json(ApiResponse::success(serde_json::json!({
+                            "id": user.id,
+                            "nickname": user.nickname,
+                            "avatar_url": user.avatar_url,
+                            "message": "Profile updated successfully"
+                        }))));
+                    }
+                    Err(e) => {
+                        let code = e.error_code();
+                        let status = salvo::http::StatusCode::from_u16(code.http_status())
+                            .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
+                        res.status_code(status);
+                        res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                    }
+                }
+            } else {
+                res.render(Json(ApiResponse::<()>::error_with_message(
+                    ErrorCode::INVALID_PARAMETER,
+                    "No fields to update"
+                )));
+            }
         }
         Err(e) => {
+            res.status_code(StatusCode::BAD_REQUEST);
             res.render(Json(ApiResponse::<()>::error_with_message(
-                rsws_common::error_code::ErrorCode::INVALID_REQUEST_FORMAT,
+                ErrorCode::INVALID_REQUEST_FORMAT,
                 format!("Invalid request: {}", e)
             )));
         }
@@ -125,20 +203,47 @@ pub async fn update_profile(req: &mut Request, res: &mut Response) {
 
 /// 修改密码
 #[handler]
-pub async fn change_password(req: &mut Request, res: &mut Response) {
-    let body = req.parse_json::<serde_json::Value>().await;
+pub async fn change_password(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let user_id = match require_user_id(depot) {
+        Ok(id) => id,
+        Err(_) => {
+            res.status_code(StatusCode::UNAUTHORIZED);
+            res.render(Json(ApiResponse::<()>::error(
+                ErrorCode::AUTH_MISSING_CREDENTIALS
+            )));
+            return;
+        }
+    };
+
+    let body = req.parse_json::<ChangePasswordRequest>().await;
 
     match body {
-        Ok(_data) => {
-            // TODO: 验证旧密码并更新新密码
+        Ok(data) => {
+            let state = get_state(depot);
 
-            res.render(Json(ApiResponse::success(serde_json::json!({
-                "message": "Password changed successfully"
-            }))));
+            match state.user_service.change_password(
+                user_id,
+                &data.old_password,
+                &data.new_password,
+            ).await {
+                Ok(()) => {
+                    res.render(Json(ApiResponse::success(serde_json::json!({
+                        "message": "Password changed successfully"
+                    }))));
+                }
+                Err(e) => {
+                    let code = e.error_code();
+                    let status = salvo::http::StatusCode::from_u16(code.http_status())
+                        .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
+                    res.status_code(status);
+                    res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                }
+            }
         }
         Err(e) => {
+            res.status_code(StatusCode::BAD_REQUEST);
             res.render(Json(ApiResponse::<()>::error_with_message(
-                rsws_common::error_code::ErrorCode::INVALID_REQUEST_FORMAT,
+                ErrorCode::INVALID_REQUEST_FORMAT,
                 format!("Invalid request: {}", e)
             )));
         }

@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use rsws_common::error::RswsError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::PgPool;
 use std::collections::HashMap;
 use tracing::info;
 
@@ -36,15 +35,13 @@ pub struct SyncRecord {
 
 /// 跨平台服务
 pub struct CrossPlatformService {
-    pool: PgPool,
     configs: HashMap<String, PlatformConfig>,
 }
 
 impl CrossPlatformService {
     /// 创建跨平台服务实例
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new() -> Self {
         Self {
-            pool,
             configs: HashMap::new(),
         }
     }
@@ -97,27 +94,8 @@ impl CrossPlatformService {
     }
 }
 
-// ==================== 单元测试 ====================
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_register_platform() {
-        // let pool = PgPool::connect("...").await.unwrap();
-        // let mut service = CrossPlatformService::new(pool);
-        
-        // let config = PlatformConfig {
-        //     platform_name: "test".to_string(),
-        //     api_endpoint: "https://api.test.com".to_string(),
-        //     api_key: Some("key".to_string()),
-        //     api_secret: Some("secret".to_string()),
-        //     webhook_url: None,
-        //     is_active: true,
-        // };
-        
-        // service.register_platform(config);
-        // assert!(service.get_platform_config("test").is_some());
+impl Default for CrossPlatformService {
+    fn default() -> Self {
+        Self::new()
     }
 }

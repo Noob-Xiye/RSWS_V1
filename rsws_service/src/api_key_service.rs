@@ -58,4 +58,9 @@ impl ApiKeyService {
     pub async fn delete(&self, api_key_id: i64, user_id: i64) -> Result<bool, RswsError> {
         self.repository.delete(api_key_id, user_id).await
     }
+
+    /// 更新最后使用时间
+    pub async fn update_last_used(&self, api_key_id: i64) -> Result<(), RswsError> {
+        self.repository.update_last_used(api_key_id).await
+    }
 }

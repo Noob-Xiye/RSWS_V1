@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 rsws_common = { path = "../rsws_common" }
 rsws_db = { path = "../rsws_db" }
+rsws_service = { path = "../rsws_service" }
 rsws_api = { path = "../rsws_api" }
 salvo = { workspace = true }
 sqlx = { workspace = true }

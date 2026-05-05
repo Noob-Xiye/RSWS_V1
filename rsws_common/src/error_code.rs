@@ -48,6 +48,8 @@ impl ErrorCode {
     pub const AUTH_API_KEY_EXPIRED: Self = Self(20016);
     pub const AUTH_INVALID_SIGNATURE: Self = Self(20017);
     pub const AUTH_TIMESTAMP_EXPIRED: Self = Self(20018);
+    pub const AUTH_MISSING_CREDENTIALS: Self = Self(20019);
+    pub const AUTH_PERMISSION_DENIED: Self = Self(20020);
 
     // ==================== 用户错误 (3xxxx) ====================
     pub const USER_NOT_FOUND: Self = Self(30001);
@@ -141,6 +143,8 @@ impl ErrorCode {
             10008 => "Service unavailable",
             10009 => "Request timeout",
             10010 => "Rate limit exceeded",
+            10011 => "Invalid parameter",
+            10012 => "Invalid request format",
 
             // 认证
             20001 => "Invalid credentials",
@@ -157,6 +161,12 @@ impl ErrorCode {
             20012 => "Account locked",
             20013 => "2FA required",
             20014 => "Invalid 2FA code",
+            20015 => "Invalid API key",
+            20016 => "API key expired",
+            20017 => "Invalid signature",
+            20018 => "Timestamp expired",
+            20019 => "Missing credentials",
+            20020 => "Permission denied",
 
             // 用户
             30001 => "User not found",

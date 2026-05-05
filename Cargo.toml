@@ -12,7 +12,7 @@ resolver = "2"
 
 [workspace.dependencies]
 # Salvo 核心和插件，全部禁用默认特性，统一启用 rustls
-salvo = { git = "https://github.com/salvo-rs/salvo", features = ["oapi", "cors", "compression", "serve-static", "rustls", "server", "http1", "http2"], default-features = false }
+salvo = { git = "https://github.com/salvo-rs/salvo", features = ["oapi", "cors", "compression", "serve-static", "rustls", "server", "http1", "http2", "affix-state"], default-features = false }
 salvo-cache = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-compression = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-cors = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
@@ -25,7 +25,6 @@ salvo-proxy = { git = "https://github.com/salvo-rs/salvo", default-features = fa
 salvo-rate-limiter = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-serve-static = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-session = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
-salvo-extra = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 
 # 异步运行时
 tokio = { version = "1.42.0", features = ["full"] }
