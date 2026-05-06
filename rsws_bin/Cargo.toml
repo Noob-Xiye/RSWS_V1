@@ -10,7 +10,7 @@ rsws_service = { path = "../rsws_service" }
 rsws_api = { path = "../rsws_api" }
 rsws_usdt = { path = "../rsws_usdt" }
 salvo = { workspace = true }
-sqlx = { workspace = true }
+sqlx = { version = "0.8.2", features = ["runtime-tokio-rustls", "postgres", "chrono", "rust_decimal", "migrate", "macros"], default-features = false }
 deadpool-redis = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

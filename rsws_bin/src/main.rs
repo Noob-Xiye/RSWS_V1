@@ -45,6 +45,16 @@ async fn main() -> Result<(), RswsError> {
 
     info!("Database connected");
 
+    // 运行数据库迁移
+    sqlx::migrate!("../migrations")
+        .run(&pool)
+        .await
+        .map_err(|e| {
+            error!("Database migration failed: {}", e);
+            RswsError::internal("Database migration failed")
+        })?;
+    info!("Database migrations applied");
+
     let redis_pool = RedisPool::new(&config.redis.url)?;
     info!("Redis connected");
 
