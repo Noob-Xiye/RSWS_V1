@@ -7,6 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tracing::{debug, error};
 
 /// Redis 服务
+#[derive(Clone)]
 pub struct RedisService {
     pool: Pool,
 }
@@ -111,23 +112,31 @@ impl RedisService {
     }
 
     /// 原子递增
-    pub async fn incr(&self, key: &str) -> Result<i64, RswsError> {
+    /// 
+    /// # Arguments
+    /// * `key` - Redis key
+    /// * `delta` - 增量值
+    pub async fn incr(&self, key: &str, delta: i64) -> Result<i64, RswsError> {
         let mut conn = self.get_connection().await?;
-        let result: i64 = conn.incr(key, 1).await.map_err(|e| {
+        let result: i64 = conn.incr(key, delta).await.map_err(|e| {
             error!("Failed to increment Redis key: {}", e);
             RswsError::internal("Failed to increment Redis key")
         })?;
         Ok(result)
     }
 
-    /// 设置键过期时间
-    pub async fn expire(&self, key: &str, ttl_secs: i64) -> Result<(), RswsError> {
+    /// 设置键过期时间（秒）
+    /// 
+    /// # Returns
+    /// * `true` - 设置成功
+    /// * `false` - key 不存在
+    pub async fn expire(&self, key: &str, ttl_secs: i64) -> Result<bool, RswsError> {
         let mut conn = self.get_connection().await?;
-        conn.expire::<_, ()>(key, ttl_secs).await.map_err(|e| {
+        let result: bool = conn.expire(key, ttl_secs).await.map_err(|e| {
             error!("Failed to set Redis key expiration: {}", e);
             RswsError::internal("Failed to set Redis key expiration")
         })?;
-        Ok(())
+        Ok(result)
     }
 }
 
@@ -191,7 +200,7 @@ impl RedisService {
         }
 
         // 增加尝试次数
-        let new_attempts = self.incr(&attempts_key).await?;
+        let new_attempts = self.incr(&attempts_key, 1).await?;
 
         // 获取存储的验证码
         let stored = self.get(&cache.key()).await?;

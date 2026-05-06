@@ -8,6 +8,7 @@ use rsws_service::{
     UserService, OrderService, ResourceService,
     ApiKeyService, PayPalService, BlockchainService,
     WebhookService, CrossPlatformService, ConfigService,
+    PaymentService,
 };
 
 /// 应用全局状态
@@ -18,6 +19,7 @@ pub struct AppState {
     pub resource_service: Arc<ResourceService>,
     pub api_key_service: Arc<ApiKeyService>,
     pub paypal_service: Arc<PayPalService>,
+    pub payment_service: Arc<PaymentService>,
     pub blockchain_service: Arc<BlockchainService>,
     pub webhook_service: Arc<WebhookService>,
     pub cross_platform_service: Arc<CrossPlatformService>,
@@ -31,6 +33,7 @@ impl AppState {
         resource_service: ResourceService,
         api_key_service: ApiKeyService,
         paypal_service: PayPalService,
+        payment_service: PaymentService,
         blockchain_service: BlockchainService,
         webhook_service: WebhookService,
         cross_platform_service: CrossPlatformService,
@@ -42,6 +45,7 @@ impl AppState {
             resource_service: Arc::new(resource_service),
             api_key_service: Arc::new(api_key_service),
             paypal_service: Arc::new(paypal_service),
+            payment_service: Arc::new(payment_service),
             blockchain_service: Arc::new(blockchain_service),
             webhook_service: Arc::new(webhook_service),
             cross_platform_service: Arc::new(cross_platform_service),

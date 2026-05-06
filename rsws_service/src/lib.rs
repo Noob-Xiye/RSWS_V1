@@ -36,8 +36,11 @@ pub use user_service::UserService;
 pub use webhook_service::WebhookService;
 
 use std::sync::Arc;
-use rsws_db::{ApiKeyRepository, UserRepository, OrderRepository, ResourceRepository, WalletRepository};
-use rsws_db::RedisPool;
+use rsws_db::{
+    ApiKeyRepository, UserRepository, OrderRepository,
+    ResourceRepository, WalletRepository, RedisService,
+    PaymentRepository,
+};
 use rsws_common::config::{PayPalConfig, USDTConfig};
 
 /// 创建 PayPal 服务
@@ -60,16 +63,15 @@ pub fn create_cross_platform_service() -> CrossPlatformService {
     CrossPlatformService::new()
 }
 
-/// 创建 API Key 服务
+/// 创建 API Key 服务（已自动使用 Arc<ApiKeyRepository>）
 pub fn create_api_key_service(pool: sqlx::PgPool) -> ApiKeyService {
-    // TODO: check ApiKeyService::new signature, may need Arc wrapping
     ApiKeyService::new(Arc::new(ApiKeyRepository::new(pool)))
 }
 
 /// 创建用户服务
 pub fn create_user_service(
     pool: sqlx::PgPool,
-    redis: Option<RedisPool>,
+    redis: Option<RedisService>,
 ) -> UserService {
     let user_repo = UserRepository::new(pool);
     
@@ -91,6 +93,11 @@ pub fn create_resource_service(pool: sqlx::PgPool) -> ResourceService {
 }
 
 /// 创建配置服务
-pub fn create_config_service(pool: sqlx::PgPool) -> ConfigService {
-    ConfigService::new(pool)
+pub fn create_config_service(pool: sqlx::PgPool, redis: RedisService) -> ConfigService {
+    ConfigService::new(pool, redis)
+}
+
+/// 创建支付服务
+pub fn create_payment_service(pool: sqlx::PgPool) -> PaymentService {
+    PaymentService::new(Arc::new(PaymentRepository::new(pool)))
 }

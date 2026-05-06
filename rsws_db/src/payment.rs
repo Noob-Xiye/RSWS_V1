@@ -108,6 +108,33 @@ impl PaymentRepository {
         Ok(())
     }
 
+    /// 根据 PayPal order ID（provider_transaction_id）查找交易
+    pub async fn get_by_provider_tx(
+        &self,
+        provider_tx_id: &str,
+    ) -> Result<Option<PaymentTransaction>, RswsError> {
+        let tx = sqlx::query_as::<_, PaymentTransaction>(
+            "SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status, created_at, updated_at, completed_at FROM payment_transactions WHERE provider_transaction_id = $1",
+        )
+        .bind(provider_tx_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get transaction by provider tx: {}", e)))?;
+
+        Ok(tx)
+    }
+
+    /// 获取所有待处理交易（webhook 查找用，生产环境建议加索引）
+    pub async fn get_all_pending(&self) -> Result<Vec<PaymentTransaction>, RswsError> {
+        let txs = sqlx::query_as::<_, PaymentTransaction>(
+            "SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status, created_at, updated_at, completed_at FROM payment_transactions WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1000",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get pending transactions: {}", e)))?;
+        Ok(txs)
+    }
+
     /// 获取用户交易记录
     pub async fn get_user_transactions(
         &self,

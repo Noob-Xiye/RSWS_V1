@@ -43,17 +43,18 @@ async fn main() -> Result<(), RswsError> {
     info!("Redis connected");
 
     // 创建所有 service
-    let user_service = rsws_service::create_user_service(pool.clone(), Some(redis_pool));
+    let user_service = rsws_service::create_user_service(pool.clone(), Some(redis_pool.clone()));
     let order_service = rsws_service::create_order_service(pool.clone());
     let resource_service = rsws_service::create_resource_service(pool.clone());
     let api_key_service = rsws_service::create_api_key_service(pool.clone());
-    let config_service = rsws_service::create_config_service(pool.clone());
+    let config_service = rsws_service::create_config_service(pool.clone(), redis_pool.clone());
     let wallet_repo = rsws_db::WalletRepository::new(pool.clone());
 
     // PayPal/区块链/webhook/跨平台服务
     let paypal_config = config.paypal();
     let usdt_config = config.usdt();
     let paypal_service = rsws_service::create_paypal_service(paypal_config);
+    let payment_service = rsws_service::create_payment_service(pool.clone());
     let blockchain_service = rsws_service::create_blockchain_service(usdt_config, wallet_repo);
     let webhook_service = rsws_service::create_webhook_service();
     let cross_platform_service = rsws_service::create_cross_platform_service();
@@ -67,6 +68,7 @@ async fn main() -> Result<(), RswsError> {
         resource_service,
         api_key_service,
         paypal_service,
+        payment_service,
         blockchain_service,
         webhook_service,
         cross_platform_service,
