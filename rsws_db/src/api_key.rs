@@ -20,7 +20,8 @@ impl ApiKeyRepository {
 
     /// 生成 API Key 和 Secret
     fn generate_credentials() -> (String, String) {
-        let mut rng = rand::rng();
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::from_os_rng();
 
         // 生成 32 字节的随机数据作为 API Key
         let api_key_bytes: [u8; 32] = rng.random();
@@ -136,6 +137,38 @@ impl ApiKeyRepository {
             .map_err(|e| RswsError::internal(format!("Failed to delete API key: {}", e)))?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    /// 禁用指定 API Key
+    pub async fn deactivate_by_id(&self, key_id: i64) -> Result<bool, RswsError> {
+        let result = sqlx::query("UPDATE api_keys SET is_active = false, updated_at = NOW() WHERE id = $1")
+            .bind(key_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to deactivate API key: {}", e)))?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// 禁用用户所有 API Key（改密码/强制下线时使用）
+    pub async fn deactivate_by_user(&self, user_id: i64) -> Result<u64, RswsError> {
+        let result = sqlx::query("UPDATE api_keys SET is_active = false, updated_at = NOW() WHERE user_id = $1 AND is_active = true")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to deactivate user API keys: {}", e)))?;
+        Ok(result.rows_affected())
+    }
+
+    /// 获取用户所有活跃 API Key（用于 Redis 缓存清理）
+    pub async fn get_active_keys_by_user(&self, user_id: i64) -> Result<Vec<ApiKey>, RswsError> {
+        let keys = sqlx::query_as::<_, ApiKey>(
+            "SELECT id, user_id, api_key, api_secret, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at FROM api_keys WHERE user_id = $1 AND is_active = true"
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get active API keys: {}", e)))?;
+        Ok(keys)
     }
 }
 

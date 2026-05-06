@@ -5,7 +5,7 @@ use salvo::affix_state;
 use salvo::oapi::OpenApi;
 use salvo_oapi::swagger_ui::SwaggerUi;
 use crate::handler;
-use crate::middleware::auth::api_key_auth;
+use crate::middleware::auth::{api_key_auth, rate_limit};
 use crate::state::AppState;
 
 /// 创建路由（带 State 注入 + OpenAPI 文档）
@@ -14,10 +14,11 @@ pub fn create_router(state: AppState) -> Router {
         // 健康检查（无需认证）
         .push(Router::with_path("health").get(handler::health))
 
-        // API v1（带认证）
+        // API v1（统一 API Key 认证 + 速率限制）
         .push(
             Router::with_path("api/v1")
                 .hoop(api_key_auth)
+                .hoop(rate_limit)
                 // 用户相关
                 .push(Router::with_path("user")
                     .push(Router::new()
@@ -55,6 +56,43 @@ pub fn create_router(state: AppState) -> Router {
                         .push(Router::with_path("status").get(handler::order::check_order_status))
                     )
                 )
+
+                // 管理后台（同样使用 API Key 认证，handler 内检查 is_admin）
+                .push(Router::with_path("admin")
+                    .push(Router::new()
+                        .get(handler::admin::get_current_admin)
+                        .push(Router::with_path("list").get(handler::admin::list_admins))
+                        .push(Router::with_path("create").post(handler::admin::create_admin))
+                        .push(Router::with_path("api-keys")
+                            .get(handler::admin::list_api_keys)
+                            .post(handler::admin::create_api_key)
+                        )
+                        // 日志配置管理
+                        .push(Router::with_path("log-configs")
+                            .get(handler::admin::list_log_configs)
+                            .post(handler::admin::create_log_config)
+                        )
+                        // 日志查询
+                        .push(Router::with_path("logs/system").get(handler::admin::query_system_logs))
+                    )
+                    .push(Router::with_path("<id>")
+                        .get(handler::admin::get_admin)
+                        .push(Router::with_path("deactivate").post(handler::admin::deactivate_admin))
+                        .push(Router::with_path("api-keys/<key_id>").delete(handler::admin::delete_api_key))
+                    )
+                    // 日志配置详情/更新/删除
+                    .push(Router::with_path("log-configs/<key>")
+                        .get(handler::admin::get_log_config)
+                        .put(handler::admin::update_log_config)
+                        .delete(handler::admin::delete_log_config)
+                    )
+                )
+        )
+
+        // 管理员登录（无需 API Key，使用邮箱+密码）
+        .push(
+            Router::with_path("api/v1/admin/login")
+                .post(handler::admin::login)
         )
 
         // 支付相关（无需 API Key 认证）
@@ -78,7 +116,7 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .hoop(affix_state::inject(state))
-        // Swagger UI（访问 /swagger-ui 查看）
+        // Swagger UI
         .push(doc.into_router("/api-doc/openapi.json"))
         .push(SwaggerUi::new("/swagger-ui").into_router("/api-doc/openapi.json"))
         // 业务路由

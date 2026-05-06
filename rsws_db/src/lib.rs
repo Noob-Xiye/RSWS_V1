@@ -11,6 +11,7 @@ pub mod payment;
 pub mod resource;
 pub mod redis;
 pub mod wallet;
+pub mod admin;
 
 pub use user::UserRepository;
 pub use order::OrderRepository;
@@ -19,6 +20,7 @@ pub use resource::ResourceRepository;
 pub use api_key::ApiKeyRepository;
 pub use redis::RedisService;
 pub use wallet::WalletRepository;
+pub use admin::AdminRepository;
 
 /// Redis 连接池类型别名
 pub type RedisPool = RedisService;

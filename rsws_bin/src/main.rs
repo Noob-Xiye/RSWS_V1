@@ -120,7 +120,10 @@ async fn main() -> Result<(), RswsError> {
     };
     let order_service = rsws_service::create_order_service(pool.clone());
     let resource_service = rsws_service::create_resource_service(pool.clone());
-    let api_key_service = rsws_service::create_api_key_service(pool.clone());
+    let api_key_service = rsws_service::ApiKeyService::with_redis(
+        std::sync::Arc::new(rsws_db::ApiKeyRepository::new(pool.clone())),
+        redis_pool.clone(),
+    );
     let wallet_repo = rsws_db::WalletRepository::new(pool.clone());
 
     // PayPal 服务 — 配置从 DB 读取
@@ -131,6 +134,11 @@ async fn main() -> Result<(), RswsError> {
     let blockchain_service = rsws_service::create_blockchain_service(wallet_repo);
     let webhook_service = rsws_service::create_webhook_service(paypal_service.clone());
     let cross_platform_service = rsws_service::create_cross_platform_service();
+
+    // Admin 服务
+    let admin_repo = rsws_db::AdminRepository::new(pool.clone());
+    let admin_service = rsws_service::create_admin_service(pool.clone(), Some(redis_pool.clone()));
+    let log_service = rsws_service::LogService::new(pool.clone());
 
     info!("Services initialized");
 
@@ -146,6 +154,9 @@ async fn main() -> Result<(), RswsError> {
         webhook_service,
         cross_platform_service,
         config_service,
+        admin_service,
+        log_service,
+        admin_repo,
     );
 
     // ========== 5. 启动 USDT 监听服务（配置来自数据库） ==========

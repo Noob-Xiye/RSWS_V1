@@ -4,6 +4,7 @@ pub mod user;
 pub mod resource;
 pub mod order;
 pub mod payment;
+pub mod admin;
 
 use salvo::prelude::*;
 use salvo_oapi::endpoint;

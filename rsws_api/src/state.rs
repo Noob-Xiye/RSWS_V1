@@ -8,7 +8,8 @@ use rsws_service::{
     UserService, OrderService, ResourceService,
     ApiKeyService, PayPalService, BlockchainService,
     WebhookService, CrossPlatformService, ConfigService,
-    PaymentService,
+    PaymentService, AdminService, AdminRepository,
+    LogService,
 };
 
 /// 应用全局状态
@@ -24,6 +25,9 @@ pub struct AppState {
     pub webhook_service: Arc<WebhookService>,
     pub cross_platform_service: Arc<CrossPlatformService>,
     pub config_service: Arc<ConfigService>,
+    pub admin_service: Arc<AdminService>,
+    pub log_service: Arc<LogService>,
+    admin_repo: Arc<AdminRepository>,
 }
 
 impl AppState {
@@ -38,6 +42,9 @@ impl AppState {
         webhook_service: WebhookService,
         cross_platform_service: CrossPlatformService,
         config_service: ConfigService,
+        admin_service: AdminService,
+        log_service: LogService,
+        admin_repo: AdminRepository,
     ) -> Self {
         Self {
             user_service: Arc::new(user_service),
@@ -50,7 +57,15 @@ impl AppState {
             webhook_service: Arc::new(webhook_service),
             cross_platform_service: Arc::new(cross_platform_service),
             config_service: Arc::new(config_service),
+            admin_service: Arc::new(admin_service),
+            log_service: Arc::new(log_service),
+            admin_repo: Arc::new(admin_repo),
         }
+    }
+
+    /// 克隆 AdminRepository 用于中间件更新 last_used
+    pub fn admin_repo_clone(&self) -> Arc<AdminRepository> {
+        self.admin_repo.clone()
     }
 }
 

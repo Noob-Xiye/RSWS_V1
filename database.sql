@@ -642,6 +642,35 @@ CREATE INDEX IF NOT EXISTS idx_commission_records_status ON commission_records(s
 -- 跨平台表索引
 CREATE INDEX IF NOT EXISTS idx_cross_platform_configs_platform ON cross_platform_configs(platform_name);
 CREATE INDEX IF NOT EXISTS idx_cross_platform_orders_platform ON cross_platform_orders(platform_name);
+
+-- 日志配置表
+CREATE TABLE IF NOT EXISTS log_configs (
+    id SERIAL PRIMARY KEY,
+    config_key VARCHAR(100) NOT NULL UNIQUE,
+    config_value TEXT NOT NULL,
+    config_type VARCHAR(20) NOT NULL DEFAULT 'string',
+    description TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_log_configs_key ON log_configs(config_key);
+CREATE INDEX IF NOT EXISTS idx_log_configs_active ON log_configs(is_active);
+
+-- 日志配置初始数据
+INSERT INTO log_configs (config_key, config_value, config_type, description) VALUES
+('log.level', 'info', 'string', '日志级别: trace, debug, info, warn, error'),
+('log.enable_database_logging', 'true', 'boolean', '是否启用数据库日志'),
+('log.enable_file_logging', 'false', 'boolean', '是否启用文件日志'),
+('log.file_path', '/var/log/rsws/app.log', 'string', '日志文件路径'),
+('log.max_file_size', '10485760', 'number', '日志文件最大大小 (字节)'),
+('log.retention_days', '30', 'number', '日志保留天数'),
+('log.enable_error_logging', 'true', 'boolean', '是否启用错误日志'),
+('log.enable_operation_logging', 'true', 'boolean', '是否启用操作日志'),
+('log.enable_payment_logging', 'true', 'boolean', '是否启用支付日志'),
+('log.enable_request_logging', 'true', 'boolean', '是否启用请求日志')
+ON CONFLICT (config_key) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_cross_platform_orders_email ON cross_platform_orders(customer_email);
 CREATE INDEX IF NOT EXISTS idx_cross_platform_orders_status ON cross_platform_orders(status);
 
@@ -733,7 +762,8 @@ INSERT INTO system_configs (config_key, config_value, config_type, description, 
 ('security.password_require_special', 'false', 'boolean', '密码是否需要特殊字符', false, false),
 ('security.login_max_attempts', '5', 'number', '最大登录尝试次数', false, false),
 ('security.login_lockout_minutes', '15', 'number', '登录锁定时间 (分钟)', false, false),
-('security.enable_2fa', 'false', 'boolean', '是否启用双因素认证', false, false)
+('security.enable_2fa', 'false', 'boolean', '是否启用双因素认证', false, false),
+', false, false)
 ON CONFLICT (config_key) DO NOTHING;
 
 -- 资源配置
@@ -794,6 +824,7 @@ COMMENT ON TABLE commission_rules IS '佣金规则表';
 COMMENT ON TABLE commission_records IS '佣金记录表';
 COMMENT ON TABLE cross_platform_configs IS '跨平台配置表';
 COMMENT ON TABLE cross_platform_orders IS '跨平台订单表';
+COMMENT ON TABLE log_configs IS '日志配置表，后台可动态管理';
 
 -- 系统配置字段注释
 COMMENT ON COLUMN system_configs.config_key IS '配置键，使用点分隔命名空间 (如 api_key.session_expire_days)';

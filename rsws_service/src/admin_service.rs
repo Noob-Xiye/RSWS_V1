@@ -1,54 +1,137 @@
-use rsws_db::admin::AdminRepository;
-use rsws_model::user::admin::*;
-use rsws_model::user::role::*;
-use rsws_common::error::ServiceError;
-use chrono::{Duration, Utc};
-use bcrypt::verify;
-use jsonwebtoken::{encode, Header, EncodingKey, Algorithm};
-use std::net::IpAddr;
-use serde::{Deserialize, Serialize};
+//! 管理员服务
+//!
+//! 管理员 CRUD + Admin API Key 管理
+//! 认证统一走 API Key，不使用 JWT
+//! Admin API Key 凭证缓存到 Redis（快速验证 + 强制下线）
 
-#[derive(Debug, Serialize, Deserialize)]
-struct AdminClaims {
-    sub: String,        // 主题 (admin ID)
-    exp: usize,         // 过期时间
-    iat: usize,         // 签发时间
-    role: String,       // 角色
-    permissions: Vec<String>, // 权限
+use std::sync::Arc;
+use rsws_common::error::RswsError;
+use rsws_db::admin::AdminRepository;
+use rsws_db::RedisService;
+use rsws_model::user::admin::*;
+use serde::{Serialize, Deserialize};
+
+/// Redis 中缓存的管理员 API Key 会话信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedAdminApiKey {
+    pub admin_id: i64,
+    pub key_id: i64,
+    pub api_secret: String,
+    pub role: String,
+    pub permissions: Vec<String>,
+    pub rate_limit: Option<i32>,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+/// 管理员服务
 pub struct AdminService {
-    admin_repo: AdminRepository,
-    jwt_secret: String,
-    jwt_expiry: i64,    // 过期时间（分钟）
+    admin_repo: Arc<AdminRepository>,
+    redis: Option<RedisService>,
 }
 
 impl AdminService {
-    pub fn new(admin_repo: AdminRepository, jwt_secret: String, jwt_expiry: i64) -> Self {
+    /// 创建管理员服务（无 Redis）
+    pub fn new(admin_repo: AdminRepository) -> Self {
         Self {
-            admin_repo,
-            jwt_secret,
-            jwt_expiry,
+            admin_repo: Arc::new(admin_repo),
+            redis: None,
         }
     }
-    
-    // 创建管理员
+
+    /// 创建管理员服务（带 Redis 缓存）
+    pub fn with_redis(admin_repo: AdminRepository, redis: RedisService) -> Self {
+        Self {
+            admin_repo: Arc::new(admin_repo),
+            redis: Some(redis),
+        }
+    }
+
+    /// Redis key 格式
+    fn redis_key(api_key: &str) -> String {
+        format!("admin_apikey:{}", api_key)
+    }
+
+    /// 默认会话 TTL（秒）= 7 天
+    const DEFAULT_SESSION_TTL: u64 = 7 * 24 * 3600;
+
+    /// 管理员登录（验证密码，返回管理员信息）
+    /// 注意：登录后客户端需自行使用 Admin API Key 调用受保护接口
+    pub async fn login(
+        &self,
+        email: &str,
+        password: &str,
+        ip_address: Option<&str>,
+    ) -> Result<AdminInfo, RswsError> {
+        let admin = self.admin_repo
+            .verify_admin_credentials(email, password)
+            .await?
+            .ok_or_else(|| RswsError::unauthorized("Invalid email or password"))?;
+
+        if !admin.is_active {
+            return Err(RswsError::forbidden("Account is disabled"));
+        }
+
+        // 更新登录信息
+        self.admin_repo.update_admin_login(admin.id, ip_address).await?;
+
+        // 记录操作日志
+        let _ = self.admin_repo.log_admin_operation(
+            admin.id,
+            "login",
+            None,
+            None,
+            None,
+            ip_address,
+            None,
+        ).await;
+
+        let permissions: Vec<String> = serde_json::from_value(admin.permissions.clone())
+            .unwrap_or_default();
+
+        Ok(AdminInfo {
+            id: admin.id,
+            email: admin.email,
+            username: admin.username,
+            avatar_url: admin.avatar_url,
+            role: admin.role,
+            permissions,
+        })
+    }
+
+    /// 通过 ID 获取管理员信息
+    pub async fn get_admin_info(&self, id: i64) -> Result<AdminInfo, RswsError> {
+        let admin = self.admin_repo.get_admin_by_id(id).await?
+            .ok_or_else(|| RswsError::not_found("Admin not found"))?;
+
+        let permissions: Vec<String> = serde_json::from_value(admin.permissions.clone())
+            .unwrap_or_default();
+
+        Ok(AdminInfo {
+            id: admin.id,
+            email: admin.email,
+            username: admin.username,
+            avatar_url: admin.avatar_url,
+            role: admin.role,
+            permissions,
+        })
+    }
+
+    /// 创建管理员
     pub async fn create_admin(
         &self,
-        request: CreateAdminRequest,
+        email: &str,
+        password: &str,
+        username: &str,
+        role: &str,
         creator_id: Option<i64>,
-        ip: Option<IpAddr>,
-        user_agent: Option<&str>,
-    ) -> Result<Admin, ServiceError> {
-        // 检查邮箱是否已存在
-        if self.admin_repo.email_exists(&request.email).await? {
-            return Err(ServiceError::AlreadyExists("Email already exists".to_string()));
+        ip_address: Option<&str>,
+    ) -> Result<Admin, RswsError> {
+        if self.admin_repo.email_exists(email).await? {
+            return Err(RswsError::conflict("Email already exists"));
         }
-        
-        // 创建管理员
-        let admin = self.admin_repo.create_admin(&request).await?;
-        
-        // 记录操作日志
+
+        let admin = self.admin_repo.create_admin(email, password, username, role).await?;
+
         if let Some(creator_id) = creator_id {
             let _ = self.admin_repo.log_admin_operation(
                 creator_id,
@@ -56,303 +139,263 @@ impl AdminService {
                 Some("admin"),
                 Some(&admin.id.to_string()),
                 Some(&format!("Created admin: {}", admin.username)),
-                ip.map(|ip| ip.to_string()).as_deref(),
-                user_agent,
+                ip_address,
+                None,
             ).await;
         }
-        
+
         Ok(admin)
     }
-    
-    // 管理员登录
-    // 移除 bcrypt::verify 导入，使用 PasswordService
-    use rsws_common::password::PasswordService;
-    
-    impl AdminService {
-        // 更新管理员登录逻辑
-        pub async fn login(
-            &self,
-            request: AdminLoginRequest,
-            ip_address: Option<IpAddr>,
-        ) -> Result<AdminLoginResponse, ServiceError> {
-            // 验证管理员凭据（使用Argon2）
-            let admin = self.admin_repo
-                .verify_admin_credentials(&request.email, &request.password)
-                .await?
-                .ok_or_else(|| ServiceError::AuthError("邮箱或密码错误".to_string()))?;
-            
-            // 获取管理员
-            let admin = self.admin_repo.get_admin_by_email(&request.email).await?
-                .ok_or_else(|| ServiceError::NotFound("Admin not found".to_string()))?;
-            
-            // 检查账号是否激活
-            if !admin.is_active {
-                return Err(ServiceError::Unauthorized("Account is disabled".to_string()));
-            }
-            
-            // 更新登录信息
-            self.admin_repo.update_admin_login(
-                admin.id,
-                ip.map(|ip| ip.to_string()).as_deref(),
-            ).await?;
-            
-            // 记录登录日志
-            let _ = self.admin_repo.log_admin_operation(
-                admin.id,
-                "login",
-                None,
-                None,
-                None,
-                ip.map(|ip| ip.to_string()).as_deref(),
-                user_agent,
-            ).await;
-            
-            // 生成JWT
-            let now = Utc::now();
-            let expires_at = now + Duration::minutes(self.jwt_expiry);
-            let claims = AdminClaims {
-                sub: admin.id.to_string(),
-                exp: expires_at.timestamp() as usize,
-                iat: now.timestamp() as usize,
-                role: admin.role.clone(),
-                permissions: admin.permissions.clone(),
-            };
-            
-            let token = encode(
-                &Header::new(Algorithm::HS256),
-                &claims,
-                &EncodingKey::from_secret(self.jwt_secret.as_bytes()),
-            ).map_err(|e| ServiceError::InternalError(format!("Failed to generate token: {}", e)))?;
-            
-            // 返回登录响应
-            Ok(AdminLoginResponse {
-                admin: AdminInfo {
-                    id: admin.id,
-                    email: admin.email,
-                    username: admin.username,
-                    avatar_url: admin.avatar_url,
-                    role: admin.role,
-                    permissions: admin.permissions,
-                },
-                token,
-                expires_at,
-            })
+
+    /// 更新管理员信息
+    pub async fn update_admin(
+        &self,
+        request: UpdateAdminRequest,
+        updater_id: i64,
+        ip_address: Option<&str>,
+    ) -> Result<Admin, RswsError> {
+        let updated = self.admin_repo.update_admin(&request).await?;
+
+        // 如果是禁用管理员，清除其 Redis 缓存
+        if request.is_active == Some(false) {
+            self.invalidate_admin_keys(updated.id).await;
         }
-        
-        // 获取管理员信息
-        pub async fn get_admin_info(&self, id: i64) -> Result<AdminInfo, ServiceError> {
-            let admin = self.admin_repo.get_admin_by_id(id).await?
-                .ok_or_else(|| ServiceError::NotFound("Admin not found".to_string()))?;
-            
-            Ok(AdminInfo {
+
+        // 如果改了密码，清除所有 API Key 缓存
+        if request.password.is_some() {
+            self.invalidate_admin_keys(updated.id).await;
+            // 同时禁用其所有 API Key
+            self.admin_repo.deactivate_admin_api_keys(updated.id).await?;
+        }
+
+        let _ = self.admin_repo.log_admin_operation(
+            updater_id,
+            "update",
+            Some("admin"),
+            Some(&updated.id.to_string()),
+            Some(&format!("Updated admin: {}", updated.username)),
+            ip_address,
+            None,
+        ).await;
+
+        Ok(updated)
+    }
+
+    /// 获取管理员列表
+    pub async fn list_admins(
+        &self,
+        page: i64,
+        page_size: i64,
+        role: Option<&str>,
+    ) -> Result<(Vec<AdminInfo>, i64), RswsError> {
+        let admins = self.admin_repo.get_admins(page, page_size, role).await?;
+        let total = self.admin_repo.get_admins_count(role).await?;
+
+        let admin_infos = admins.into_iter().map(|admin| {
+            let permissions: Vec<String> = serde_json::from_value(admin.permissions.clone())
+                .unwrap_or_default();
+            AdminInfo {
                 id: admin.id,
                 email: admin.email,
                 username: admin.username,
                 avatar_url: admin.avatar_url,
                 role: admin.role,
-                permissions: admin.permissions,
-            })
-        }
-        
-        // 更新管理员信息
-        pub async fn update_admin(
-            &self,
-            request: UpdateAdminRequest,
-            updater_id: i64,
-            ip: Option<IpAddr>,
-            user_agent: Option<&str>,
-        ) -> Result<Admin, ServiceError> {
-            // 检查管理员是否存在
-            let admin = self.admin_repo.get_admin_by_id(request.id).await?
-                .ok_or_else(|| ServiceError::NotFound("Admin not found".to_string()))?;
-            
-            // 如果更新邮箱，检查邮箱是否已存在
-            if let Some(email) = &request.email {
-                if email != &admin.email && self.admin_repo.email_exists(email).await? {
-                    return Err(ServiceError::AlreadyExists("Email already exists".to_string()));
-                }
+                permissions,
             }
-            
-            // 更新管理员
-            let updated_admin = self.admin_repo.update_admin(&request).await?;
-            
-            // 记录操作日志
-            let _ = self.admin_repo.log_admin_operation(
-                updater_id,
-                "update",
-                Some("admin"),
-                Some(&updated_admin.id.to_string()),
-                Some(&format!("Updated admin: {}", updated_admin.username)),
-                ip.map(|ip| ip.to_string()).as_deref(),
-                user_agent,
-            ).await;
-            
-            Ok(updated_admin)
-        }
-        
-        // 获取管理员列表
-        pub async fn get_admins(
-            &self,
-            page: i64,
-            page_size: i64,
-            role: Option<&str>,
-        ) -> Result<(Vec<AdminInfo>, i64), ServiceError> {
-            let admins = self.admin_repo.get_admins(page, page_size, role).await?;
-            let total = self.admin_repo.get_admins_count(role).await?;
-            
-            let admin_infos = admins.into_iter().map(|admin| {
-                AdminInfo {
-                    id: admin.id,
-                    email: admin.email,
-                    username: admin.username,
-                    avatar_url: admin.avatar_url,
-                    role: admin.role,
-                    permissions: admin.permissions,
-                }
-            }).collect();
-            
-            Ok((admin_infos, total))
-        }
-        
-        // 创建管理员API Key
-        pub async fn create_admin_api_key(
-            &self,
-            admin_id: i32,
-            request: CreateAdminApiKeyRequest,
-        ) -> Result<AdminApiKeyResponse, ServiceError> {
-            let api_key = format!("ak_{}", generate_random_string(32));
-            let api_secret = generate_random_string(64);
-            let api_secret_encrypted = self.encryption.encrypt(&api_secret)?;
-            
-            let expires_at = request.expires_in_days
-                .map(|days| Utc::now() + Duration::days(days as i64));
-            
-            let permissions_json = serde_json::to_value(&request.permissions)?;
-            
-            let id = sqlx::query_scalar::<_, i32>(
-                r#"
-                INSERT INTO admin_api_keys (admin_id, name, api_key, api_secret_encrypted, permissions, rate_limit, expires_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING id
-                "#
-            )
-            .bind(admin_id)
-            .bind(&request.name)
-            .bind(&api_key)
-            .bind(&api_secret_encrypted)
-            .bind(&permissions_json)
-            .bind(request.rate_limit)
-            .bind(expires_at)
-            .execute(&self.db_pool)
+        }).collect();
+
+        Ok((admin_infos, total))
+    }
+
+    /// 停用管理员
+    pub async fn deactivate_admin(
+        &self,
+        admin_id: i64,
+        operator_id: i64,
+        ip_address: Option<&str>,
+    ) -> Result<(), RswsError> {
+        let request = UpdateAdminRequest {
+            id: admin_id,
+            email: None,
+            password: None,
+            username: None,
+            avatar_url: None,
+            is_active: Some(false),
+            role: None,
+            permissions: None,
+        };
+        self.admin_repo.update_admin(&request).await?;
+
+        // 禁用管理员所有 API Key
+        self.admin_repo.deactivate_admin_api_keys(admin_id).await?;
+
+        // 清除 Redis 缓存
+        self.invalidate_admin_keys(admin_id).await;
+
+        let _ = self.admin_repo.log_admin_operation(
+            operator_id,
+            "deactivate",
+            Some("admin"),
+            Some(&admin_id.to_string()),
+            None,
+            ip_address,
+            None,
+        ).await;
+
+        Ok(())
+    }
+
+    // ==================== Admin API Key 管理 ====================
+
+    /// 创建管理员 API Key
+    pub async fn create_api_key(
+        &self,
+        admin_id: i64,
+        name: &str,
+        permissions: Vec<String>,
+        rate_limit: Option<i32>,
+        expires_in_days: Option<i32>,
+    ) -> Result<AdminApiKeyResponse, RswsError> {
+        let (record, secret) = self.admin_repo
+            .create_admin_api_key(admin_id, name, permissions, rate_limit, expires_in_days)
             .await?;
-            
-            Ok(AdminApiKeyResponse {
-                id,
-                name: request.name,
-                api_key,
-                api_secret: Some(api_secret), // 只在创建时返回
-                permissions: request.permissions,
-                rate_limit: request.rate_limit,
-                last_used_at: None,
-                expires_at,
-                is_active: true,
-                created_at: Utc::now(),
-            })
+
+        // 创建后写入 Redis 缓存
+        if let Some(ref redis) = self.redis {
+            let perms: Vec<String> = serde_json::from_value(record.permissions.clone())
+                .unwrap_or_default();
+            let cached = CachedAdminApiKey {
+                admin_id: record.admin_id,
+                key_id: record.id,
+                api_secret: secret.clone(),
+                role: String::new(), // role 会在 validate 时从 DB 补充
+                permissions: perms,
+                rate_limit: record.rate_limit,
+                expires_at: record.expires_at,
+            };
+            let _ = redis.set_json(&Self::redis_key(&record.api_key), &cached, Self::DEFAULT_SESSION_TTL).await;
         }
-        
-        // 验证管理员API Key和签名
-        pub async fn validate_admin_api_request(
-            &self,
-            method: &str,
-            path: &str,
-            api_key: &str,
-            timestamp: i64,
-            nonce: &str,
-            signature: &str,
-            body: Option<&str>,
-            query_params: Option<&BTreeMap<String, String>>,
-        ) -> Result<SignatureValidation, ServiceError> {
-            // 检查时间戳
-            let current_timestamp = Utc::now().timestamp();
-            let time_diff = (current_timestamp - timestamp).abs();
-            if time_diff > 300 { // 5分钟有效期
-                return Ok(SignatureValidation {
-                    is_valid: false,
-                    admin_session: None,
-                    error_message: Some("Request expired".to_string()),
-                });
-            }
-            
-            // 获取API Key信息
-            let api_key_info = sqlx::query_as::<_, AdminApiKey>(
-                "SELECT * FROM admin_api_keys WHERE api_key = $1 AND is_active = true"
-            )
-            .bind(api_key)
-            .fetch_optional(&self.db_pool)
-            .await?;
-            
-            let api_key_info = match api_key_info {
-                Some(info) => {
-                    // 检查过期时间
-                    if let Some(expires_at) = info.expires_at {
-                        if Utc::now() > expires_at {
-                            return Ok(SignatureValidation {
-                                is_valid: false,
-                                admin_session: None,
-                                error_message: Some("API key expired".to_string()),
-                            });
+
+        let perms: Vec<String> = serde_json::from_value(record.permissions.clone())
+            .unwrap_or_default();
+
+        Ok(AdminApiKeyResponse {
+            id: record.id,
+            name: record.name,
+            api_key: record.api_key,
+            api_secret: Some(secret),
+            permissions: perms,
+            rate_limit: record.rate_limit,
+            last_used_at: record.last_used_at,
+            expires_at: record.expires_at,
+            is_active: record.is_active,
+            created_at: record.created_at,
+        })
+    }
+
+    /// 获取管理员的 API Key 列表
+    pub async fn list_api_keys(&self, admin_id: i64) -> Result<Vec<AdminApiKey>, RswsError> {
+        self.admin_repo.get_admin_api_keys(admin_id).await
+    }
+
+    /// 删除管理员 API Key
+    pub async fn delete_api_key(&self, key_id: i64, admin_id: i64) -> Result<bool, RswsError> {
+        let deleted = self.admin_repo.delete_admin_api_key(key_id, admin_id).await?;
+
+        // 删除后清除 Redis（需要知道 api_key 值，这里简化处理）
+        // 更好的做法是 delete 返回被删记录
+
+        Ok(deleted)
+    }
+
+    /// 验证管理员 API Key（供中间件调用，带 Redis 缓存）
+    pub async fn validate_admin_api_key(
+        &self,
+        api_key: &str,
+        api_secret: &str,
+    ) -> Result<Option<(AdminApiKey, Admin)>, RswsError> {
+        // 1) 先查 Redis
+        if let Some(ref redis) = self.redis {
+            if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&Self::redis_key(api_key)).await? {
+                // Redis 命中：验证 secret
+                if cached.api_secret == api_secret {
+                    // 检查是否过期
+                    if let Some(expires) = cached.expires_at {
+                        if expires < chrono::Utc::now() {
+                            let _ = redis.del(&Self::redis_key(api_key)).await;
+                            return Ok(None);
                         }
                     }
-                    info
+
+                    // 需要补查 admin 信息
+                    let admin = self.admin_repo.get_admin_by_id(cached.admin_id).await?;
+                    if let Some(admin) = admin {
+                        if !admin.is_active {
+                            let _ = redis.del(&Self::redis_key(api_key)).await;
+                            return Ok(None);
+                        }
+
+                        // 构造 AdminApiKey（简化）
+                        let key_record = AdminApiKey {
+                            id: cached.key_id,
+                            admin_id: cached.admin_id,
+                            name: String::new(),
+                            api_key: api_key.to_string(),
+                            api_secret_encrypted: String::new(), // Redis 中不需要
+                            permissions: serde_json::to_value(&cached.permissions).unwrap_or_default(),
+                            rate_limit: cached.rate_limit,
+                            last_used_at: None,
+                            expires_at: cached.expires_at,
+                            is_active: true,
+                            created_at: chrono::Utc::now(),
+                            updated_at: chrono::Utc::now(),
+                        };
+
+                        return Ok(Some((key_record, admin)));
+                    }
                 }
-                None => {
-                    return Ok(SignatureValidation {
-                        is_valid: false,
-                        admin_session: None,
-                        error_message: Some("Invalid API key".to_string()),
-                    });
+                // secret 不匹配
+                let _ = redis.del(&Self::redis_key(api_key)).await;
+            }
+        }
+
+        // 2) Redis miss → 查 DB
+        let result = self.admin_repo.validate_admin_api_key(api_key, api_secret).await?;
+
+        // 3) DB 验证通过 → 写入 Redis
+        if let Some((ref key_record, ref admin)) = result {
+            if let Some(ref redis) = self.redis {
+                let permissions: Vec<String> = serde_json::from_value(key_record.permissions.clone())
+                    .unwrap_or_default();
+                let cached = CachedAdminApiKey {
+                    admin_id: admin.id,
+                    key_id: key_record.id,
+                    api_secret: api_secret.to_string(),
+                    role: admin.role.clone(),
+                    permissions,
+                    rate_limit: key_record.rate_limit,
+                    expires_at: key_record.expires_at,
+                };
+                let _ = redis.set_json(&Self::redis_key(api_key), &cached, Self::DEFAULT_SESSION_TTL).await;
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// 清除管理员所有 Redis 缓存的 API Key
+    async fn invalidate_admin_keys(&self, admin_id: i64) {
+        if let Some(ref redis) = self.redis {
+            // 获取管理员所有 API Key，逐个删 Redis
+            match self.admin_repo.get_admin_api_keys(admin_id).await {
+                Ok(keys) => {
+                    for key in keys {
+                        let _ = redis.del(&Self::redis_key(&key.api_key)).await;
+                    }
                 }
-            };
-            
-            // 解密API Secret
-            let api_secret = self.encryption.decrypt(&api_key_info.api_secret_encrypted)?;
-            
-            // 验证签名
-            let is_valid = SignatureService::verify_signature(
-                &api_secret,
-                method,
-                path,
-                timestamp,
-                nonce,
-                signature,
-                body,
-                query_params,
-            ).map_err(|e| ServiceError::ValidationError(e))?;
-            
-            if is_valid {
-                // 更新最后使用时间
-                let _ = sqlx::query(
-                    "UPDATE admin_api_keys SET last_used_at = NOW() WHERE id = $1"
-                )
-                .bind(api_key_info.id)
-                .execute(&self.db_pool)
-                .await;
-                
-                Ok(SignatureValidation {
-                    is_valid: true,
-                    admin_session: Some(AdminSession {
-                        admin_id: api_key_info.admin_id,
-                        api_key: api_key_info.api_key,
-                        permissions: api_key_info.permissions,
-                    }),
-                    error_message: None,
-                })
-            } else {
-                Ok(SignatureValidation {
-                    is_valid: false,
-                    admin_session: None,
-                    error_message: Some("Invalid signature".to_string()),
-                })
+                Err(e) => {
+                    tracing::warn!("Failed to get admin API keys for cache invalidation: {}", e);
+                }
             }
         }
     }

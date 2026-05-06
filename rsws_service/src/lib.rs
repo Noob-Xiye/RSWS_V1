@@ -17,6 +17,7 @@ pub mod resource_service;
 pub mod user_payment_service;
 pub mod user_service;
 pub mod webhook_service;
+pub mod admin_service;
 
 // 导出主要服务
 pub use api_key_service::ApiKeyService;
@@ -27,6 +28,7 @@ pub use config_service::ConfigService;
 pub use config_service::{PayPalDbConfig, BlockchainDbConfig, EmailDbConfig, UsdtListenDbConfig};
 pub use cross_platform_service::CrossPlatformService;
 pub use log_service::LogService;
+pub use log_service::{LogConfig, UpdateLogConfigRequest};
 pub use order_service::OrderService;
 pub use payment_service::PaymentService;
 pub use paypal_service::PayPalService;
@@ -35,6 +37,8 @@ pub use resource_service::ResourceService;
 pub use user_payment_service::UserPaymentService;
 pub use user_service::UserService;
 pub use webhook_service::WebhookService;
+pub use admin_service::AdminService;
+pub use rsws_db::admin::AdminRepository;
 
 use std::sync::Arc;
 use rsws_db::{
@@ -115,4 +119,13 @@ pub fn create_config_service(pool: sqlx::PgPool, redis: RedisService) -> ConfigS
 /// 创建支付服务
 pub fn create_payment_service(pool: sqlx::PgPool) -> PaymentService {
     PaymentService::new(Arc::new(PaymentRepository::new(pool)))
+}
+
+/// 创建管理员服务
+pub fn create_admin_service(pool: sqlx::PgPool, redis: Option<RedisService>) -> AdminService {
+    if let Some(redis) = redis {
+        AdminService::with_redis(AdminRepository::new(pool), redis)
+    } else {
+        AdminService::new(AdminRepository::new(pool))
+    }
 }

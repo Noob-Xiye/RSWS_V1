@@ -205,11 +205,21 @@ pub async fn get_usdt_address(req: &mut Request, depot: &mut Depot, res: &mut Re
 
     let state = get_state(depot);
 
-    let contract = match network.as_str() {
-        "tron" => "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
-        "ethereum" => "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-        _ => {
-            res.http_error(StatusCode::BAD_REQUEST, "Unsupported network, use 'tron' or 'ethereum'");
+    // 从 DB 配置读取合约地址
+    let blockchain_configs = match state.config_service.get_blockchain_configs().await {
+        Ok(configs) => configs,
+        Err(e) => {
+            tracing::error!("Failed to load blockchain configs: {}", e);
+            res.http_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load blockchain config");
+            return;
+        }
+    };
+
+    let bc_config = blockchain_configs.iter().find(|c| c.network == network && c.is_active);
+    let contract = match bc_config {
+        Some(c) => c.usdt_contract.clone(),
+        None => {
+            res.http_error(StatusCode::BAD_REQUEST, "Unsupported or inactive network, use 'tron' or 'ethereum'");
             return;
         }
     };
