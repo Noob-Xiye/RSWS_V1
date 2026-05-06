@@ -15,7 +15,7 @@ resolver = "2"
 salvo = { git = "https://github.com/salvo-rs/salvo", features = ["oapi", "cors", "compression", "serve-static", "rustls", "server", "http1", "http2", "affix-state"], default-features = false }
 salvo-cache = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-compression = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
-salvo-cors = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
+salvo-cors = { git = "https://github.com/salvo-rs/salvo", default-features = false }
 salvo-csrf = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-flash = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-jwt-auth = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }

@@ -3,6 +3,9 @@
 use salvo::prelude::*;
 use salvo::affix_state;
 use salvo::oapi::OpenApi;
+use salvo_cors::Cors;
+use salvo_cors::Any;
+use salvo::http::Method;
 use salvo_oapi::swagger_ui::SwaggerUi;
 use crate::handler;
 use crate::middleware::auth::{api_key_auth, rate_limit};
@@ -114,7 +117,16 @@ pub fn create_router(state: AppState) -> Router {
     let doc = OpenApi::new("RSWS API", "0.1.0")
         .merge_router(&api_routes);
 
+    // CORS 中间件 — 允许前端跨域访问
+    let cors = Cors::new()
+        .allow_origin(Any)
+        .allow_methods(vec![Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_headers(vec!["Content-Type", "Authorization", "X-Api-Key", "X-Signature"])
+        .allow_credentials(true)
+        .max_age(3600);
+
     Router::new()
+        .hoop(cors.into_handler())
         .hoop(affix_state::inject(state))
         // Swagger UI
         .push(doc.into_router("/api-doc/openapi.json"))

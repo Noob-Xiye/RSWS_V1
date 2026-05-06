@@ -2397,6 +2397,7 @@ dependencies = [
  "rsws_model",
  "rsws_service",
  "salvo",
+ "salvo-cors",
  "salvo-oapi",
  "serde",
  "serde_json",
