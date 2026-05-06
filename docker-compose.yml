@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rsws-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rsws}
+      POSTGRES_USER: ${POSTGRES_USER:-rsws}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rsws_secret}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rsws}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: rsws-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-rsws_redis}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-rsws_redis}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rsws:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rsws-server
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-5170}:5170"
+    environment:
+      RSWS_DATABASE_URL: postgres://${POSTGRES_USER:-rsws}:${POSTGRES_PASSWORD:-rsws_secret}@postgres:5432/${POSTGRES_DB:-rsws}
+      RSWS_REDIS_URL: redis://:${REDIS_PASSWORD:-rsws_redis}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./rsws_bin/config.toml:/app/config.toml:ro
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -3,8 +3,12 @@
 //! 仅保留启动时必需的配置（server/database/redis/encryption）。
 //! 所有业务配置（PayPal/区块链/Email/USDT监听等）从数据库读取，
 //! 通过 ConfigService 提供。
+//!
+//! 优先级：环境变量 > config.toml
+//! 环境变量前缀：RSWS_，分隔符：_
+//! 例如：RSWS_DATABASE_URL 覆盖 database.url
 
-use config::{Config, ConfigError};
+use config::{Config, ConfigError, Environment};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -43,7 +47,14 @@ pub struct AppConfig {
 
 pub fn load_config() -> Result<AppConfig, ConfigError> {
     let config = Config::builder()
+        // 1. 从 config.toml 读取基础配置
         .add_source(config::File::with_name("config.toml"))
+        // 2. 环境变量覆盖（RSWS_ 前缀，支持 RSWS_DATABASE_URL 覆盖 database.url 等）
+        .add_source(
+            Environment::with_prefix("RSWS")
+                .prefix_separator("_")
+                .separator("_")
+        )
         .build()?;
 
     config.try_deserialize::<AppConfig>()
