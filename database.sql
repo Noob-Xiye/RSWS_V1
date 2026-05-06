@@ -1,4 +1,4 @@
--- ========================================
+﻿-- ========================================
 -- RSWS 统一数据库架构文件
 -- 版本: v0.1.0
 -- 生成时间: 2026-05-05
@@ -133,8 +133,9 @@ CREATE TABLE IF NOT EXISTS orders (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     expired_at TIMESTAMP WITH TIME ZONE,
-    UNIQUE(user_id, resource_id)
-);
+    referrer_id BIGINT REFERENCES users(id),
+    transaction_id VARCHAR(50),
+    UNIQUE(user_id, resource_id)\n);
 
 -- 支付交易表
 CREATE TABLE IF NOT EXISTS payment_transactions (
@@ -650,9 +651,26 @@ CREATE INDEX IF NOT EXISTS idx_cross_platform_orders_status ON cross_platform_or
 
 -- 区块链配置
 INSERT INTO blockchain_configs (network, network_name, api_url, usdt_contract, wallet_addresses, min_confirmations) VALUES
-('tron', 'TRON', 'https://api.trongrid.io', 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', '[]', 1),
-('ethereum', 'Ethereum', 'https://api.etherscan.io/api', '0xdAC17F958D2ee523a2206206994597C13D831ec7', '[]', 12)
+('tron', 'TRON', 'https://api.trongrid.io', 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', '[]', 3),
+('ethereum', 'Ethereum', 'https://api.etherscan.io', '0xdAC17F958D2ee523a2206206994597C13D831ec7', '[]', 12)
 ON CONFLICT (network) DO NOTHING;
+
+-- PayPal 配置（sandbox 默认，正式环境更新 client_secret 和 sandbox=false）
+INSERT INTO paypal_configs (client_id, client_secret_encrypted, sandbox, webhook_id, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate)
+VALUES (
+    'sandbox_client_id_placeholder',
+    'sandbox_client_secret_placeholder',
+    true,
+    NULL,
+    'https://api-m.sandbox.paypal.com',
+    'http://localhost:3000/payment/success',
+    'http://localhost:3000/payment/cancel',
+    'RSWS Store',
+    0.01,
+    10000.00,
+    0.0349
+)
+ON CONFLICT DO NOTHING;
 
 -- 支付方式配置
 INSERT INTO payment_method_configs (method_id, method_name, icon_url, sort_order) VALUES

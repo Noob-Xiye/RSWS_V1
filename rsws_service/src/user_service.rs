@@ -49,6 +49,18 @@ impl UserService {
         }
     }
 
+    /// 创建用户服务实例（带 Email，无 Redis）
+    pub fn with_redis_and_email(
+        user_repo: UserRepository,
+        email_service: EmailService,
+    ) -> Self {
+        Self {
+            user_repo,
+            redis: None,
+            email_service: Some(email_service),
+        }
+    }
+
     /// 用户注册
     pub async fn register(&self, req: &RegisterRequest) -> Result<User, RswsError> {
         // 检查用户名是否已存在

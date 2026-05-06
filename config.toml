@@ -19,8 +19,18 @@ pool_size = 10
 [encryption]
 key = "your-32-byte-encryption-key-here!!"  # 32字节密钥，用于敏感数据加密
 
-# 注意：以下配置项将通过数据库动态管理，不在config.toml中配置：
-# - Email配置：通过EMAIL_CONFIGS表管理  
-# - Blockchain配置：通过BLOCKCHAIN_PLUGIN_CONFIGS表管理
-# - Download配置：通过DOWNLOAD_PLUGIN_CONFIGS表管理
-# - 其他业务配置：通过相应的配置表管理
+# ============================================================
+# 以下配置项已迁移到数据库管理，不再在 config.toml 中配置：
+#
+# [PayPal 配置]     → paypal_configs 表
+# [USDT/区块链配置] → blockchain_configs 表 + usdt_listen_configs 表
+# [Email 配置]      → email_configs 表
+# [加密密钥]        → encryption_configs 表
+# [API Key 配置]    → system_configs 表 (api_key.* 前缀)
+# [安全配置]        → system_configs 表 (security.* 前缀)
+# [系统参数]        → system_configs 表 (system.* 前缀)
+# [支付配置]        → system_configs 表 (payment.* 前缀)
+# [资源配置]        → system_configs 表 (resource.* 前缀)
+# [日志配置]        → system_configs 表 (log.* 前缀)
+# [通知配置]        → system_configs 表 (notification.* 前缀)
+# ============================================================

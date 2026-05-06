@@ -24,6 +24,7 @@ pub use auth_service::AuthService;
 pub use blockchain_service::BlockchainService;
 pub use commission_service::CommissionService;
 pub use config_service::ConfigService;
+pub use config_service::{PayPalDbConfig, BlockchainDbConfig, EmailDbConfig, UsdtListenDbConfig};
 pub use cross_platform_service::CrossPlatformService;
 pub use log_service::LogService;
 pub use order_service::OrderService;
@@ -41,21 +42,20 @@ use rsws_db::{
     ResourceRepository, WalletRepository, RedisService,
     PaymentRepository,
 };
-use rsws_common::config::{PayPalConfig, USDTConfig};
 
-/// 创建 PayPal 服务
-pub fn create_paypal_service(config: PayPalConfig) -> PayPalService {
+/// 创建 PayPal 服务（配置从数据库读取）
+pub fn create_paypal_service(config: Option<crate::config_service::PayPalDbConfig>) -> PayPalService {
     PayPalService::new(config)
 }
 
-/// 创建区块链服务
-pub fn create_blockchain_service(config: USDTConfig, wallet_repo: WalletRepository) -> BlockchainService {
-    BlockchainService::new(config, wallet_repo)
+/// 创建区块链服务（配置从数据库读取）
+pub fn create_blockchain_service(wallet_repo: WalletRepository) -> BlockchainService {
+    BlockchainService::new(wallet_repo)
 }
 
 /// 创建 Webhook 服务
-pub fn create_webhook_service() -> WebhookService {
-    WebhookService::new()
+pub fn create_webhook_service(paypal_service: Arc<PayPalService>) -> WebhookService {
+    WebhookService::new(paypal_service)
 }
 
 /// 创建跨平台服务
@@ -79,6 +79,21 @@ pub fn create_user_service(
         UserService::with_redis(user_repo, redis)
     } else {
         UserService::new(user_repo)
+    }
+}
+
+/// 创建用户服务（带 Email）
+pub fn create_user_service_with_email(
+    pool: sqlx::PgPool,
+    redis: Option<RedisService>,
+    email_service: rsws_common::email::EmailService,
+) -> UserService {
+    let user_repo = UserRepository::new(pool);
+    if let Some(redis) = redis {
+        UserService::with_services(user_repo, redis, email_service)
+    } else {
+        // 没有 Redis 的情况，用 with_email
+        UserService::with_redis_and_email(user_repo, email_service)
     }
 }
 

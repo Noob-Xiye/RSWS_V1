@@ -2,11 +2,12 @@
 
 use crate::{
     config::{UsdtConfig, WalletAddress, ListenerStatus},
-    processor::TransactionProcessor,
+    processor::{TransactionProcessor, UsdtTransaction},
     tron::TronClient,
     ethereum::EthereumClient,
     UsdtError,
 };
+use chrono::Utc;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
@@ -21,7 +22,6 @@ pub struct UsdtListener {
 }
 
 impl UsdtListener {
-    /// 创建新监听服务
     pub fn new(
         db_pool: PgPool,
         tron_config: Option<UsdtConfig>,
@@ -29,12 +29,7 @@ impl UsdtListener {
     ) -> Self {
         let tron_client = tron_config.as_ref().map(|c| TronClient::new(c));
         let ethereum_client = ethereum_config.as_ref().map(|c| EthereumClient::new(c));
-
-        // 使用精确匹配策略
-        let processor = TransactionProcessor::new(
-            db_pool.clone(),
-            crate::matcher::MatchStrategy::Exact,
-        );
+        let processor = TransactionProcessor::new(db_pool.clone());
 
         Self {
             db_pool,
@@ -45,34 +40,26 @@ impl UsdtListener {
     }
 
     /// 启动监听服务
-    ///
-    /// 生成两个后台任务，分别监听 Tron 和 Ethereum 网络
     pub async fn start(&self) {
         info!("Starting USDT listener service");
 
-        // 启动 Tron 监听任务
         if let Some(ref client) = self.tron_client {
             let db_pool = self.db_pool.clone();
             let processor = self.processor.clone();
             let client = client.clone();
-
             tokio::spawn(async move {
                 Self::listen_tron(db_pool, client, processor).await;
             });
-
             info!("Tron listener started");
         }
 
-        // 启动 Ethereum 监听任务
         if let Some(ref client) = self.ethereum_client {
             let db_pool = self.db_pool.clone();
             let processor = self.processor.clone();
             let client = client.clone();
-
             tokio::spawn(async move {
                 Self::listen_ethereum(db_pool, client, processor).await;
             });
-
             info!("Ethereum listener started");
         }
     }
@@ -89,7 +76,6 @@ impl UsdtListener {
         loop {
             interval.tick().await;
 
-            // 获取收款地址列表
             let wallets = match Self::get_active_wallets(&db_pool, "tron").await {
                 Ok(w) => w,
                 Err(e) => {
@@ -102,7 +88,6 @@ impl UsdtListener {
                 continue;
             }
 
-            // 获取最新区块高度
             let latest_block = match client.get_latest_block_number().await {
                 Ok(b) => b,
                 Err(e) => {
@@ -111,38 +96,37 @@ impl UsdtListener {
                 }
             };
 
-            // 检查每个地址的交易
             for wallet in wallets {
                 match client.get_transactions(&wallet.address, 20).await {
                     Ok(transactions) => {
-                        for tx in transactions {
-                            // 计算确认数
+                        for raw_tx in transactions {
                             let confirmations = client.calculate_confirmations(
-                                tx.block_number,
+                                raw_tx.block_number,
                                 latest_block,
                             );
 
-                            // 检查确认数是否足够
                             if !client.is_confirmed(confirmations) {
                                 continue;
                             }
 
-                            // 处理交易
-                            match processor.process_transaction(
-                                &tx.tx_id,
-                                "tron",
-                                &tx.from,
-                                &tx.to,
-                                tx.amount,
-                                tx.block_number as i64,
-                                confirmations as i32,
-                            ).await {
-                                Ok(result) => {
-                                    info!("Tron transaction processed: {:?}", result);
-                                }
-                                Err(e) => {
-                                    error!("Failed to process Tron transaction: {}", e);
-                                }
+                            let tx = UsdtTransaction {
+                                id: rsws_common::snowflake::next_id(),
+                                tx_hash: raw_tx.tx_id,
+                                network: "tron".to_string(),
+                                from_address: raw_tx.from,
+                                to_address: raw_tx.to,
+                                amount: raw_tx.amount,
+                                block_number: raw_tx.block_number as i64,
+                                confirmations: confirmations as i32,
+                                status: "pending".to_string(),
+                                order_id: None,
+                                processed_at: None,
+                                created_at: Utc::now(),
+                            };
+
+                            match processor.process_transaction(tx).await {
+                                Ok(result) => info!("Tron transaction processed: matched={}", result),
+                                Err(e) => error!("Failed to process Tron transaction: {}", e),
                             }
                         }
                     }
@@ -167,7 +151,7 @@ impl UsdtListener {
         loop {
             interval.tick().await;
 
-            // 获取收款地址列表
+            // 从数据库读取以太坊收款地址
             let wallets = match Self::get_active_wallets(&db_pool, "ethereum").await {
                 Ok(w) => w,
                 Err(e) => {
@@ -180,32 +164,32 @@ impl UsdtListener {
                 continue;
             }
 
-            // 检查每个地址的交易
             for wallet in wallets {
                 match client.get_transactions(&wallet.address, 20).await {
                     Ok(transactions) => {
-                        for tx in transactions {
-                            // 检查确认数是否足够
-                            if !client.is_confirmed(tx.confirmations) {
+                        for raw_tx in transactions {
+                            if !client.is_confirmed(raw_tx.confirmations) {
                                 continue;
                             }
 
-                            // 处理交易
-                            match processor.process_transaction(
-                                &tx.tx_hash,
-                                "ethereum",
-                                &tx.from,
-                                &tx.to,
-                                tx.amount,
-                                tx.block_number as i64,
-                                tx.confirmations as i32,
-                            ).await {
-                                Ok(result) => {
-                                    info!("Ethereum transaction processed: {:?}", result);
-                                }
-                                Err(e) => {
-                                    error!("Failed to process Ethereum transaction: {}", e);
-                                }
+                            let tx = UsdtTransaction {
+                                id: rsws_common::snowflake::next_id(),
+                                tx_hash: raw_tx.tx_hash,
+                                network: "ethereum".to_string(),
+                                from_address: raw_tx.from,
+                                to_address: raw_tx.to,
+                                amount: raw_tx.amount,
+                                block_number: raw_tx.block_number as i64,
+                                confirmations: raw_tx.confirmations as i32,
+                                status: "pending".to_string(),
+                                order_id: None,
+                                processed_at: None,
+                                created_at: Utc::now(),
+                            };
+
+                            match processor.process_transaction(tx).await {
+                                Ok(result) => info!("Ethereum transaction processed: matched={}", result),
+                                Err(e) => error!("Failed to process Ethereum transaction: {}", e),
                             }
                         }
                     }
@@ -217,7 +201,6 @@ impl UsdtListener {
         }
     }
 
-    /// 获取活跃的收款地址
     async fn get_active_wallets(
         db_pool: &PgPool,
         network: &str,
@@ -227,7 +210,8 @@ impl UsdtListener {
         )
         .bind(network)
         .fetch_all(db_pool)
-        .await?;
+        .await
+        .map_err(|e| UsdtError::DatabaseError(e.to_string()))?;
 
         Ok(rows
             .into_iter()
@@ -241,7 +225,6 @@ impl UsdtListener {
             .collect())
     }
 
-    /// 获取监听状态
     pub async fn get_status(&self) -> Vec<ListenerStatus> {
         let mut statuses = Vec::new();
 
@@ -268,30 +251,5 @@ impl UsdtListener {
         }
 
         statuses
-    }
-}
-
-// 为 TronClient 和 EthereumClient 实现 Clone
-impl Clone for TronClient {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-            api_url: self.api_url.clone(),
-            api_key: self.api_key.clone(),
-            usdt_contract: self.usdt_contract.clone(),
-            min_confirmations: self.min_confirmations,
-        }
-    }
-}
-
-impl Clone for EthereumClient {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-            api_url: self.api_url.clone(),
-            api_key: self.api_key.clone(),
-            usdt_contract: self.usdt_contract.clone(),
-            min_confirmations: self.min_confirmations,
-        }
     }
 }

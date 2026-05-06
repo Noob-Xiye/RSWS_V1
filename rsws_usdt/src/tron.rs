@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// TronGrid API 客户端
+#[derive(Clone)]
 pub struct TronClient {
     pub client: Client,
     pub api_url: String,

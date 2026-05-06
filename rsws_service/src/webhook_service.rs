@@ -1,16 +1,21 @@
 //! Webhook 服务
 
+use std::sync::Arc;
 use rsws_common::error::RswsError;
 use serde_json::Value;
 use tracing::info;
 
+use crate::PayPalService;
+
 /// Webhook 服务
-pub struct WebhookService;
+pub struct WebhookService {
+    paypal_service: Arc<PayPalService>,
+}
 
 impl WebhookService {
     /// 创建 Webhook 服务实例
-    pub fn new() -> Self {
-        Self
+    pub fn new(paypal_service: Arc<PayPalService>) -> Self {
+        Self { paypal_service }
     }
 
     /// 处理 PayPal Webhook
@@ -67,21 +72,12 @@ impl WebhookService {
         Ok(status.to_uppercase())
     }
 
-    /// 验证 PayPal Webhook 签名
+    /// 验证 PayPal Webhook 签名（委托给 PayPalService）
     pub async fn verify_paypal_signature(
         &self,
-        _headers: &[(String, String)],
-        _body: &[u8],
+        headers: &[(String, String)],
+        body: &[u8],
     ) -> Result<bool, RswsError> {
-        // TODO: 实现真实的 PayPal Webhook 签名验证
-        // https://developer.paypal.com/docs/api-basics/notifications/webhooks/verify-webhook-signatures/
-        
-        Ok(true)
-    }
-}
-
-impl Default for WebhookService {
-    fn default() -> Self {
-        Self::new()
+        self.paypal_service.verify_webhook(headers, body).await
     }
 }
