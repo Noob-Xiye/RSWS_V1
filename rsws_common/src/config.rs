@@ -33,6 +33,8 @@ pub struct PayPalConfig {
     pub mode: String, // "sandbox" or "live"
     pub return_url: String,
     pub cancel_url: String,
+    #[serde(default)]
+    pub webhook_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -42,6 +44,10 @@ pub struct USDTConfig {
     pub trc20_private_key: Option<String>,
     pub erc20_private_key: Option<String>,
     pub confirmations_required: u32,
+    #[serde(default)]
+    pub trongrid_api_key: Option<String>,
+    #[serde(default)]
+    pub etherscan_api_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -71,6 +77,7 @@ impl AppConfig {
             mode: "sandbox".to_string(),
             return_url: "http://localhost:3000/payment/success".to_string(),
             cancel_url: "http://localhost:3000/payment/cancel".to_string(),
+            webhook_id: None,
         })
     }
 
@@ -82,6 +89,8 @@ impl AppConfig {
             trc20_private_key: None,
             erc20_private_key: None,
             confirmations_required: 3,
+            trongrid_api_key: None,
+            etherscan_api_key: None,
         })
     }
 }

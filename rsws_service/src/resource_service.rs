@@ -1,9 +1,11 @@
 //! 资源服务
 
 use rsws_common::error::RswsError;
+use rsws_common::error_code::ErrorCode;
 use rsws_db::ResourceRepository;
-use rsws_model::resource::Resource;
+use rsws_model::resource::{Resource, CreateResourceRequest, UpdateResourceRequest};
 use std::sync::Arc;
+use tracing::info;
 
 /// 资源服务
 pub struct ResourceService {
@@ -29,5 +31,59 @@ impl ResourceService {
         page_size: i64,
     ) -> Result<(Vec<Resource>, i64), RswsError> {
         self.resource_repo.get_list(category_id, page, page_size).await
+    }
+
+    /// 创建资源
+    pub async fn create(&self, req: CreateResourceRequest, user_id: i64) -> Result<Resource, RswsError> {
+        // 验证价格
+        if req.price < 0 {
+            return Err(RswsError::business(ErrorCode::INVALID_PARAMETER));
+        }
+
+        let resource = self.resource_repo.create(
+            user_id,
+            &req,
+        ).await?;
+
+        info!("Resource created: {} by user {}", resource.id, user_id);
+
+        Ok(resource)
+    }
+
+    /// 更新资源
+    pub async fn update(&self, resource_id: i64, req: UpdateResourceRequest, user_id: i64) -> Result<Resource, RswsError> {
+        // 检查资源是否存在且属于该用户
+        let existing = self.resource_repo.get_by_id(resource_id).await?
+            .ok_or_else(|| RswsError::business(ErrorCode::RESOURCE_NOT_FOUND))?;
+
+        if existing.user_id != user_id {
+            return Err(RswsError::business(ErrorCode::AUTH_PERMISSION_DENIED));
+        }
+
+        let updated = self.resource_repo.update(
+            resource_id,
+            &req,
+        ).await?;
+
+        info!("Resource updated: {} by user {}", resource_id, user_id);
+
+        Ok(updated)
+    }
+
+    /// 删除资源
+    pub async fn delete(&self, resource_id: i64, user_id: i64) -> Result<(), RswsError> {
+        // 检查资源是否存在且属于该用户
+        let existing = self.resource_repo.get_by_id(resource_id).await?
+            .ok_or_else(|| RswsError::business(ErrorCode::RESOURCE_NOT_FOUND))?;
+
+        if existing.user_id != user_id {
+            return Err(RswsError::business(ErrorCode::AUTH_PERMISSION_DENIED));
+        }
+
+        self.resource_repo.delete(resource_id).await?;
+
+        info!("Resource deleted: {} by user {}", resource_id, user_id);
+
+        Ok(())
     }
 }

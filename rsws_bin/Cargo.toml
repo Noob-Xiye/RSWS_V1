@@ -8,6 +8,7 @@ rsws_common = { path = "../rsws_common" }
 rsws_db = { path = "../rsws_db" }
 rsws_service = { path = "../rsws_service" }
 rsws_api = { path = "../rsws_api" }
+rsws_usdt = { path = "../rsws_usdt" }
 salvo = { workspace = true }
 sqlx = { workspace = true }
 deadpool-redis = { workspace = true }

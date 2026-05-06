@@ -1,8 +1,11 @@
 //! 支付处理器
+//!
+//! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
-use rsws_common::response::ApiResponse;
+use rsws_common::{ResponseExt, AuthHandler};
+use crate::state::get_state;
 
 /// PayPal Webhook
 #[endpoint(
@@ -18,16 +21,12 @@ pub async fn paypal_webhook(req: &mut Request, _depot: &mut Depot, res: &mut Res
         Ok(data) => {
             // TODO: 验证 PayPal 签名
             // TODO: 处理支付事件
-
             tracing::info!("PayPal webhook received: {:?}", data);
-
-            res.status_code(StatusCode::OK);
-            res.render(Json(serde_json::json!({ "status": "ok" })));
+            res.success(serde_json::json!({ "status": "ok" }));
         }
         Err(e) => {
             tracing::error!("PayPal webhook error: {}", e);
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(serde_json::json!({ "error": "Invalid payload" })));
+            res.http_error(StatusCode::BAD_REQUEST, "Invalid payload");
         }
     }
 }
@@ -46,16 +45,12 @@ pub async fn usdt_webhook(req: &mut Request, _depot: &mut Depot, res: &mut Respo
         Ok(data) => {
             // TODO: 验证交易
             // TODO: 更新订单状态
-
             tracing::info!("USDT webhook received: {:?}", data);
-
-            res.status_code(StatusCode::OK);
-            res.render(Json(serde_json::json!({ "status": "ok" })));
+            res.success(serde_json::json!({ "status": "ok" }));
         }
         Err(e) => {
             tracing::error!("USDT webhook error: {}", e);
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(serde_json::json!({ "error": "Invalid payload" })));
+            res.http_error(StatusCode::BAD_REQUEST, "Invalid payload");
         }
     }
 }
@@ -67,28 +62,46 @@ pub async fn usdt_webhook(req: &mut Request, _depot: &mut Depot, res: &mut Respo
     ),
     responses(
         (status_code = 200, description = "成功"),
+        (status_code = 401, description = "未认证"),
     )
 )]
-pub async fn get_usdt_address(req: &mut Request, _depot: &mut Depot, res: &mut Response) {
+pub async fn get_usdt_address(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let network: String = req.param("network").unwrap_or_else(|| "tron".to_string());
 
-    // TODO: 为用户生成或获取 USDT 收款地址
-
-    let address = if network == "tron" {
-        "TJxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    } else {
-        "0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    let _user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
     };
 
-    res.render(Json(ApiResponse::success(serde_json::json!({
+    let state = get_state(depot);
+
+    // 合约地址（固定值，真实 USDT 合约）
+    let contract = match network.as_str() {
+        "tron" => "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+        "ethereum" => "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        _ => {
+            res.http_error(StatusCode::BAD_REQUEST, "Unsupported network, use 'tron' or 'ethereum'");
+            return;
+        }
+    };
+
+    // 从数据库获取收款地址（async，fallback 到配置文件）
+    let address = match network.as_str() {
+        "tron" => state.blockchain_service.get_trc20_address().await,
+        "ethereum" => state.blockchain_service.get_erc20_address().await,
+        _ => {
+            res.http_error(StatusCode::BAD_REQUEST, "Unsupported network");
+            return;
+        }
+    };
+
+    tracing::info!("User {} requesting USDT address for network: {}", _user_id, network);
+
+    res.success(serde_json::json!({
         "network": network,
         "address": address,
-        "contract": if network == "tron" {
-            "TR7NHqjeKQxGTLi5jWnQ5Q5Q5Q5Q5Q5Q5Q5"
-        } else {
-            "0xdAC17F958D2ee523a22062099847C48cB"
-        }
-    }))));
+        "contract": contract
+    }));
 }
 
 /// PayPal 支付成功回调

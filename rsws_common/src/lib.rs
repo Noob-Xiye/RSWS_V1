@@ -13,6 +13,8 @@
 pub mod error_code;
 pub mod error;
 pub mod response;
+pub mod response_ext;  // Response 扩展 trait
+pub mod auth_handler;   // 认证辅助 trait
 pub mod config;
 pub mod email;
 pub mod encryption;
@@ -25,3 +27,5 @@ pub mod utils;
 pub use error_code::ErrorCode;
 pub use error::{RswsError, RswsResult, DbError, ServiceError, ApiError};
 pub use response::{ApiResponse, PaginatedData, PaginatedResponse, ListData, ListResponse};
+pub use response_ext::ResponseExt;
+pub use auth_handler::AuthHandler;

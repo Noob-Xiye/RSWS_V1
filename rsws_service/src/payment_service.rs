@@ -43,4 +43,19 @@ impl PaymentService {
     ) -> Result<(), RswsError> {
         self.payment_repo.update_status(transaction_id, status, provider_tx_id).await
     }
+
+    /// 获取交易信息
+    pub async fn get_transaction(&self, transaction_id: i64) -> Result<Option<rsws_model::payment::PaymentTransaction>, RswsError> {
+        self.payment_repo.get_by_id(transaction_id).await
+    }
+
+    /// 获取用户的交易记录
+    pub async fn get_user_transactions(
+        &self,
+        user_id: i64,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<rsws_model::payment::PaymentTransaction>, i64), RswsError> {
+        self.payment_repo.get_user_transactions(user_id, page, page_size).await
+    }
 }

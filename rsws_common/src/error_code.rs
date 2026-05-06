@@ -281,6 +281,31 @@ impl From<i32> for ErrorCode {
     }
 }
 
+impl From<salvo::http::StatusCode> for ErrorCode {
+    fn from(status: salvo::http::StatusCode) -> Self {
+        match status.as_u16() {
+            200 => Self::SUCCESS,
+            400 => Self::BAD_REQUEST,
+            401 => Self::UNAUTHORIZED,
+            403 => Self::FORBIDDEN,
+            404 => Self::NOT_FOUND,
+            405 => Self::METHOD_NOT_ALLOWED,
+            409 => Self::CONFLICT,
+            429 => Self::RATE_LIMIT_EXCEEDED,
+            500 => Self::INTERNAL_ERROR,
+            503 => Self::SERVICE_UNAVAILABLE,
+            _ => Self::UNKNOWN,
+        }
+    }
+}
+
+impl ErrorCode {
+    /// 从 HTTP 状态码创建 ErrorCode
+    pub fn from_status(status: salvo::http::StatusCode) -> Self {
+        Self::from(status)
+    }
+}
+
 impl From<ErrorCode> for i32 {
     fn from(code: ErrorCode) -> Self {
         code.0

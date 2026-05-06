@@ -1,12 +1,13 @@
 //! 订单处理器
+//!
+//! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
-use rsws_common::response::ApiResponse;
-use rsws_common::error_code::ErrorCode;
+use rsws_common::{ResponseExt, AuthHandler, error_code::ErrorCode, RswsError};
 use serde::Deserialize;
 use salvo_oapi::ToSchema;
-use crate::state::{get_state, require_user_id};
+use crate::state::get_state;
 
 /// 订单创建请求
 #[derive(Debug, Deserialize, ToSchema)]
@@ -27,13 +28,9 @@ pub struct CreateOrderRequest {
     )
 )]
 pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let user_id = match require_user_id(depot) {
-        Ok(id) => id,
-        Err(_) => {
-            res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(ApiResponse::<()>::error(ErrorCode::AUTH_MISSING_CREDENTIALS)));
-            return;
-        }
+    let user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
     };
 
     let page: i32 = req.query("page").unwrap_or(1);
@@ -44,20 +41,16 @@ pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Respons
     match state.order_service.list_by_user(user_id, page, limit).await {
         Ok((orders, total)) => {
             let total_pages = if limit > 0 { (total + limit as i64 - 1) / limit as i64 } else { 0 };
-            res.render(Json(ApiResponse::success(serde_json::json!({
+            res.success(serde_json::json!({
                 "items": orders,
                 "total": total,
                 "page": page,
                 "limit": limit,
                 "total_pages": total_pages,
-            }))));
+            }));
         }
         Err(e) => {
-            let code = e.error_code();
-            let status = salvo::http::StatusCode::from_u16(code.http_status())
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-            res.status_code(status);
-            res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+            res.error(e);
         }
     }
 }
@@ -76,11 +69,10 @@ pub async fn get_order(req: &mut Request, depot: &mut Depot, res: &mut Response)
     let id: i64 = req.param("id").unwrap_or(0);
 
     if id <= 0 {
-        res.status_code(StatusCode::BAD_REQUEST);
-        res.render(Json(ApiResponse::<()>::error_with_message(
-            ErrorCode::INVALID_PARAMETER,
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
             "Invalid order ID"
-        )));
+        );
         return;
     }
 
@@ -88,18 +80,13 @@ pub async fn get_order(req: &mut Request, depot: &mut Depot, res: &mut Response)
 
     match state.order_service.get(id).await {
         Ok(Some(order)) => {
-            res.render(Json(ApiResponse::success(order)));
+            res.success(order);
         }
         Ok(None) => {
-            res.status_code(StatusCode::NOT_FOUND);
-            res.render(Json(ApiResponse::<()>::error(ErrorCode::ORDER_NOT_FOUND)));
+            res.error(RswsError::from(ErrorCode::ORDER_NOT_FOUND));
         }
         Err(e) => {
-            let code = e.error_code();
-            let status = salvo::http::StatusCode::from_u16(code.http_status())
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-            res.status_code(status);
-            res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+            res.error(e);
         }
     }
 }
@@ -115,13 +102,9 @@ pub async fn get_order(req: &mut Request, depot: &mut Depot, res: &mut Response)
     )
 )]
 pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let user_id = match require_user_id(depot) {
-        Ok(id) => id,
-        Err(_) => {
-            res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(ApiResponse::<()>::error(ErrorCode::AUTH_MISSING_CREDENTIALS)));
-            return;
-        }
+    let user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
     };
 
     let body = req.parse_json::<CreateOrderRequest>().await;
@@ -130,65 +113,50 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
         Ok(data) => {
             let valid_methods = ["paypal", "usdt_trc20", "usdt_erc20"];
             if !valid_methods.contains(&data.payment_method.as_str()) {
-                res.status_code(StatusCode::BAD_REQUEST);
-                res.render(Json(ApiResponse::<()>::error_with_message(
-                    ErrorCode::PAYMENT_METHOD_NOT_SUPPORTED,
+                res.error_msg(
+                    RswsError::from(ErrorCode::PAYMENT_METHOD_NOT_SUPPORTED),
                     format!("Unsupported payment method: {}", data.payment_method)
-                )));
+                );
                 return;
             }
 
             let state = get_state(depot);
 
+            // 获取资源价格
             let amount = match state.resource_service.get(data.resource_id).await {
                 Ok(Some(resource)) => resource.price,
                 Ok(None) => {
-                    res.status_code(StatusCode::NOT_FOUND);
-                    res.render(Json(ApiResponse::<()>::error(ErrorCode::RESOURCE_NOT_FOUND)));
+                    res.error(RswsError::from(ErrorCode::RESOURCE_NOT_FOUND));
                     return;
                 }
                 Err(e) => {
-                    let code = e.error_code();
-                    let status = salvo::http::StatusCode::from_u16(code.http_status())
-                        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-                    res.status_code(status);
-                    res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                    res.error(e);
                     return;
                 }
             };
 
-            match state.order_service.create(
-                user_id,
-                data.resource_id,
-                amount,
-                &data.payment_method,
-            ).await {
+            match state.order_service.create(user_id, data.resource_id, amount, &data.payment_method).await {
                 Ok(order) => {
                     res.status_code(StatusCode::CREATED);
-                    res.render(Json(ApiResponse::success(serde_json::json!({
+                    res.success(serde_json::json!({
                         "id": order.id,
                         "resource_id": order.resource_id,
                         "amount": order.amount,
                         "payment_method": order.payment_method,
                         "status": order.status,
                         "expired_at": order.expired_at,
-                    }))));
+                    }));
                 }
                 Err(e) => {
-                    let code = e.error_code();
-                    let status = salvo::http::StatusCode::from_u16(code.http_status())
-                        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-                    res.status_code(status);
-                    res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                    res.error(e);
                 }
             }
         }
         Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(ApiResponse::<()>::error_with_message(
-                ErrorCode::INVALID_REQUEST_FORMAT,
+            res.error_msg(
+                RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
                 format!("Invalid request: {}", e)
-            )));
+            );
         }
     }
 }
@@ -207,40 +175,31 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
 pub async fn cancel_order(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
 
-    let user_id = match require_user_id(depot) {
-        Ok(uid) => uid,
-        Err(_) => {
-            res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(ApiResponse::<()>::error(ErrorCode::AUTH_MISSING_CREDENTIALS)));
-            return;
-        }
+    let _user_id = match res.auth_require_user_id(depot) {
+        Some(uid) => uid,
+        None => return,
     };
 
     if id <= 0 {
-        res.status_code(StatusCode::BAD_REQUEST);
-        res.render(Json(ApiResponse::<()>::error_with_message(
-            ErrorCode::INVALID_PARAMETER,
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
             "Invalid order ID"
-        )));
+        );
         return;
     }
 
     let state = get_state(depot);
 
-    match state.order_service.cancel(id, user_id).await {
+    match state.order_service.cancel(id, _user_id).await {
         Ok(()) => {
-            res.render(Json(ApiResponse::success(serde_json::json!({
+            res.success(serde_json::json!({
                 "id": id,
                 "status": "cancelled",
                 "message": "Order cancelled successfully"
-            }))));
+            }));
         }
         Err(e) => {
-            let code = e.error_code();
-            let status = salvo::http::StatusCode::from_u16(code.http_status())
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-            res.status_code(status);
-            res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+            res.error(e);
         }
     }
 }
@@ -259,11 +218,10 @@ pub async fn check_order_status(req: &mut Request, depot: &mut Depot, res: &mut 
     let id: i64 = req.param("id").unwrap_or(0);
 
     if id <= 0 {
-        res.status_code(StatusCode::BAD_REQUEST);
-        res.render(Json(ApiResponse::<()>::error_with_message(
-            ErrorCode::INVALID_PARAMETER,
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
             "Invalid order ID"
-        )));
+        );
         return;
     }
 
@@ -271,23 +229,18 @@ pub async fn check_order_status(req: &mut Request, depot: &mut Depot, res: &mut 
 
     match state.order_service.get(id).await {
         Ok(Some(order)) => {
-            res.render(Json(ApiResponse::success(serde_json::json!({
+            res.success(serde_json::json!({
                 "id": order.id,
                 "status": order.status,
                 "confirmations": 0,
                 "required_confirmations": 3
-            }))));
+            }));
         }
         Ok(None) => {
-            res.status_code(StatusCode::NOT_FOUND);
-            res.render(Json(ApiResponse::<()>::error(ErrorCode::ORDER_NOT_FOUND)));
+            res.error(RswsError::from(ErrorCode::ORDER_NOT_FOUND));
         }
         Err(e) => {
-            let code = e.error_code();
-            let status = salvo::http::StatusCode::from_u16(code.http_status())
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-            res.status_code(status);
-            res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+            res.error(e);
         }
     }
 }

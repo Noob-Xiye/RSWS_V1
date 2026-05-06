@@ -1,11 +1,12 @@
 //! 用户处理器
+//!
+//! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
-use rsws_common::response::ApiResponse;
-use rsws_common::error_code::ErrorCode;
+use rsws_common::{ResponseExt, AuthHandler, error_code::ErrorCode, RswsError};
 use rsws_model::user::user::{RegisterRequest, LoginRequest, ChangePasswordRequest, UpdateProfileRequest};
-use crate::state::{get_state, require_user_id};
+use crate::state::get_state;
 
 /// 获取用户信息（按 ID）
 #[endpoint(
@@ -23,7 +24,7 @@ pub async fn get_user(req: &mut Request, depot: &mut Depot, res: &mut Response) 
 
     match state.user_service.get_user(id).await {
         Ok(user) => {
-            res.render(Json(ApiResponse::success(serde_json::json!({
+            res.success(serde_json::json!({
                 "id": user.id,
                 "email": user.email,
                 "username": user.username,
@@ -32,15 +33,10 @@ pub async fn get_user(req: &mut Request, depot: &mut Depot, res: &mut Response) 
                 "is_active": user.is_active,
                 "created_at": user.created_at,
                 "updated_at": user.updated_at,
-            }))));
+            }));
         }
         Err(e) => {
-            let code = e.error_code();
-            let msg = e.to_string();
-            let status = salvo::http::StatusCode::from_u16(code.http_status())
-                .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
-            res.status_code(status);
-            res.render(Json(ApiResponse::<()>::error_with_message(code, msg)));
+            res.error(e);
         }
     }
 }
@@ -63,29 +59,21 @@ pub async fn register(req: &mut Request, depot: &mut Depot, res: &mut Response) 
 
             match state.user_service.register(&data).await {
                 Ok(user) => {
-                    res.render(Json(ApiResponse::success(serde_json::json!({
+                    res.success(serde_json::json!({
                         "id": user.id,
                         "email": user.email,
                         "username": user.username,
                         "nickname": user.nickname,
                         "message": "Registration successful"
-                    }))));
+                    }));
                 }
                 Err(e) => {
-                    let code = e.error_code();
-                    let status = salvo::http::StatusCode::from_u16(code.http_status())
-                        .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
-                    res.status_code(status);
-                    res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                    res.error(e);
                 }
             }
         }
         Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(ApiResponse::<()>::error_with_message(
-                ErrorCode::INVALID_REQUEST_FORMAT,
-                format!("Invalid request: {}", e)
-            )));
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
         }
     }
 }
@@ -108,23 +96,15 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
 
             match state.user_service.login(&data).await {
                 Ok(response) => {
-                    res.render(Json(ApiResponse::success(response)));
+                    res.success(response);
                 }
                 Err(e) => {
-                    let code = e.error_code();
-                    let status = salvo::http::StatusCode::from_u16(code.http_status())
-                        .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
-                    res.status_code(status);
-                    res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                    res.error(e);
                 }
             }
         }
         Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(ApiResponse::<()>::error_with_message(
-                ErrorCode::INVALID_REQUEST_FORMAT,
-                format!("Invalid request: {}", e)
-            )));
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
         }
     }
 }
@@ -137,22 +117,16 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     )
 )]
 pub async fn get_current_user(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let user_id = match require_user_id(depot) {
-        Ok(id) => id,
-        Err(_) => {
-            res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(ApiResponse::<()>::error(
-                ErrorCode::AUTH_MISSING_CREDENTIALS
-            )));
-            return;
-        }
+    let user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
     };
 
     let state = get_state(depot);
 
     match state.user_service.get_user(user_id).await {
         Ok(user) => {
-            res.render(Json(ApiResponse::success(serde_json::json!({
+            res.success(serde_json::json!({
                 "id": user.id,
                 "email": user.email,
                 "username": user.username,
@@ -161,14 +135,10 @@ pub async fn get_current_user(_req: &mut Request, depot: &mut Depot, res: &mut R
                 "is_active": user.is_active,
                 "created_at": user.created_at,
                 "updated_at": user.updated_at,
-            }))));
+            }));
         }
         Err(e) => {
-            let code = e.error_code();
-            let status = salvo::http::StatusCode::from_u16(code.http_status())
-                .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
-            res.status_code(status);
-            res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+            res.error(e);
         }
     }
 }
@@ -183,15 +153,9 @@ pub async fn get_current_user(_req: &mut Request, depot: &mut Depot, res: &mut R
     )
 )]
 pub async fn update_profile(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let user_id = match require_user_id(depot) {
-        Ok(id) => id,
-        Err(_) => {
-            res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(ApiResponse::<()>::error(
-                ErrorCode::AUTH_MISSING_CREDENTIALS
-            )));
-            return;
-        }
+    let user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
     };
 
     let body = req.parse_json::<UpdateProfileRequest>().await;
@@ -203,34 +167,26 @@ pub async fn update_profile(req: &mut Request, depot: &mut Depot, res: &mut Resp
             if let Some(nickname) = data.nickname {
                 match state.user_service.update_nickname(user_id, &nickname).await {
                     Ok(user) => {
-                        res.render(Json(ApiResponse::success(serde_json::json!({
+                        res.success(serde_json::json!({
                             "id": user.id,
                             "nickname": user.nickname,
                             "avatar_url": user.avatar_url,
                             "message": "Profile updated successfully"
-                        }))));
+                        }));
                     }
                     Err(e) => {
-                        let code = e.error_code();
-                        let status = salvo::http::StatusCode::from_u16(code.http_status())
-                            .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
-                        res.status_code(status);
-                        res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                        res.error(e);
                     }
                 }
             } else {
-                res.render(Json(ApiResponse::<()>::error_with_message(
-                    ErrorCode::INVALID_PARAMETER,
+                res.error_msg(
+                    RswsError::from(ErrorCode::INVALID_PARAMETER),
                     "No fields to update"
-                )));
+                );
             }
         }
         Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(ApiResponse::<()>::error_with_message(
-                ErrorCode::INVALID_REQUEST_FORMAT,
-                format!("Invalid request: {}", e)
-            )));
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
         }
     }
 }
@@ -241,19 +197,13 @@ pub async fn update_profile(req: &mut Request, depot: &mut Depot, res: &mut Resp
     responses(
         (status_code = 200, description = "修改成功"),
         (status_code = 401, description = "未认证"),
-        (status_code = 400, description = "旧密码错误"),
+        (status_code = 400, description = "密码错误"),
     )
 )]
 pub async fn change_password(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let user_id = match require_user_id(depot) {
-        Ok(id) => id,
-        Err(_) => {
-            res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(ApiResponse::<()>::error(
-                ErrorCode::AUTH_MISSING_CREDENTIALS
-            )));
-            return;
-        }
+    let user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
     };
 
     let body = req.parse_json::<ChangePasswordRequest>().await;
@@ -262,31 +212,19 @@ pub async fn change_password(req: &mut Request, depot: &mut Depot, res: &mut Res
         Ok(data) => {
             let state = get_state(depot);
 
-            match state.user_service.change_password(
-                user_id,
-                &data.old_password,
-                &data.new_password,
-            ).await {
+            match state.user_service.change_password(user_id, &data.old_password, &data.new_password).await {
                 Ok(()) => {
-                    res.render(Json(ApiResponse::success(serde_json::json!({
+                    res.success(serde_json::json!({
                         "message": "Password changed successfully"
-                    }))));
+                    }));
                 }
                 Err(e) => {
-                    let code = e.error_code();
-                    let status = salvo::http::StatusCode::from_u16(code.http_status())
-                        .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
-                    res.status_code(status);
-                    res.render(Json(ApiResponse::<()>::error_with_message(code, e.to_string())));
+                    res.error(e);
                 }
             }
         }
         Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(ApiResponse::<()>::error_with_message(
-                ErrorCode::INVALID_REQUEST_FORMAT,
-                format!("Invalid request: {}", e)
-            )));
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
         }
     }
 }

@@ -2415,6 +2415,7 @@ dependencies = [
  "rsws_common",
  "rsws_db",
  "rsws_service",
+ "rsws_usdt",
  "salvo",
  "sqlx",
  "tokio",

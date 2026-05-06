@@ -36,7 +36,7 @@ pub use user_service::UserService;
 pub use webhook_service::WebhookService;
 
 use std::sync::Arc;
-use rsws_db::{ApiKeyRepository, UserRepository, OrderRepository, ResourceRepository};
+use rsws_db::{ApiKeyRepository, UserRepository, OrderRepository, ResourceRepository, WalletRepository};
 use rsws_db::RedisPool;
 use rsws_common::config::{PayPalConfig, USDTConfig};
 
@@ -46,8 +46,8 @@ pub fn create_paypal_service(config: PayPalConfig) -> PayPalService {
 }
 
 /// 创建区块链服务
-pub fn create_blockchain_service(config: USDTConfig) -> BlockchainService {
-    BlockchainService::new(config)
+pub fn create_blockchain_service(config: USDTConfig, wallet_repo: WalletRepository) -> BlockchainService {
+    BlockchainService::new(config, wallet_repo)
 }
 
 /// 创建 Webhook 服务

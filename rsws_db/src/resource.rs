@@ -1,8 +1,9 @@
 //! 资源仓储层
 
 use rsws_common::error::RswsError;
-use rsws_model::resource::Resource;
+use rsws_model::resource::{CreateResourceRequest, Resource, UpdateResourceRequest};
 use sqlx::PgPool;
+use rsws_common::snowflake::next_id;
 
 /// 资源仓储
 pub struct ResourceRepository {
@@ -109,6 +110,128 @@ impl ResourceRepository {
 
         Ok((resources, total.0))
     }
+
+    /// 创建资源
+    pub async fn create(
+        &self,
+        user_id: i64,
+        req: &CreateResourceRequest,
+    ) -> Result<Resource, RswsError> {
+        // 生成雪花 ID
+        let id = next_id();
+
+        // 将 display_images 从 Vec<String> 转换为 PostgreSQL 数组格式
+        let display_images_array: Option<Vec<String>> = req.display_images.clone();
+
+        let resource = sqlx::query_as::<_, Resource>(
+            "INSERT INTO resources (id, user_id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'user', $14, 0) RETURNING id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at"
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(&req.title)
+        .bind(&req.description)
+        .bind(req.price)
+        .bind(req.category_id)
+        .bind(&req.file_url)
+        .bind(&req.thumbnail_url)
+        .bind(&req.detail_description)
+        .bind(&req.specifications)
+        .bind(&req.usage_guide)
+        .bind(&req.precautions)
+        .bind(&display_images_array)
+        .bind(user_id) // provider_id = user_id for user-created resources
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to create resource: {}", e)))?;
+
+        Ok(resource)
+    }
+
+    /// 更新资源
+    pub async fn update(
+        &self,
+        id: i64,
+        req: &UpdateResourceRequest,
+    ) -> Result<Resource, RswsError> {
+        // 先获取当前资源
+        let mut resource = self.get_by_id(id).await?
+            .ok_or_else(|| RswsError::internal("Resource not found".to_string()))?;
+
+        // 合并更新字段
+        if let Some(title) = &req.title {
+            resource.title = title.clone();
+        }
+        if let Some(description) = &req.description {
+            resource.description = Some(description.clone());
+        }
+        if let Some(price) = req.price {
+            resource.price = price;
+        }
+        if let Some(category_id) = req.category_id {
+            resource.category_id = Some(category_id);
+        }
+        if let Some(file_url) = &req.file_url {
+            resource.file_url = Some(file_url.clone());
+        }
+        if let Some(thumbnail_url) = &req.thumbnail_url {
+            resource.thumbnail_url = Some(thumbnail_url.clone());
+        }
+        if let Some(is_active) = req.is_active {
+            resource.is_active = is_active;
+        }
+        if let Some(detail_description) = &req.detail_description {
+            resource.detail_description = Some(detail_description.clone());
+        }
+        if let Some(specifications) = &req.specifications {
+            resource.specifications = Some(specifications.clone());
+        }
+        if let Some(usage_guide) = &req.usage_guide {
+            resource.usage_guide = Some(usage_guide.clone());
+        }
+        if let Some(precautions) = &req.precautions {
+            resource.precautions = Some(precautions.clone());
+        }
+        if let Some(display_images) = &req.display_images {
+            resource.display_images = Some(serde_json::to_value(display_images).unwrap_or(serde_json::Value::Null));
+        }
+
+        // 更新数据库
+        let updated = sqlx::query_as::<_, Resource>(
+            "UPDATE resources SET title = $1, description = $2, price = $3, category_id = $4, file_url = $5, thumbnail_url = $6, is_active = $7, detail_description = $8, specifications = $9, usage_guide = $10, precautions = $11, display_images = $12, updated_at = NOW() WHERE id = $13 RETURNING id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at"
+        )
+        .bind(&resource.title)
+        .bind(&resource.description)
+        .bind(resource.price)
+        .bind(resource.category_id)
+        .bind(&resource.file_url)
+        .bind(&resource.thumbnail_url)
+        .bind(resource.is_active)
+        .bind(&resource.detail_description)
+        .bind(&resource.specifications)
+        .bind(&resource.usage_guide)
+        .bind(&resource.precautions)
+        .bind(&resource.display_images)
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to update resource: {}", e)))?;
+
+        Ok(updated)
+    }
+
+    /// 删除资源（软删除，设置 is_active = false）
+    pub async fn delete(
+        &self,
+        id: i64,
+    ) -> Result<(), RswsError> {
+        sqlx::query("UPDATE resources SET is_active = false, updated_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to delete resource: {}", e)))?;
+
+        Ok(())
+    }
 }
 
 // ==================== 单元测试 ====================
@@ -121,4 +244,6 @@ mod tests {
     fn test_resource_repository_new() {
         // 仅测试构造函数
     }
+
+    // create, update, delete 方法需要数据库测试，这里省略
 }
