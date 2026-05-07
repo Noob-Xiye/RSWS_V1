@@ -9,7 +9,9 @@ use sqlx::FromRow;
 /// 订单状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, sqlx::Type)]
 #[sqlx(type_name = "order_status", rename_all = "lowercase")]
+#[derive(Default)]
 pub enum OrderStatus {
+    #[default]
     Pending,
     Paid,
     Completed,
@@ -17,11 +19,6 @@ pub enum OrderStatus {
     Refunded,
 }
 
-impl Default for OrderStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
-}
 
 /// 订单
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -49,7 +46,9 @@ pub struct CreateOrderRequest {
 /// 交易状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, sqlx::Type)]
 #[sqlx(type_name = "transaction_status", rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TransactionStatus {
+    #[default]
     Pending,
     Completed,
     Failed,
@@ -57,11 +56,6 @@ pub enum TransactionStatus {
     Refunded,
 }
 
-impl Default for TransactionStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
-}
 
 /// 支付交易
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

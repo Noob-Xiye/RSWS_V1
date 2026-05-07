@@ -349,7 +349,7 @@ impl UserService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[test]
     fn test_user_service_new() {

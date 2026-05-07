@@ -157,7 +157,7 @@ impl EthereumClient {
             .await?;
 
         // 结果是十六进制字符串
-        let block_number = u64::from_str_radix(&response.result.trim_start_matches("0x"), 16)
+        let block_number = u64::from_str_radix(response.result.trim_start_matches("0x"), 16)
             .map_err(|_| UsdtError::ApiError("Invalid block number format".to_string()))?;
 
         Ok(block_number)

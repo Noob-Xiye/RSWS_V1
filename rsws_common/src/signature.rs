@@ -64,11 +64,7 @@ impl SignatureService {
             .unwrap()
             .as_secs();
 
-        let diff = if now > timestamp {
-            now - timestamp
-        } else {
-            timestamp - now
-        };
+        let diff = now.abs_diff(timestamp);
 
         diff <= tolerance_seconds
     }

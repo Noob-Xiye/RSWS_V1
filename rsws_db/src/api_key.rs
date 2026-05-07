@@ -25,11 +25,11 @@ impl ApiKeyRepository {
 
         // 生成 32 字节的随机数据作为 API Key
         let api_key_bytes: [u8; 32] = rng.random();
-        let api_key = format!("ak_{}", general_purpose::URL_SAFE_NO_PAD.encode(&api_key_bytes));
+        let api_key = format!("ak_{}", general_purpose::URL_SAFE_NO_PAD.encode(api_key_bytes));
 
         // 生成 64 字节的随机数据作为 API Secret
         let secret_bytes: [u8; 64] = rng.random();
-        let api_secret = format!("sk_{}", general_purpose::URL_SAFE_NO_PAD.encode(&secret_bytes));
+        let api_secret = format!("sk_{}", general_purpose::URL_SAFE_NO_PAD.encode(secret_bytes));
 
         (api_key, api_secret)
     }

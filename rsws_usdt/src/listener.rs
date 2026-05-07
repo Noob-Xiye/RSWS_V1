@@ -27,8 +27,8 @@ impl UsdtListener {
         tron_config: Option<UsdtConfig>,
         ethereum_config: Option<UsdtConfig>,
     ) -> Self {
-        let tron_client = tron_config.as_ref().map(|c| TronClient::new(c));
-        let ethereum_client = ethereum_config.as_ref().map(|c| EthereumClient::new(c));
+        let tron_client = tron_config.as_ref().map(TronClient::new);
+        let ethereum_client = ethereum_config.as_ref().map(EthereumClient::new);
         let processor = TransactionProcessor::new(db_pool.clone());
 
         Self {

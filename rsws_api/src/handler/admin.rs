@@ -61,8 +61,7 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
 )]
 pub async fn get_current_admin(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
     // 检查是否管理员
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -104,8 +103,7 @@ pub struct CreateAdminBody {
     )
 )]
 pub async fn create_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -170,8 +168,7 @@ pub async fn create_admin(req: &mut Request, depot: &mut Depot, res: &mut Respon
     )
 )]
 pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -212,8 +209,7 @@ pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Respons
     )
 )]
 pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -246,8 +242,7 @@ pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response)
     )
 )]
 pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -304,8 +299,7 @@ pub struct CreateAdminApiKeyBody {
     )
 )]
 pub async fn create_api_key(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -354,8 +348,7 @@ pub async fn create_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
     )
 )]
 pub async fn list_api_keys(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -390,8 +383,7 @@ pub async fn list_api_keys(_req: &mut Request, depot: &mut Depot, res: &mut Resp
     )
 )]
 pub async fn delete_api_key(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -432,8 +424,7 @@ pub async fn delete_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
     )
 )]
 pub async fn list_log_configs(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -460,8 +451,7 @@ pub async fn list_log_configs(_req: &mut Request, depot: &mut Depot, res: &mut R
     )
 )]
 pub async fn get_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -501,8 +491,7 @@ pub struct SetLogConfigBody {
     )
 )]
 pub async fn create_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -556,8 +545,7 @@ pub struct UpdateLogConfigBody {
     )
 )]
 pub async fn update_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -604,8 +592,7 @@ pub async fn update_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
     )
 )]
 pub async fn delete_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {
@@ -643,8 +630,7 @@ pub async fn delete_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
     )
 )]
 pub async fn query_system_logs(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin")
-        .map(|v| *v)
+    let is_admin: bool = depot.get("is_admin").copied()
         .unwrap_or(false);
 
     if !is_admin {

@@ -167,7 +167,7 @@ impl UserRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[test]
     fn test_user_repository_new() {

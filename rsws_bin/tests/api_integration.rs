@@ -21,15 +21,13 @@ mod tests {
     #[test]
     fn test_route_structure_integrity() {
         // 公开端点（无需认证）
-        let public_routes = vec![
-            ("GET", "/health"),
+        let public_routes = [("GET", "/health"),
             ("POST", "/api/v1/admin/login"),
             ("GET", "/api/v1/payment/usdt/<network>"),
             ("GET", "/api/v1/payment/paypal/success"),
             ("GET", "/api/v1/payment/paypal/cancel"),
             ("POST", "/api/v1/webhook/paypal"),
-            ("POST", "/api/v1/webhook/usdt"),
-        ];
+            ("POST", "/api/v1/webhook/usdt")];
 
         // 需要认证的端点
         let protected_routes = vec![
@@ -71,25 +69,23 @@ mod tests {
     fn test_config_structure() {
         // 验证 AppConfig 需要的字段存在
         // 这确保配置结构变更时测试会提醒更新
-        let required_config_sections = vec![
-            "server", "database", "redis", "encryption",
-        ];
+        let required_config_sections = ["server", "database", "redis", "encryption"];
         assert_eq!(required_config_sections.len(), 4, "Config should have 4 sections");
 
         // 验证服务器配置字段
-        let server_fields = vec!["host", "port", "cors_origins"];
+        let server_fields = ["host", "port", "cors_origins"];
         assert_eq!(server_fields.len(), 3);
 
         // 验证数据库配置字段
-        let db_fields = vec!["url", "max_connections", "min_connections"];
+        let db_fields = ["url", "max_connections", "min_connections"];
         assert_eq!(db_fields.len(), 3);
     }
 
     /// 验证 CORS 配置的合理性
     #[test]
     fn test_cors_configuration() {
-        let allowed_methods = vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"];
-        let allowed_headers = vec!["Content-Type", "Authorization", "X-Api-Key", "X-Signature"];
+        let allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
+        let allowed_headers = ["Content-Type", "Authorization", "X-Api-Key", "X-Signature"];
 
         assert!(allowed_methods.contains(&"GET"), "GET should be allowed");
         assert!(allowed_methods.contains(&"POST"), "POST should be allowed");
@@ -101,7 +97,7 @@ mod tests {
     /// 验证订单状态流转的合理性
     #[test]
     fn test_order_status_flow() {
-        let valid_statuses = vec!["pending", "paid", "completed", "cancelled", "refunded"];
+        let valid_statuses = ["pending", "paid", "completed", "cancelled", "refunded"];
 
         // 有效状态转换: pending → paid → completed
         assert!(valid_statuses.contains(&"pending"), "pending is a valid status");

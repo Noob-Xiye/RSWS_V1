@@ -30,7 +30,7 @@ impl PayPalService {
 
     /// 是否已配置
     pub fn is_configured(&self) -> bool {
-        self.config.as_ref().map_or(false, |c| !c.client_id.is_empty())
+        self.config.as_ref().is_some_and(|c| !c.client_id.is_empty())
     }
 
     /// 获取 base URL（sandbox 或 live）

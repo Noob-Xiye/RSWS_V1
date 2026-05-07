@@ -318,10 +318,10 @@ impl AdminRepository {
 
         let mut rng = rand::rngs::StdRng::from_os_rng();
         let key_bytes: [u8; 32] = rng.random();
-        let api_key = format!("adm_ak_{}", general_purpose::URL_SAFE_NO_PAD.encode(&key_bytes));
+        let api_key = format!("adm_ak_{}", general_purpose::URL_SAFE_NO_PAD.encode(key_bytes));
 
         let secret_bytes: [u8; 64] = rng.random();
-        let api_secret = format!("adm_sk_{}", general_purpose::URL_SAFE_NO_PAD.encode(&secret_bytes));
+        let api_secret = format!("adm_sk_{}", general_purpose::URL_SAFE_NO_PAD.encode(secret_bytes));
 
         // 用 Argon2 加密 secret 存储
         let api_secret_encrypted = PasswordService::hash(&api_secret)?;
