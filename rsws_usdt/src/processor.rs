@@ -7,6 +7,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tracing::info;
 
+/// Pending order query result row (5 columns)
+#[allow(clippy::type_complexity)]
+type PendingOrderRow = (i64, i64, Decimal, DateTime<Utc>, Option<DateTime<Utc>>);
+
 /// USDT 交易记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsdtTransaction {
@@ -100,7 +104,7 @@ impl TransactionProcessor {
     }
 
     async fn get_pending_orders(&self, wallet_address: &str) -> Result<Vec<PendingOrder>, UsdtError> {
-        let rows: Vec<(i64, i64, Decimal, DateTime<Utc>, Option<DateTime<Utc>>)> = sqlx::query_as(
+        let rows: Vec<PendingOrderRow> = sqlx::query_as(
             r#"
             SELECT o.id, o.user_id, o.amount, o.created_at, o.expired_at
             FROM orders o
@@ -228,6 +232,7 @@ impl TransactionProcessor {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn record_transaction(
         &self,
         tx_hash: String,

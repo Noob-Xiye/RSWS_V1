@@ -47,6 +47,7 @@ impl LogService {
     // ==================== 日志记录 ====================
 
     /// 记录系统日志
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_system(
         &self,
         level: &str,
@@ -82,6 +83,7 @@ impl LogService {
     }
 
     /// 记录错误日志
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_error(
         &self,
         error_type: &str,
@@ -121,6 +123,7 @@ impl LogService {
     }
 
     /// 记录支付日志
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_payment(
         &self,
         transaction_id: Option<&str>,
@@ -160,6 +163,7 @@ impl LogService {
     }
 
     /// 记录请求日志
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_request(
         &self,
         request_id: &str,

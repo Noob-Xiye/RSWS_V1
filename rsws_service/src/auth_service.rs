@@ -18,6 +18,7 @@ impl AuthService {
     }
 
     /// 验证 API Key 签名
+    #[allow(clippy::too_many_arguments)]
     pub async fn verify_signature(
         &self,
         api_key: &str,

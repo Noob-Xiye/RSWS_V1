@@ -66,6 +66,35 @@ pub struct UsdtListenDbConfig {
     pub is_active: bool,
 }
 
+// ==================== Type aliases for complex query results ====================
+
+/// PayPal 配置查询结果行（13 列）
+#[allow(clippy::type_complexity)]
+type PayPalConfigRow = (
+    i32, String, String, bool, Option<String>, Option<String>,
+    String, String, String, String,
+    rust_decimal::Decimal, rust_decimal::Decimal, rust_decimal::Decimal,
+);
+
+/// 区块链配置查询结果行（10 列）
+#[allow(clippy::type_complexity)]
+type BlockchainConfigRow = (
+    String, String, String, Option<String>,
+    String, i32,
+    rust_decimal::Decimal, rust_decimal::Decimal, rust_decimal::Decimal, bool,
+);
+
+/// Email 配置查询结果行（9 列）
+#[allow(clippy::type_complexity)]
+type EmailConfigRow = (
+    String, Option<String>, Option<i32>, Option<String>, Option<String>,
+    bool, String, Option<String>, Option<String>,
+);
+
+/// USDT 监听配置查询结果行（7 列）
+#[allow(clippy::type_complexity)]
+type UsdtListenConfigRow = (String, String, Option<String>, String, i32, i32, bool);
+
 /// 配置服务
 pub struct ConfigService {
     pool: PgPool,
@@ -143,7 +172,7 @@ impl ConfigService {
 
     /// 从 paypal_configs 表获取活跃的 PayPal 配置
     pub async fn get_paypal_config(&self) -> Result<Option<PayPalDbConfig>, RswsError> {
-        let row: Option<(i32, String, String, bool, Option<String>, Option<String>, String, String, String, String, rust_decimal::Decimal, rust_decimal::Decimal, rust_decimal::Decimal)> =
+        let row: Option<PayPalConfigRow> =
             sqlx::query_as(
                 r#"
                 SELECT id, client_id, client_secret_encrypted, sandbox,
@@ -182,7 +211,7 @@ impl ConfigService {
 
     /// 从 blockchain_configs 表获取所有活跃的区块链配置
     pub async fn get_blockchain_configs(&self) -> Result<Vec<BlockchainDbConfig>, RswsError> {
-        let rows: Vec<(String, String, String, Option<String>, String, i32, rust_decimal::Decimal, rust_decimal::Decimal, rust_decimal::Decimal, bool)> =
+        let rows: Vec<BlockchainConfigRow> =
             sqlx::query_as(
                 r#"
                 SELECT network, network_name, api_url, api_key_encrypted,
@@ -222,7 +251,7 @@ impl ConfigService {
 
     /// 从 email_configs 表获取活跃的邮件配置
     pub async fn get_email_config(&self) -> Result<Option<EmailDbConfig>, RswsError> {
-        let row: Option<(String, Option<String>, Option<i32>, Option<String>, Option<String>, bool, String, Option<String>, Option<String>)> =
+        let row: Option<EmailConfigRow> =
             sqlx::query_as(
                 r#"
                 SELECT provider, host, port, username, password_encrypted,
@@ -262,7 +291,7 @@ impl ConfigService {
 
     /// 从 usdt_listen_configs 表获取所有活跃的监听配置
     pub async fn get_usdt_listen_configs(&self) -> Result<Vec<UsdtListenDbConfig>, RswsError> {
-        let rows: Vec<(String, String, Option<String>, String, i32, i32, bool)> =
+        let rows: Vec<UsdtListenConfigRow> =
             sqlx::query_as(
                 r#"
                 SELECT network, api_url, api_key_encrypted,
