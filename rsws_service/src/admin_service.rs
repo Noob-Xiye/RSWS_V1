@@ -8,7 +8,7 @@ use std::sync::Arc;
 use rsws_common::error::RswsError;
 use rsws_db::admin::AdminRepository;
 use rsws_db::RedisService;
-use rsws_model::user::admin::*;
+use rsws_model::user_models::admin::*;
 use serde::{Serialize, Deserialize};
 
 /// Redis 中缓存的管理员 API Key 会话信息

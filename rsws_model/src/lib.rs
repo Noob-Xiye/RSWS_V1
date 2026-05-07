@@ -8,6 +8,6 @@ pub mod config;
 pub mod payment;
 pub mod resource;
 pub mod response;
-pub mod user;
+pub mod user_models;
 pub mod log;
 pub mod request;

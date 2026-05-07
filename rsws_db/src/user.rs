@@ -2,7 +2,7 @@
 
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
-use rsws_model::user::user::User;
+use rsws_model::user_models::user::User;
 use sqlx::PgPool;
 
 /// 用户仓储

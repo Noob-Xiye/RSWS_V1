@@ -3,7 +3,7 @@
 use rsws_common::error::RswsError;
 use rsws_common::snowflake;
 use rsws_common::password::PasswordService;
-use rsws_model::user::admin::*;
+use rsws_model::user_models::admin::*;
 use sqlx::PgPool;
 use chrono::Utc;
 
@@ -214,6 +214,7 @@ impl AdminRepository {
     }
 
     /// 记录管理员操作日志
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_admin_operation(
         &self,
         admin_id: i64,

@@ -7,7 +7,7 @@ use rsws_common::error_code::ErrorCode;
 use rsws_common::password::PasswordService;
 use rsws_common::snowflake;
 use rsws_db::{RedisService, UserRepository};
-use rsws_model::user::user::{User, LoginRequest, LoginResponse, UserInfo, SessionData, RegisterRequest};
+use rsws_model::user_models::user::{User, LoginRequest, LoginResponse, UserInfo, SessionData, RegisterRequest};
 use tracing::{info, warn};
 
 /// 用户服务

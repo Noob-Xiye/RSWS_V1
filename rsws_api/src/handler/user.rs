@@ -5,7 +5,7 @@
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
 use rsws_common::{ResponseExt, AuthHandler, error_code::ErrorCode, RswsError};
-use rsws_model::user::user::{RegisterRequest, LoginRequest, ChangePasswordRequest, UpdateProfileRequest};
+use rsws_model::user_models::user::{RegisterRequest, LoginRequest, ChangePasswordRequest, UpdateProfileRequest};
 use crate::state::get_state;
 
 /// 获取用户信息（按 ID）
