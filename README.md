@@ -1,6 +1,10 @@
 # RSWS V1 - 数字内容交易平台
 
-> **版本**: 0.1.0
+[![CI](https://github.com/Noob-Xiye/RSWS_V1/actions/workflows/ci.yml/badge.svg)](https://github.com/Noob-Xiye/RSWS_V1/actions/workflows/ci.yml)
+[![Release](https://github.com/Noob-Xiye/RSWS_V1/actions/workflows/release.yml/badge.svg)](https://github.com/Noob-Xiye/RSWS_V1/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **版本**: 0.1.0  
 > **状态**: 开发中
 
 ## 项目简介
@@ -28,10 +32,11 @@ RSWS (Resource Sharing Web System) 是一个数字内容付费交易平台，支
 | 组件 | 技术 |
 |------|------|
 | Web 框架 | Salvo (Rust) |
-| 数据库 | PostgreSQL |
+| 数据库 | PostgreSQL + SQLx |
 | 缓存 | Redis |
 | 异步运行时 | Tokio |
 | USDT 监听 | 内置 (TronGrid/Etherscan API) |
+| 容器化 | Docker + docker-compose |
 
 ### 前端
 
@@ -55,11 +60,11 @@ RSWS_V1/
 ├── rsws_model/        # 数据模型层
 ├── rsws_db/           # 数据库访问层
 ├── rsws_common/       # 公共工具
-├── rsws_usdt/         # USDT 监听服务 (NEW in v0.1.0)
+├── rsws_usdt/         # USDT 监听服务
+├── migrations/        # 数据库迁移文件
 ├── ui/
 │   ├── user/          # 用户端前端
 │   └── admin/         # 管理端前端
-├── sql/               # 数据库脚本
 ├── static/            # 静态资源
 └── config.toml        # 配置文件
 ```
@@ -107,8 +112,8 @@ cp .env.example .env
 编辑 `.env` 或通过环境变量覆盖 `config.toml`：
 
 ```bash
-export RSWS__DATABASE__URL="postgresql://user:pass@localhost:5432/rsws"
-export RSWS__REDIS__URL="redis://localhost:6379"
+export RSWS_DATABASE_URL="postgresql://user:pass@localhost:5432/rsws"
+export RSWS_REDIS_URL="redis://localhost:6379"
 ```
 
 ### 5. 启动后端
@@ -117,7 +122,7 @@ export RSWS__REDIS__URL="redis://localhost:6379"
 cargo run --release
 ```
 
-### 5. 启动前端
+### 6. 启动前端
 
 ```bash
 # 用户端
@@ -152,14 +157,15 @@ npm run dev
 - [x] 资源审核
 - [x] 订单管理
 - [x] 支付配置
-- [x] USDT 监听配置 (NEW)
+- [x] USDT 监听配置
 - [x] 数据报表
+- [x] 日志配置管理
 
 ### 支付
 
 - [x] USDT (TRC20) 支付
 - [x] USDT (ERC20) 支付
-- [x] PayPal 支付 (Webhook 签名验证)
+- [x] PayPal 支付（Webhook 真实签名验证）
 
 ---
 
@@ -196,7 +202,7 @@ USDT 监听服务检测交易 → 匹配订单 → 确认支付
 
 ## 版本规划
 
-### v0.1.0 (当前)
+### v0.1.0 (当前) ✅
 
 - [x] 项目骨架重构
 - [x] USDT 监听服务
@@ -210,12 +216,13 @@ USDT 监听服务检测交易 → 匹配订单 → 确认支付
 - [x] Docker 部署配置
 - [x] CORS 中间件
 - [x] API 集成测试框架
+- [x] GitHub Actions CI/CD
 
 ### v0.2.0
 
-- [ ] PayPal Webhook
 - [ ] 用户上传审核流程
-- [ ] 佣金自动结算
+- [ ] 佣金自动结算优化
+- [ ] Email 通知服务
 
 ### v0.3.0
 
@@ -245,6 +252,26 @@ USDT 监听服务检测交易 → 匹配订单 → 确认支付
 1. 在 `rsws_service/payment_service.rs` 扩展
 2. 在 `rsws_api` 添加回调接口
 3. 在前端添加支付选项
+
+### 运行测试
+
+```bash
+# 单元测试
+cargo test --lib
+
+# 集成测试（需要数据库）
+cargo test --test api_integration
+```
+
+### 代码检查
+
+```bash
+# 编译检查
+cargo check
+
+# Clippy 检查
+cargo clippy
+```
 
 ---
 
