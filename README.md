@@ -42,11 +42,12 @@ RSWS (Resource Sharing Web System) 是一个数字内容付费交易平台，支
 
 | 组件 | 技术 |
 |------|------|
-| 框架 | React 18 + TypeScript |
+| 框架 | Vue 3 + TypeScript |
 | 构建 | Vite |
-| UI | Ant Design |
-| 状态管理 | Context API + useReducer |
+| UI | Element Plus |
+| 状态管理 | Pinia |
 | HTTP | Axios |
+| 包管理 | Bun |
 
 ---
 
@@ -127,13 +128,13 @@ cargo run --release
 ```bash
 # 用户端
 cd ui/user
-npm install
-npm run dev
+bun install
+bun run dev
 
 # 管理端
 cd ui/admin
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 ---
