@@ -70,40 +70,48 @@ RSWS_V1/
 
 ### 1. 环境准备
 
-- Rust 1.70+
-- Node.js 18+
-- PostgreSQL 14+
-- Redis 6+
+- Rust 1.85+
+- Docker & Docker Compose（推荐）
+- PostgreSQL 14+（如不使用 Docker）
+- Redis 6+（如不使用 Docker）
 
-### 2. 数据库初始化
+### 2. 使用 Docker 启动（推荐）
 
 ```bash
-# 创建数据库
-createdb rsws
+# 启动开发环境（仅数据库和 Redis）
+docker compose -f docker-compose.dev.yml up -d
 
-# 执行迁移脚本
-psql -d rsws -f sql/unified_schema.sql
-psql -d rsws -f sql/usdt_tables.sql
-psql -d rsws -f sql/missing_tables.sql
+# 或启动完整生产环境
+docker compose up -d
 ```
 
-### 3. 配置
+### 3. 数据库初始化
 
-编辑 `config.toml`：
+项目启动时自动运行数据库迁移：
 
-```toml
-[server]
-host = "0.0.0.0"
-port = 8080
-
-[database]
-url = "postgresql://user:pass@localhost:5432/rsws"
-
-[redis]
-url = "redis://localhost:6379"
+```bash
+# 首次启动会自动创建表结构和初始数据
+cargo run --release
 ```
 
-### 4. 启动后端
+迁移文件位于 `migrations/` 目录。
+
+### 4. 配置
+
+复制环境变量模板：
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 或通过环境变量覆盖 `config.toml`：
+
+```bash
+export RSWS__DATABASE__URL="postgresql://user:pass@localhost:5432/rsws"
+export RSWS__REDIS__URL="redis://localhost:6379"
+```
+
+### 5. 启动后端
 
 ```bash
 cargo run --release
@@ -151,7 +159,7 @@ npm run dev
 
 - [x] USDT (TRC20) 支付
 - [x] USDT (ERC20) 支付
-- [ ] PayPal 支付 (计划中)
+- [x] PayPal 支付 (Webhook 签名验证)
 
 ---
 
@@ -194,6 +202,14 @@ USDT 监听服务检测交易 → 匹配订单 → 确认支付
 - [x] USDT 监听服务
 - [x] 基础支付流程
 - [x] 管理后台基础
+- [x] API Key 统一认证
+- [x] Redis 速率限制
+- [x] PayPal Webhook 签名验证
+- [x] 佣金结算系统
+- [x] 数据库迁移体系 (sqlx migrate)
+- [x] Docker 部署配置
+- [x] CORS 中间件
+- [x] API 集成测试框架
 
 ### v0.2.0
 
