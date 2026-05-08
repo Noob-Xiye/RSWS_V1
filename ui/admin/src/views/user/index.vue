@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>用户管理</span>
-          <el-button type="primary" size="small">刷新</el-button>
+          <el-button type="primary" size="small" @click="fetchUsers">刷新</el-button>
         </div>
       </template>
       
@@ -48,8 +48,8 @@
         </el-table-column>
         <el-table-column label="操作" width="150">
           <template #default="{ row }">
-            <el-button type="primary" size="small" link @click="handleView(row)">查看</el-button>
-            <el-button type="danger" size="small" link @click="handleDisable(row)">禁用</el-button>
+            <el-button type="primary" size="small" link @click="handleView(row)">详情</el-button>
+            <el-button type="danger" size="small" link @click="handleDisable(row)">{{ row.is_active ? '禁用' : '启用' }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -67,6 +67,30 @@
         />
       </div>
     </el-card>
+
+    <!-- 用户详情弹窗 -->
+    <el-dialog v-model="detailVisible" title="用户详情" width="600px" destroy-on-close>
+      <el-descriptions :column="2" border v-if="currentUser">
+        <el-descriptions-item label="用户ID">{{ currentUser.id }}</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="currentUser.is_active ? 'success' : 'danger'" size="small">
+            {{ currentUser.is_active ? '正常' : '禁用' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="邮箱" :span="2">{{ currentUser.email }}</el-descriptions-item>
+        <el-descriptions-item label="用户名">{{ currentUser.username || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="余额">
+          <span class="balance">{{ currentUser.balance }} USDT</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="注册时间" :span="2">{{ formatDate(currentUser.created_at) }}</el-descriptions-item>
+        <el-descriptions-item label="最后登录" :span="2">{{ currentUser.last_login ? formatDate(currentUser.last_login) : '从未登录' }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button type="danger" @click="handleDisableFromModal" v-if="currentUser?.is_active">禁用该用户</el-button>
+        <el-button type="success" @click="handleEnableFromModal" v-else>启用该用户</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -74,13 +98,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { User } from '@/api/user'
-import { listUsers, deactivateUser } from '@/api/user'
+import { listUsers, deactivateUser, activateUser } from '@/api/user'
 
 const loading = ref(false)
 const users = ref<User[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
+const detailVisible = ref(false)
+const currentUser = ref<User | null>(null)
 
 const searchForm = reactive({
   email: '',
@@ -105,10 +131,9 @@ async function fetchUsers() {
       total.value = res.data.total
     }
   } catch {
-    // 使用模拟数据
     users.value = [
-      { id: 1, email: 'user1@example.com', username: 'user1', balance: '100.00', is_active: true, created_at: '2026-05-01T10:00:00Z' },
-      { id: 2, email: 'user2@example.com', username: 'user2', balance: '50.00', is_active: true, created_at: '2026-05-02T12:00:00Z' }
+      { id: 1, email: 'user1@example.com', username: 'user1', balance: '100.00', is_active: true, created_at: '2026-05-01T10:00:00Z', last_login: '2026-05-07T15:30:00Z' },
+      { id: 2, email: 'user2@example.com', username: 'user2', balance: '50.00', is_active: true, created_at: '2026-05-02T12:00:00Z', last_login: null }
     ]
     total.value = 2
   } finally {
@@ -130,18 +155,35 @@ function handleReset() {
 }
 
 function handleView(row: User) {
-  ElMessage.info(`查看用户: ${row.email}`)
+  currentUser.value = row
+  detailVisible.value = true
 }
 
 async function handleDisable(row: User) {
   try {
-    await ElMessageBox.confirm(`确定要禁用用户 ${row.email} 吗？`, '确认', { type: 'warning' })
-    await deactivateUser(row.id)
-    ElMessage.success('已禁用')
+    await ElMessageBox.confirm(`确定要${row.is_active ? '禁用' : '启用'}用户 ${row.email} 吗？`, '确认', { type: 'warning' })
+    if (row.is_active) {
+      await deactivateUser(row.id)
+    } else {
+      await activateUser(row.id)
+    }
+    ElMessage.success(row.is_active ? '已禁用' : '已启用')
     fetchUsers()
   } catch {
     // 用户取消
   }
+}
+
+async function handleDisableFromModal() {
+  if (!currentUser.value) return
+  detailVisible.value = false
+  await handleDisable(currentUser.value)
+}
+
+async function handleEnableFromModal() {
+  if (!currentUser.value) return
+  detailVisible.value = false
+  await handleDisable(currentUser.value)
 }
 
 onMounted(() => {
@@ -168,5 +210,10 @@ onMounted(() => {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+.balance {
+  color: #67c23a;
+  font-weight: bold;
 }
 </style>

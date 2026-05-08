@@ -7,6 +7,7 @@ export interface User {
   balance: string
   is_active: boolean
   created_at: string
+  last_login?: string | null
 }
 
 export interface UserListParams extends PaginationParams {
@@ -28,4 +29,9 @@ export async function getUser(id: number): Promise<ApiResponse<User>> {
 // 禁用用户
 export async function deactivateUser(id: number): Promise<ApiResponse<void>> {
   return request.delete(`/user/${id}`)
+}
+
+// 启用用户
+export async function activateUser(id: number): Promise<ApiResponse<void>> {
+  return request.post(`/user/${id}/activate`)
 }

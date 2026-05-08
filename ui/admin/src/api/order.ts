@@ -8,12 +8,14 @@ export interface Order {
   order_no: string
   user_id: number
   user_name: string
+  user_email?: string
   resource_id: number
   resource_title: string
   amount: string
   status: OrderStatus
   payment_method: PaymentMethod | null
   transaction_id: string | null
+  tx_hash: string | null
   created_at: string
   paid_at: string | null
   completed_at: string | null
@@ -46,4 +48,9 @@ export async function cancelOrder(id: number): Promise<ApiResponse<void>> {
 // 退款
 export async function refundOrder(id: number): Promise<ApiResponse<void>> {
   return request.post(`/order/${id}/refund`)
+}
+
+// 完成订单
+export async function completeOrder(id: number): Promise<ApiResponse<void>> {
+  return request.post(`/order/${id}/complete`)
 }

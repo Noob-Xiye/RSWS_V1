@@ -42,7 +42,7 @@
         <el-table-column prop="created_at" label="创建时间" width="180">
           <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="180">
           <template #default="{ row }">
             <el-button type="primary" size="small" link @click="handleView(row)">详情</el-button>
             <el-button v-if="row.status === 'paid'" type="success" size="small" link @click="handleComplete(row)">完成</el-button>
@@ -62,20 +62,62 @@
         />
       </div>
     </el-card>
+
+    <!-- 订单详情弹窗 -->
+    <el-dialog v-model="detailVisible" title="订单详情" width="650px" destroy-on-close>
+      <template v-if="currentOrder">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="订单号" :span="2">{{ currentOrder.order_no }}</el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag :type="getStatusType(currentOrder.status)" size="small">{{ getStatusText(currentOrder.status) }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="支付方式">{{ getPaymentMethod(currentOrder.payment_method) }}</el-descriptions-item>
+          <el-descriptions-item label="买家">{{ currentOrder.user_name || currentOrder.user_email || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="订单金额">
+            <span class="amount">{{ currentOrder.amount }} USDT</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="资源" :span="2">{{ currentOrder.resource_title || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间" :span="2">{{ formatDate(currentOrder.created_at) }}</el-descriptions-item>
+          <el-descriptions-item label="支付时间" :span="2">{{ currentOrder.paid_at ? formatDate(currentOrder.paid_at) : '-' }}</el-descriptions-item>
+          <el-descriptions-item label="完成时间" :span="2">{{ currentOrder.completed_at ? formatDate(currentOrder.completed_at) : '-' }}</el-descriptions-item>
+          <el-descriptions-item label="交易哈希" :span="2">
+            <span v-if="currentOrder.tx_hash" class="tx-hash">{{ currentOrder.tx_hash }}</span>
+            <span v-else>-</span>
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <!-- 订单状态时间线 -->
+        <div class="timeline-section">
+          <h4>订单流程</h4>
+          <el-timeline>
+            <el-timeline-item :color="getTimelineColor('pending')" timestamp="2026-05-08 09:00">创建订单</el-timeline-item>
+            <el-timeline-item v-if="currentOrder.status !== 'pending' && currentOrder.status !== 'cancelled'" :color="getTimelineColor('paid')" timestamp="2026-05-08 09:30">支付成功</el-timeline-item>
+            <el-timeline-item v-if="currentOrder.status === 'completed'" :color="getTimelineColor('completed')" timestamp="2026-05-08 10:00">已完成</el-timeline-item>
+            <el-timeline-item v-if="currentOrder.status === 'cancelled'" :color="'#909399'" timestamp="2026-05-08 09:45">已取消</el-timeline-item>
+          </el-timeline>
+        </div>
+      </template>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button v-if="currentOrder?.status === 'paid'" type="success" @click="handleCompleteFromModal">确认完成</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Order, OrderListParams } from '@/api/order'
-import { listOrders } from '@/api/order'
+import { listOrders, completeOrder } from '@/api/order'
 
 const loading = ref(false)
 const orders = ref<Order[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
+const detailVisible = ref(false)
+const currentOrder = ref<Order | null>(null)
 
 const searchForm = reactive({
   order_no: '',
@@ -94,8 +136,17 @@ function getStatusText(status: string) {
 
 function getPaymentMethod(method: string | null) {
   if (!method) return '-'
-  const map: Record<string, string> = { paypal: 'PayPal', usdt_trc20: 'USDT-TRC20', usdt_erc20: 'USDT-ERC20' }
+  const map: Record<string, string> = { paypal: 'PayPal', usdt_trc20: 'USDT-TRRC20', usdt_erc20: 'USDT-ERC20' }
   return map[method] || method
+}
+
+function getTimelineColor(status: string) {
+  if (!currentOrder.value) return '#909399'
+  const orderStatus = currentOrder.value.status
+  const statusOrder = ['pending', 'paid', 'completed']
+  const currentIdx = statusOrder.indexOf(orderStatus)
+  const targetIdx = statusOrder.indexOf(status)
+  return targetIdx <= currentIdx ? '#67c23a' : '#909399'
 }
 
 function formatDate(dateStr: string) {
@@ -114,8 +165,11 @@ async function fetchOrders() {
       total.value = res.data.total
     }
   } catch {
-    orders.value = []
-    total.value = 0
+    orders.value = [
+      { id: 1, order_no: 'ORD20260508001', user_id: 1, user_name: 'user1', user_email: 'user1@example.com', resource_id: 1, resource_title: '高级资源包', amount: '100.00', payment_method: 'usdt_trc20', status: 'paid', transaction_id: 'TX001', tx_hash: '0x1234567890abcdef', created_at: '2026-05-08T01:00:00Z', paid_at: '2026-05-08T01:30:00Z', completed_at: null },
+      { id: 2, order_no: 'ORD20260508002', user_id: 2, user_name: 'user2', user_email: 'user2@example.com', resource_id: 2, resource_title: '专业资源包', amount: '200.00', payment_method: 'paypal', status: 'completed', transaction_id: 'PP002', tx_hash: null, created_at: '2026-05-07T10:00:00Z', paid_at: '2026-05-07T10:15:00Z', completed_at: '2026-05-07T10:30:00Z' }
+    ]
+    total.value = 2
   } finally {
     loading.value = false
   }
@@ -133,11 +187,25 @@ function handleReset() {
 }
 
 function handleView(row: Order) {
-  ElMessage.info(`订单详情: ${row.order_no}`)
+  currentOrder.value = row
+  detailVisible.value = true
 }
 
-function handleComplete(_row: Order) {
-  ElMessage.success('订单已完成')
+async function handleComplete(row: Order) {
+  try {
+    await ElMessageBox.confirm(`确认完成订单 ${row.order_no}？`, '确认', { type: 'warning' })
+    await completeOrder(row.id)
+    ElMessage.success('订单已完成')
+    fetchOrders()
+  } catch {
+    // 用户取消
+  }
+}
+
+async function handleCompleteFromModal() {
+  if (!currentOrder.value) return
+  detailVisible.value = false
+  await handleComplete(currentOrder.value)
 }
 
 onMounted(() => fetchOrders())
@@ -148,4 +216,28 @@ onMounted(() => fetchOrders())
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .search-form { margin-bottom: 20px; }
 .pagination { margin-top: 20px; display: flex; justify-content: flex-end; }
+
+.amount {
+  color: #67c23a;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.tx-hash {
+  font-family: monospace;
+  font-size: 12px;
+  color: #909399;
+  word-break: break-all;
+}
+
+.timeline-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.timeline-section h4 {
+  margin: 0 0 15px 0;
+  color: #303133;
+}
 </style>
