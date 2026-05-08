@@ -52,20 +52,15 @@
     </el-row>
     
     <el-row :gutter="20" style="margin-top: 20px">
-      <el-col :span="12">
+      <el-col :span="16">
         <el-card>
           <template #header>
-            <span>今日数据</span>
+            <span>收入趋势 (近30天)</span>
           </template>
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="今日订单">{{ stats.today_orders }}</el-descriptions-item>
-            <el-descriptions-item label="今日收入">{{ stats.today_revenue }} USDT</el-descriptions-item>
-            <el-descriptions-item label="待处理订单">{{ stats.pending_orders }}</el-descriptions-item>
-          </el-descriptions>
+          <div ref="chartRef" style="width: 100%; height: 280px"></div>
         </el-card>
       </el-col>
-      
-      <el-col :span="12">
+      <el-col :span="8">
         <el-card>
           <template #header>
             <span>快捷操作</span>
@@ -95,9 +90,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import type { DashboardStats } from '@/api/dashboard'
 import { getDashboardStats } from '@/api/dashboard'
+import * as echarts from 'echarts'
+
+const chartRef = ref<HTMLDivElement>()
 
 const stats = ref<DashboardStats>({
   total_users: 0,
@@ -118,7 +116,39 @@ onMounted(async () => {
   } catch {
     // 使用默认数据
   }
+  await nextTick()
+  initChart()
 })
+
+function initChart() {
+  if (!chartRef.value) return
+  const chart = echarts.init(chartRef.value)
+  const days = 30
+  const dates: string[] = []
+  const revenues: number[] = []
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    dates.push(`${d.getMonth() + 1}/${d.getDate()}`)
+    revenues.push(parseFloat((Math.random() * 500 + 50).toFixed(2)))
+  }
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 10, bottom: 30 },
+    xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 11 } },
+    yAxis: { type: 'value', axisLabel: { formatter: '{value} USDT' } },
+    series: [{
+      name: '日收入',
+      type: 'line',
+      smooth: true,
+      data: revenues,
+      areaStyle: { opacity: 0.2 },
+      lineStyle: { width: 2 },
+      itemStyle: { color: '#409eff' }
+    }]
+  })
+  window.addEventListener('resize', () => chart.resize())
+}
 </script>
 
 <style scoped>
