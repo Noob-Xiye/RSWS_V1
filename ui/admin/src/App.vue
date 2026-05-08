@@ -38,6 +38,10 @@
           <el-icon><Document /></el-icon>
           <template #title>日志查询</template>
         </el-menu-item>
+        <el-menu-item index="/admin">
+          <el-icon><Setting /></el-icon>
+          <template #title>管理员</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
     

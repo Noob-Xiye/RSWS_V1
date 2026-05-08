@@ -50,6 +50,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '日志查询' }
   },
   {
+    path: '/admin',
+    name: 'AdminManagement',
+    component: () => import('@/views/admin/index.vue'),
+    meta: { requiresAuth: true, title: '管理员' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/dashboard'
   }

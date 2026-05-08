@@ -1,5 +1,6 @@
 import request, { type ApiResponse } from './request'
 
+// ========== Admin 管理员 ==========
 export interface AdminInfo {
   id: number
   email: string
@@ -7,6 +8,14 @@ export interface AdminInfo {
   role: string
   is_active: boolean
   created_at: string
+  last_login: string | null
+}
+
+export interface AdminListParams {
+  page?: number
+  page_size?: number
+  role?: string
+  is_active?: boolean
 }
 
 export interface LoginRequest {
@@ -18,6 +27,13 @@ export interface LoginResponse {
   token: string
   api_key: string
   admin: AdminInfo
+}
+
+export interface CreateAdminParams {
+  email: string
+  username: string
+  password: string
+  role: string
 }
 
 export interface ApiKeyInfo {
@@ -40,21 +56,29 @@ export async function getAdminInfo(): Promise<ApiResponse<AdminInfo>> {
 }
 
 // 获取管理员列表
-export async function listAdmins(params?: { page?: number; page_size?: number }): Promise<ApiResponse<AdminInfo[]>> {
+export async function listAdmins(params?: AdminListParams): Promise<ApiResponse<AdminInfo[]>> {
   return request.get('/admin/list', { params })
 }
 
 // 创建管理员
-export async function createAdmin(data: { email: string; password: string; username?: string; role?: string }): Promise<ApiResponse<AdminInfo>> {
+export async function createAdmin(data: CreateAdminParams): Promise<ApiResponse<AdminInfo>> {
   return request.post('/admin/create', data)
 }
 
-// 停用管理员
+// 停用/启用管理员
 export async function deactivateAdmin(id: number): Promise<ApiResponse<void>> {
   return request.post(`/admin/${id}/deactivate`)
 }
 
-// API Key 管理
+export async function activateAdmin(id: number): Promise<ApiResponse<void>> {
+  return request.post(`/admin/${id}/activate`)
+}
+
+export async function resetAdminPassword(id: number, newPassword: string): Promise<ApiResponse<void>> {
+  return request.post(`/admin/${id}/reset-password`, { password: newPassword })
+}
+
+// ========== API Key 管理 ==========
 export async function listApiKeys(): Promise<ApiResponse<ApiKeyInfo[]>> {
   return request.get('/admin/api-keys')
 }
@@ -65,4 +89,8 @@ export async function createApiKey(data: { name: string; expires_at?: string }):
 
 export async function deleteApiKey(keyId: number): Promise<ApiResponse<void>> {
   return request.delete(`/admin/api-keys/${keyId}`)
+}
+
+export async function toggleApiKey(keyId: number, isActive: boolean): Promise<ApiResponse<void>> {
+  return request.put(`/admin/api-keys/${keyId}`, { is_active: isActive })
 }
