@@ -12,8 +12,12 @@
         <el-form-item label="标题">
           <el-input v-model="searchForm.title" placeholder="搜索标题" clearable />
         </el-form-item>
+        <el-form-item label="分类">
+          <el-input v-model="searchForm.category" placeholder="分类" clearable />
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="全部" clearable>
+            <el-option label="草稿" value="draft" />
             <el-option label="待审核" value="pending" />
             <el-option label="已通过" value="approved" />
             <el-option label="已拒绝" value="rejected" />
@@ -60,6 +64,25 @@
         />
       </div>
     </el-card>
+    
+    <el-dialog v-model="detailVisible" title="资源详情" width="600px">
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="ID">{{ currentResource?.id }}</el-descriptions-item>
+        <el-descriptions-item label="标题">{{ currentResource?.title }}</el-descriptions-item>
+        <el-descriptions-item label="分类">{{ currentResource?.category }}</el-descriptions-item>
+        <el-descriptions-item label="价格">{{ currentResource?.price }} USDT</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="getStatusType(currentResource?.status || '')">{{ getStatusText(currentResource?.status || '') }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="创作者">{{ currentResource?.creator_name }}</el-descriptions-item>
+        <el-descriptions-item label="下载量">{{ currentResource?.download_count }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ formatDate(currentResource?.created_at || '') }}</el-descriptions-item>
+        <el-descriptions-item label="更新时间">{{ formatDate(currentResource?.updated_at || '') }}</el-descriptions-item>
+        <el-descriptions-item label="描述">
+          <div style="white-space: pre-wrap; word-break: break-all;">{{ currentResource?.description || '无' }}</div>
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
   </div>
 </template>
 
@@ -77,8 +100,12 @@ const pageSize = ref(20)
 
 const searchForm = reactive({
   title: '',
+  category: '',
   status: ''
 })
+
+const detailVisible = ref(false)
+const currentResource = ref<Resource | null>(null)
 
 function getStatusType(status: string) {
   const map: Record<string, string> = { pending: 'warning', approved: 'success', rejected: 'danger', draft: 'info' }
@@ -118,12 +145,14 @@ function handleSearch() {
 
 function handleReset() {
   searchForm.title = ''
+  searchForm.category = ''
   searchForm.status = ''
   fetchResources()
 }
 
 function handleView(row: Resource) {
-  ElMessage.info(`查看资源: ${row.title}`)
+  currentResource.value = row
+  detailVisible.value = true
 }
 
 async function handleApprove(row: Resource) {

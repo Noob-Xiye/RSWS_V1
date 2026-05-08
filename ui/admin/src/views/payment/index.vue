@@ -69,6 +69,22 @@
       </el-tabs>
     </el-card>
     
+    <el-dialog v-model="detailVisible" title="支付详情" width="500px">
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="类型">{{ currentItem?.type }}</el-descriptions-item>
+        <el-descriptions-item label="地址">
+          <code class="addr-code">{{ currentItem?.address }}</code>
+        </el-descriptions-item>
+        <el-descriptions-item label="网络">{{ currentItem?.network }}</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="currentItem?.is_active ? 'success' : 'danger'">
+            {{ currentItem?.is_active ? '启用' : '禁用' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ formatDate(currentItem?.created_at || '') }}</el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
+    
     <!-- 创建 API Key 对话框 -->
     <el-dialog v-model="createApiKeyVisible" title="新建 API Key" width="400px">
       <el-form :model="newApiKeyForm" label-width="80px">
@@ -91,6 +107,8 @@ import type { ApiKeyInfo } from '@/api/admin'
 import { listApiKeys, createApiKey, deleteApiKey } from '@/api/admin'
 
 const activeTab = ref('usdt')
+const detailVisible = ref(false)
+const currentItem = ref<{type:string;address:string;network:string;is_active:boolean;created_at:string}|null>(null)
 
 const usdtForm = reactive({ trc20: '', erc20: '' })
 const paypalForm = reactive({ client_id: '', secret: '', mode: 'sandbox' as 'sandbox' | 'live' })
@@ -101,6 +119,11 @@ const newApiKeyForm = reactive({ name: '' })
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+function showDetail(row: {type:string;address:string;network:string;is_active:boolean;created_at:string}) {
+  currentItem.value = row
+  detailVisible.value = true
 }
 
 function handleSaveUsdt() {
@@ -160,4 +183,5 @@ onMounted(() => {
 .page-container { padding: 20px; }
 .apikey-header { margin-bottom: 20px; }
 .apikey-code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }
+.addr-code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; word-break: break-all; }
 </style>
