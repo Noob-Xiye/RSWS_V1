@@ -9,7 +9,7 @@
           </div>
           <div class="stat-content">
             <div class="stat-value">{{ stats.total_users }}</div>
-            <div class="stat-label">总用户数</div>
+            <div class="stat-label">总用户数 <span class="sub">(近30天 +{{ stats.new_users_30d }})</span></div>
           </div>
         </el-card>
       </el-col>
@@ -21,7 +21,7 @@
           </div>
           <div class="stat-content">
             <div class="stat-value">{{ stats.total_resources }}</div>
-            <div class="stat-label">总资源数</div>
+            <div class="stat-label">总资源数 <span class="sub">(活跃 {{ stats.active_resources }})</span></div>
           </div>
         </el-card>
       </el-col>
@@ -33,7 +33,7 @@
           </div>
           <div class="stat-content">
             <div class="stat-value">{{ stats.total_orders }}</div>
-            <div class="stat-label">总订单数</div>
+            <div class="stat-label">总订单数 <span class="sub">(完成 {{ stats.completed_orders }})</span></div>
           </div>
         </el-card>
       </el-col>
@@ -44,8 +44,8 @@
             <el-icon :size="32"><Money /></el-icon>
           </div>
           <div class="stat-content">
-            <div class="stat-value">{{ stats.total_revenue }}</div>
-            <div class="stat-label">总收入 (USDT)</div>
+            <div class="stat-value">{{ formatRevenue(stats.total_revenue) }}</div>
+            <div class="stat-label">总收入 (USDT) <span class="sub">(近30天 {{ formatRevenue(stats.revenue_30d) }})</span></div>
           </div>
         </el-card>
       </el-col>
@@ -91,7 +91,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
-import type { DashboardStats } from '@/api/dashboard'
+import type { DashboardStats, DailyOrderCount } from '@/api/dashboard'
 import { getDashboardStats } from '@/api/dashboard'
 import * as echarts from 'echarts'
 
@@ -99,13 +99,21 @@ const chartRef = ref<HTMLDivElement>()
 
 const stats = ref<DashboardStats>({
   total_users: 0,
-  total_resources: 0,
+  new_users_30d: 0,
   total_orders: 0,
-  total_revenue: '0',
-  pending_orders: 0,
-  today_orders: 0,
-  today_revenue: '0'
+  completed_orders: 0,
+  total_revenue: 0,
+  revenue_30d: 0,
+  total_resources: 0,
+  active_resources: 0,
+  new_resources_30d: 0,
+  orders_trend: []
 })
+
+// 收入单位：分 -> 元
+function formatRevenue(cents: number): string {
+  return (cents / 100).toFixed(2)
+}
 
 onMounted(async () => {
   try {
@@ -117,31 +125,44 @@ onMounted(async () => {
     // 使用默认数据
   }
   await nextTick()
-  initChart()
+  initChart(stats.value.orders_trend)
 })
 
-function initChart() {
+function initChart(trend: DailyOrderCount[]) {
   if (!chartRef.value) return
   const chart = echarts.init(chartRef.value)
-  const days = 30
+  
+  // 使用真实数据或生成占位数据
   const dates: string[] = []
-  const revenues: number[] = []
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    dates.push(`${d.getMonth() + 1}/${d.getDate()}`)
-    revenues.push(parseFloat((Math.random() * 500 + 50).toFixed(2)))
+  const counts: number[] = []
+  
+  if (trend.length > 0) {
+    trend.forEach(item => {
+      // date 格式 YYYY-MM-DD -> M/D
+      const [y, m, d] = item.date.split('-')
+      dates.push(`${parseInt(m)}/${parseInt(d)}`)
+      counts.push(item.count)
+    })
+  } else {
+    // 无数据时显示占位
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      dates.push(`${d.getMonth() + 1}/${d.getDate()}`)
+      counts.push(0)
+    }
   }
+  
   chart.setOption({
     tooltip: { trigger: 'axis' },
     grid: { left: 50, right: 20, top: 10, bottom: 30 },
     xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 11 } },
-    yAxis: { type: 'value', axisLabel: { formatter: '{value} USDT' } },
+    yAxis: { type: 'value', axisLabel: { formatter: '{value} 单' } },
     series: [{
-      name: '日收入',
+      name: '日订单数',
       type: 'line',
       smooth: true,
-      data: revenues,
+      data: counts,
       areaStyle: { opacity: 0.2 },
       lineStyle: { width: 2 },
       itemStyle: { color: '#409eff' }
@@ -193,6 +214,11 @@ function initChart() {
   font-size: 14px;
   color: #909399;
   margin-top: 5px;
+}
+
+.stat-label .sub {
+  font-size: 12px;
+  color: #c0c4cc;
 }
 
 .quick-actions {
