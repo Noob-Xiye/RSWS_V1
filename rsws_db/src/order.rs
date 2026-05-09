@@ -194,6 +194,44 @@ impl OrderRepository {
 
         Ok(result.rows_affected())
     }
+
+    /// 获取基础统计（订单总数 + 已完成订单数 + 总收入 + 过去30天订单数 + 过去30天收入）
+    pub async fn get_basic_stats(&self) -> Result<(i64, i64, i64, i64, i64), RswsError> {
+        let total_orders: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM orders")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
+
+        let completed_orders: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM orders WHERE status IN ('paid', 'completed')"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to count completed orders: {}", e)))?;
+
+        let total_revenue: (i64,) = sqlx::query_as(
+            "SELECT COALESCE(SUM(amount), 0) FROM orders WHERE status IN ('paid', 'completed')"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to sum revenue: {}", e)))?;
+
+        let orders_30d: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM orders WHERE created_at >= NOW() - INTERVAL '30 days'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to count recent orders: {}", e)))?;
+
+        let revenue_30d: (i64,) = sqlx::query_as(
+            "SELECT COALESCE(SUM(amount), 0) FROM orders WHERE status IN ('paid', 'completed') AND created_at >= NOW() - INTERVAL '30 days'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to sum recent revenue: {}", e)))?;
+
+        Ok((total_orders.0, completed_orders.0, total_revenue.0, orders_30d.0, revenue_30d.0))
+    }
 }
 
 // ==================== 单元测试 ====================

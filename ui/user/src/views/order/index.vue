@@ -111,7 +111,7 @@
           <ul style="margin: 0; padding-left: 20px; font-size: 12px">
             <li>请确保转账金额准确</li>
             <li>转账完成后请等待链上确认</li>
-            <li>订单将在 {{ formatExpiredTime(currentOrder.expired_at) }} 过期</li>
+            <li>订单将在 {{ formatExpiredTime(currentOrder?.expired_at) }} 过期</li>
           </ul>
         </el-alert>
         <div class="payment-status" v-if="pollingStatus">
@@ -193,7 +193,7 @@ function formatDate(dateStr: string) {
   return dateStr.substring(0, 19).replace('T', ' ')
 }
 
-function formatExpiredTime(dateStr: string) {
+function formatExpiredTime(dateStr: string | undefined) {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return date.toLocaleString('zh-CN')

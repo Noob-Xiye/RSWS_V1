@@ -85,6 +85,8 @@ pub fn create_router(state: AppState) -> Router {
                         )
                         // 日志查询
                         .push(Router::with_path("logs/system").get(handler::admin::query_system_logs))
+                        // Dashboard 统计
+                        .push(Router::with_path("dashboard/stats").get(handler::admin::dashboard_stats))
                     )
                     .push(Router::with_path("<id>")
                         .get(handler::admin::get_admin)

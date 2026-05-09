@@ -125,6 +125,33 @@ pub struct AdminApiKeyResponse {
     pub created_at: DateTime<Utc>,
 }
 
+/// Dashboard 统计面板数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardStats {
+    // 用户统计
+    pub total_users: i64,
+    pub new_users_30d: i64,
+    // 订单统计
+    pub total_orders: i64,
+    pub completed_orders: i64,
+    // 收入统计（单位：分，前端除以100转元）
+    pub total_revenue: i64,
+    pub revenue_30d: i64,
+    // 资源统计
+    pub total_resources: i64,
+    pub active_resources: i64,
+    pub new_resources_30d: i64,
+    // 过去30天订单趋势（按天分组）
+    pub orders_trend: Vec<DailyOrderCount>,
+}
+
+/// 单日订单统计
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DailyOrderCount {
+    pub date: String,  // YYYY-MM-DD
+    pub count: i64,
+}
+
 // ==================== 单元测试 ====================
 
 #[cfg(test)]

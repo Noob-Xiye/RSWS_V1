@@ -5,13 +5,17 @@
 
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
+use sqlx::PgPool;
 use rsws_common::{ResponseExt, error_code::ErrorCode, RswsError};
 use serde::Deserialize;
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 use crate::state::get_state;
 use rsws_service::UpdateLogConfigRequest;
-use rsws_model::user_models::admin::AdminLoginResponse;
+use rsws_model::user_models::admin::{
+    AdminLoginResponse, DashboardStats, DailyOrderCount,
+};
+use rsws_db::{user::UserRepository, order::OrderRepository, resource::ResourceRepository};
 
 /// 管理员登录请求
 #[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
@@ -757,4 +761,96 @@ pub async fn update_usdt_wallet(req: &mut Request, depot: &mut Depot, res: &mut 
             res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
         }
     }
+}
+
+// ==================== Dashboard 统计面板 ====================
+
+/// 获取 Dashboard 统计面板数据
+#[endpoint(
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 403, description = "非管理员"),
+    )
+)]
+pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied()
+        .unwrap_or(false);
+
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let state = get_state(depot);
+    let pool: PgPool = state.pool();
+
+    let user_repo = UserRepository::new(pool.clone());
+    let order_repo = OrderRepository::new(pool.clone());
+    let resource_repo = ResourceRepository::new(pool.clone());
+
+    // 并行查询所有统计数据
+    let (user_result, order_result, resource_result) = tokio::join!(
+        user_repo.get_basic_stats(),
+        order_repo.get_basic_stats(),
+        resource_repo.get_basic_stats(),
+    );
+
+    let (total_users, new_users_30d) = match user_result {
+        Ok(v) => v,
+        Err(e) => {
+            res.error(e);
+            return;
+        }
+    };
+
+    let (total_orders, completed_orders, total_revenue, _orders_30d, revenue_30d) = match order_result {
+        Ok(v) => v,
+        Err(e) => {
+            res.error(e);
+            return;
+        }
+    };
+
+    let (total_resources, active_resources, new_resources_30d) = match resource_result {
+        Ok(v) => v,
+        Err(e) => {
+            res.error(e);
+            return;
+        }
+    };
+
+    // 查询过去30天订单趋势
+    let orders_trend: Vec<DailyOrderCount> = match sqlx::query_as(
+        r#"
+        SELECT DATE(created_at AT TIME ZONE 'UTC')::text AS date, COUNT(*)::bigint AS count
+        FROM orders
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE(created_at AT TIME ZONE 'UTC')
+        ORDER BY date ASC
+        "#
+    )
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            res.error(RswsError::internal(format!("Failed to query orders trend: {}", e)));
+            return;
+        }
+    };
+
+    let stats = DashboardStats {
+        total_users,
+        new_users_30d,
+        total_orders,
+        completed_orders,
+        total_revenue,      // 单位：分，前端除以100转元
+        revenue_30d,         // 单位：分，前端除以100转元
+        total_resources,
+        active_resources,
+        new_resources_30d,
+        orders_trend,
+    };
+
+    res.success(stats);
 }

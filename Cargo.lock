@@ -2395,6 +2395,7 @@ dependencies = [
  "chrono",
  "deadpool-redis",
  "rsws_common",
+ "rsws_db",
  "rsws_model",
  "rsws_service",
  "salvo",

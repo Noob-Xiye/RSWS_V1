@@ -161,14 +161,28 @@ impl UserRepository {
             }
         }
     }
+    /// 获取基础统计（用户总数 + 过去30天新增用户数）
+    pub async fn get_basic_stats(&self) -> Result<(i64, i64), RswsError> {
+        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to count users: {}", e)))?;
+
+        let new_users_30d: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '30 days'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to count new users: {}", e)))?;
+
+        Ok((total.0, new_users_30d.0))
+    }
 }
 
 // ==================== 单元测试 ====================
 
 #[cfg(test)]
 mod tests {
-    
-
     #[test]
     fn test_user_repository_new() {
         // 仅测试构造函数

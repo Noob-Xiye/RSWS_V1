@@ -46,9 +46,9 @@
                     <h4>简介</h4>
                     <p>{{ resource.description }}</p>
                   </div>
-                  <div class="content" v-if="resource.content">
+                  <div class="content" v-if="resource.detail_description">
                     <h4>详细内容</h4>
-                    <div v-html="resource.content"></div>
+                    <div v-html="resource.detail_description"></div>
                   </div>
                 </el-card>
               </el-col>
@@ -152,7 +152,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { getResource, checkPurchase, getDownloadInfo } from '@/api/resource'
+import { getResource, checkPurchase, getDownloadInfo, type ResourceDetail } from '@/api/resource'
 import { createOrder, checkOrderStatus, getUsdtAddress } from '@/api/order'
 
 const route = useRoute()

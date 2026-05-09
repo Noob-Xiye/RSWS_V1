@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as apiLogin, register as apiRegister, getUserInfo } from '@/api/user'
+import { register as apiRegister, getUserInfo, login as apiLogin } from '@/api/user'
 import { setApiKey, getApiKey, removeApiKey } from '@/utils/storage'
 import type { User } from '@/api/user'
 
@@ -24,16 +24,32 @@ export const useUserStore = defineStore('user', () => {
   const username = computed(() => userInfo.value?.nickname || userInfo.value?.username || '未登录')
   const balance = computed(() => userInfo.value?.balance || '0')
 
-  async function login(email: string, password: string) {
+  async function login(loginStr: string, passwordOrCode: string, loginType: 'password' | 'code') {
     try {
-      const res = await apiLogin(email, password)
-      if (res.success && res.data) {
-        apiKey.value = res.data.api_key
-        userInfo.value = res.data.user
-        setApiKey(res.data.api_key)
+      const res = await apiLogin({
+        login: loginStr,
+        password: loginType === 'password' ? passwordOrCode : undefined,
+        verification_code: loginType === 'code' ? passwordOrCode : undefined,
+        login_type: loginType,
+      })
+      if (res.success && res.data?.success && res.data.session_data?.api_key) {
+        apiKey.value = res.data.session_data.api_key
+        if (res.data.user_info) {
+          userInfo.value = {
+            id: res.data.user_info.id ?? 0,
+            email: res.data.user_info.email ?? '',
+            username: res.data.user_info.username ?? '',
+            nickname: res.data.user_info.nickname,
+            avatar_url: res.data.user_info.avatar_url,
+            is_active: res.data.user_info.is_active ?? false,
+            created_at: '',
+            updated_at: '',
+          }
+        }
+        setApiKey(res.data.session_data.api_key)
         return { success: true }
       }
-      return { success: false, message: res.message || '登录失败' }
+      return { success: false, message: res.data?.message || res.message || '登录失败' }
     } catch (err: any) {
       return { success: false, message: err?.message || '登录失败' }
     }
@@ -41,14 +57,25 @@ export const useUserStore = defineStore('user', () => {
 
   async function register(email: string, password: string, username: string) {
     try {
-      const res = await apiRegister(email, password, username)
-      if (res.success && res.data) {
-        apiKey.value = res.data.api_key
-        userInfo.value = res.data.user
-        setApiKey(res.data.api_key)
+      const res = await apiRegister({ email, password, username })
+      if (res.success && res.data?.success && res.data.user_info) {
+        if (res.data.session_data?.api_key) {
+          apiKey.value = res.data.session_data.api_key
+          setApiKey(res.data.session_data.api_key)
+        }
+        userInfo.value = {
+          id: res.data.user_info.id ?? 0,
+          email: res.data.user_info.email ?? '',
+          username: res.data.user_info.username ?? '',
+          nickname: res.data.user_info.nickname,
+          avatar_url: res.data.user_info.avatar_url,
+          is_active: res.data.user_info.is_active ?? false,
+          created_at: '',
+          updated_at: '',
+        }
         return { success: true }
       }
-      return { success: false, message: res.message || '注册失败' }
+      return { success: false, message: res.data?.message || res.message || '注册失败' }
     } catch (err: any) {
       return { success: false, message: err?.message || '注册失败' }
     }
@@ -59,17 +86,15 @@ export const useUserStore = defineStore('user', () => {
     try {
       const res = await getUserInfo()
       if (res.success && res.data) {
-        // 后端返回的 User 结构可能是旧版，只有 email/username/nickname/avatar_url
         userInfo.value = {
-          id: res.data.id,
-          email: res.data.email,
-          username: res.data.username,
+          id: res.data.id ?? 0,
+          email: res.data.email ?? '',
+          username: res.data.username ?? '',
           nickname: res.data.nickname,
           avatar_url: res.data.avatar_url,
-          is_active: true,
-          created_at: '',
-          updated_at: '',
-          ...res.data,
+          is_active: res.data.is_active ?? false,
+          created_at: res.data.created_at || '',
+          updated_at: res.data.updated_at || '',
         }
       }
     } catch {

@@ -331,6 +331,30 @@ impl ResourceRepository {
             .map_err(|e| RswsError::internal(format!("Failed to increment download count: {}", e)))?;
         Ok(())
     }
+
+    /// 获取基础统计（资源总数 + 已上线资源数 + 过去30天新增资源数）
+    pub async fn get_basic_stats(&self) -> Result<(i64, i64, i64), RswsError> {
+        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM resources")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to count resources: {}", e)))?;
+
+        let active: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM resources WHERE is_active = true"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to count active resources: {}", e)))?;
+
+        let new_30d: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM resources WHERE created_at >= NOW() - INTERVAL '30 days'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to count recent resources: {}", e)))?;
+
+        Ok((total.0, active.0, new_30d.0))
+    }
 }
 
 // ==================== 单元测试 ====================

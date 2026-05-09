@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 use salvo::prelude::*;
+use sqlx::PgPool;
 use rsws_service::{
     UserService, OrderService, ResourceService,
     ApiKeyService, PayPalService, BlockchainService,
@@ -15,6 +16,7 @@ use rsws_service::{
 /// 应用全局状态
 #[derive(Clone)]
 pub struct AppState {
+    pub pool: PgPool,
     pub user_service: Arc<UserService>,
     pub order_service: Arc<OrderService>,
     pub resource_service: Arc<ResourceService>,
@@ -31,8 +33,8 @@ pub struct AppState {
 }
 
 impl AppState {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        pool: PgPool,
         user_service: UserService,
         order_service: OrderService,
         resource_service: ResourceService,
@@ -48,6 +50,7 @@ impl AppState {
         admin_repo: AdminRepository,
     ) -> Self {
         Self {
+            pool: pool.clone(),
             user_service: Arc::new(user_service),
             order_service: Arc::new(order_service),
             resource_service: Arc::new(resource_service),
@@ -62,6 +65,11 @@ impl AppState {
             log_service: Arc::new(log_service),
             admin_repo: Arc::new(admin_repo),
         }
+    }
+
+    /// 返回数据库连接池（用于创建临时仓储实例）
+    pub fn pool(&self) -> PgPool {
+        self.pool.clone()
     }
 
     /// 克隆 AdminRepository 用于中间件更新 last_used

@@ -154,6 +154,7 @@ async fn main() -> Result<(), RswsError> {
 
     // 创建 AppState
     let app_state = AppState::new(
+        pool.clone(),
         user_service,
         order_service,
         resource_service,

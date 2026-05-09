@@ -9,7 +9,7 @@ export interface Resource {
   category_id: number | null
   file_url: string | null
   thumbnail_url: string | null
-  cover_image?: string | null  // alias for thumbnail_url
+  cover_image?: string | null
   is_active: boolean
   detail_description?: string | null
   specifications?: any
@@ -31,8 +31,8 @@ export interface ResourceListResponse {
   total_pages: number
 }
 
-export interface ResourceDetail extends Resource {
-  // 购买后才有的字段
+// 资源详情（购买后才有的字段）
+export type ResourceDetail = Omit<Resource, 'file_url'> & {
   file_url?: string | null
 }
 

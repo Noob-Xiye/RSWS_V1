@@ -37,6 +37,18 @@ const routes: RouteRecordRaw[] = [
     name: 'Orders',
     component: () => import('@/views/order/index.vue'),
     meta: { title: '我的订单' }
+  },
+  {
+    path: '/payment/success',
+    name: 'PaymentSuccess',
+    component: () => import('@/views/payment/success.vue'),
+    meta: { title: '支付成功' }
+  },
+  {
+    path: '/payment/cancel',
+    name: 'PaymentCancel',
+    component: () => import('@/views/payment/cancel.vue'),
+    meta: { title: '支付取消' }
   }
 ]
 
