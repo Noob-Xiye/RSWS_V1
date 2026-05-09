@@ -17,6 +17,9 @@ pub fn create_router(state: AppState) -> Router {
         // 健康检查（无需认证）
         .push(Router::with_path("health").get(handler::health))
 
+        // 分类列表（无需认证）
+        .push(Router::with_path("api/v1/categories").get(handler::category::list_categories))
+
         // API v1（统一 API Key 认证 + 速率限制）
         .push(
             Router::with_path("api/v1")
@@ -104,6 +107,15 @@ pub fn create_router(state: AppState) -> Router {
                 .push(Router::with_path("usdt-wallets")
                     .get(handler::admin::list_usdt_wallets)
                     .push(Router::with_path("<network>").put(handler::admin::update_usdt_wallet))
+                )
+                // PayPal 配置管理
+                .push(Router::with_path("paypal-configs")
+                    .get(handler::admin_paypal::list_paypal_configs)
+                    .push(Router::with_path("<id>")
+                        .get(handler::admin_paypal::get_paypal_config)
+                        .put(handler::admin_paypal::update_paypal_config)
+                        .push(Router::with_path("active/<active>").post(handler::admin_paypal::set_paypal_config_active))
+                    )
                 )
         )
 

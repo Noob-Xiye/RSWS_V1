@@ -174,6 +174,122 @@ impl PaymentRepository {
     }
 }
 
+// ==================== PayPal 配置仓储 ====================
+
+use rsws_model::payment::PayPalConfig;
+
+/// PayPal 配置仓储
+pub struct PayPalConfigRepository {
+    pool: PgPool,
+}
+
+impl PayPalConfigRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    /// 获取所有 PayPal 配置
+    pub async fn list_all(&self) -> Result<Vec<PayPalConfig>, RswsError> {
+        let configs = sqlx::query_as::<_, PayPalConfig>(
+            "SELECT id, client_id, client_secret_encrypted, sandbox, webhook_id, webhook_secret_encrypted, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs ORDER BY id",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to list paypal configs: {}", e)))?;
+
+        Ok(configs)
+    }
+
+    /// 根据 ID 获取 PayPal 配置
+    pub async fn get_by_id(&self, id: i32) -> Result<Option<PayPalConfig>, RswsError> {
+        let config = sqlx::query_as::<_, PayPalConfig>(
+            "SELECT id, client_id, client_secret_encrypted, sandbox, webhook_id, webhook_secret_encrypted, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get paypal config: {}", e)))?;
+
+        Ok(config)
+    }
+
+    /// 获取当前激活的 PayPal 配置
+    pub async fn get_active(&self) -> Result<Option<PayPalConfig>, RswsError> {
+        let config = sqlx::query_as::<_, PayPalConfig>(
+            "SELECT id, client_id, client_secret_encrypted, sandbox, webhook_id, webhook_secret_encrypted, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs WHERE is_active = true LIMIT 1",
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get active paypal config: {}", e)))?;
+
+        Ok(config)
+    }
+
+    /// 更新 PayPal 配置
+    pub async fn update(&self, id: i32, req: &rsws_model::payment::UpdatePayPalConfigRequest) -> Result<PayPalConfig, RswsError> {
+        // 先获取现有配置
+        let existing = self.get_by_id(id).await?
+            .ok_or_else(|| RswsError::not_found("PayPal config not found"))?;
+
+        let updated = sqlx::query_as::<_, PayPalConfig>(
+            r#"
+            UPDATE paypal_configs SET
+                client_id = COALESCE($1, client_id),
+                client_secret_encrypted = COALESCE($2, client_secret_encrypted),
+                sandbox = COALESCE($3, sandbox),
+                webhook_id = CASE WHEN $4::boolean THEN $5 ELSE webhook_id END,
+                webhook_secret_encrypted = CASE WHEN $6::boolean THEN $7 ELSE webhook_secret_encrypted END,
+                base_url = COALESCE($8, base_url),
+                return_url = COALESCE($9, return_url),
+                cancel_url = COALESCE($10, cancel_url),
+                brand_name = COALESCE($11, brand_name),
+                min_amount = COALESCE($12, min_amount),
+                max_amount = COALESCE($13, max_amount),
+                fee_rate = COALESCE($14, fee_rate),
+                is_active = COALESCE($15, is_active),
+                updated_at = NOW()
+            WHERE id = $16
+            RETURNING id, client_id, client_secret_encrypted, sandbox, webhook_id, webhook_secret_encrypted, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at
+            "#,
+        )
+        .bind(req.client_id.as_ref().unwrap_or(&existing.client_id))
+        .bind(req.client_secret_encrypted.as_ref().unwrap_or(&existing.client_secret_encrypted))
+        .bind(req.sandbox)
+        .bind(req.webhook_id.is_some())
+        .bind(req.webhook_id.as_deref())
+        .bind(req.webhook_secret_encrypted.is_some())
+        .bind(req.webhook_secret_encrypted.as_deref())
+        .bind(req.base_url.as_ref().unwrap_or(&existing.base_url))
+        .bind(req.return_url.as_ref().unwrap_or(&existing.return_url))
+        .bind(req.cancel_url.as_ref().unwrap_or(&existing.cancel_url))
+        .bind(req.brand_name.as_ref().unwrap_or(&existing.brand_name))
+        .bind(req.min_amount)
+        .bind(req.max_amount)
+        .bind(req.fee_rate)
+        .bind(req.is_active)
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to update paypal config: {}", e)))?;
+
+        Ok(updated)
+    }
+
+    /// 设置激活状态
+    pub async fn set_active(&self, id: i32, is_active: bool) -> Result<(), RswsError> {
+        sqlx::query(
+            "UPDATE paypal_configs SET is_active = $1, updated_at = NOW() WHERE id = $2",
+        )
+        .bind(is_active)
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to set paypal config active: {}", e)))?;
+
+        Ok(())
+    }
+}
+
 // ==================== 单元测试 ====================
 
 #[cfg(test)]

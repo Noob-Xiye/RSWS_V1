@@ -12,6 +12,7 @@ use rsws_service::{
     PaymentService, AdminService, AdminRepository,
     LogService,
 };
+use rsws_db::CategoryRepository;
 
 /// 应用全局状态
 #[derive(Clone)]
@@ -30,6 +31,7 @@ pub struct AppState {
     pub admin_service: Arc<AdminService>,
     pub log_service: Arc<LogService>,
     admin_repo: Arc<AdminRepository>,
+    pub category_service: Arc<CategoryRepository>,
 }
 
 impl AppState {
@@ -48,6 +50,7 @@ impl AppState {
         admin_service: AdminService,
         log_service: LogService,
         admin_repo: AdminRepository,
+        category_service: CategoryRepository,
     ) -> Self {
         Self {
             pool: pool.clone(),
@@ -64,6 +67,7 @@ impl AppState {
             admin_service: Arc::new(admin_service),
             log_service: Arc::new(log_service),
             admin_repo: Arc::new(admin_repo),
+            category_service: Arc::new(category_service),
         }
     }
 

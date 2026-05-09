@@ -1,6 +1,6 @@
-//! 数据库层
+//! Database Repository
 //!
-//! 提供各业务模块的数据库操作
+//! Provides data access layer for each business domain
 
 use sqlx::PgPool;
 
@@ -12,25 +12,29 @@ pub mod resource;
 pub mod redis;
 pub mod wallet;
 pub mod admin;
+pub mod category;
 
 pub use user::UserRepository;
 pub use order::OrderRepository;
 pub use payment::PaymentRepository;
+pub use payment::PayPalConfigRepository;
 pub use resource::ResourceRepository;
 pub use api_key::ApiKeyRepository;
 pub use redis::RedisService;
 pub use wallet::WalletRepository;
 pub use admin::AdminRepository;
+pub use category::CategoryRepository;
+pub use category::Category;
 
-/// Redis 连接池类型别名
+/// Redis connection pool alias
 pub type RedisPool = RedisService;
 
-/// 创建数据库连接池
+/// Create database connection pool
 pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
     PgPool::connect(database_url).await
 }
 
-/// 创建数据库连接池（带配置）
+/// Create database connection pool (with config)
 pub async fn create_pool_with_config(
     database_url: &str,
     max_connections: u32,

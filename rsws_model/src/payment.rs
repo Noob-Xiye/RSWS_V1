@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use salvo_oapi::ToSchema;
 use sqlx::FromRow;
 
 // ==================== 订单 ====================
@@ -158,6 +159,47 @@ pub struct VerifyPaymentResponse {
     pub status: String,
     pub message: String,
     pub order_id: Option<i64>,
+}
+
+// ==================== PayPal 配置 ====================
+
+/// PayPal 配置
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PayPalConfig {
+    pub id: i32,
+    pub client_id: String,
+    pub client_secret_encrypted: String,
+    pub sandbox: bool,
+    pub webhook_id: Option<String>,
+    pub webhook_secret_encrypted: Option<String>,
+    pub base_url: String,
+    pub return_url: String,
+    pub cancel_url: String,
+    pub brand_name: String,
+    pub min_amount: rust_decimal::Decimal,
+    pub max_amount: rust_decimal::Decimal,
+    pub fee_rate: rust_decimal::Decimal,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// PayPal 配置更新请求（管理员用）
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UpdatePayPalConfigRequest {
+    pub client_id: Option<String>,
+    pub client_secret_encrypted: Option<String>,
+    pub sandbox: Option<bool>,
+    pub webhook_id: Option<String>,
+    pub webhook_secret_encrypted: Option<String>,
+    pub base_url: Option<String>,
+    pub return_url: Option<String>,
+    pub cancel_url: Option<String>,
+    pub brand_name: Option<String>,
+    pub min_amount: Option<rust_decimal::Decimal>,
+    pub max_amount: Option<rust_decimal::Decimal>,
+    pub fee_rate: Option<rust_decimal::Decimal>,
+    pub is_active: Option<bool>,
 }
 
 // ==================== 单元测试 ====================
