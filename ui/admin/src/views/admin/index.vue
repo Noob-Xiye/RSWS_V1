@@ -205,9 +205,9 @@ async function fetchAdmins() {
     if (searchForm.is_active !== undefined) params.is_active = searchForm.is_active
     const res = await listAdmins(params)
     if (res.success && res.data) {
-      const d = res.data as AdminInfo[]
-      admins.value = d
-      total.value = d.length
+      const data = res.data as { items: AdminInfo[]; total: number; page: number; page_size: number }
+      admins.value = data.items
+      total.value = data.total
     }
   } catch {
     admins.value = []

@@ -34,6 +34,22 @@ pub struct Order {
     pub expired_at: Option<DateTime<Utc>>,
 }
 
+/// 订单详情（包含资源信息）
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct OrderDetail {
+    pub id: i64,
+    pub user_id: i64,
+    pub resource_id: i64,
+    pub amount: i64,
+    pub status: String,
+    pub payment_method: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub expired_at: Option<DateTime<Utc>>,
+    /// 资源标题
+    pub resource_title: Option<String>,
+}
+
 /// 创建订单请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateOrderRequest {

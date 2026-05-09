@@ -15,7 +15,7 @@
               <el-input v-model="usdtForm.erc20" placeholder="输入 ERC20 收款地址" style="max-width: 500px" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="handleSaveUsdt">保存</el-button>
+              <el-button type="primary" :loading="usdtLoading" @click="handleSaveUsdt">保存</el-button>
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -46,9 +46,9 @@
           </div>
           <el-table :data="apiKeys" stripe>
             <el-table-column prop="name" label="名称" />
-            <el-table-column prop="key" label="Key">
+            <el-table-column prop="api_key" label="Key">
               <template #default="{ row }">
-                <code class="apikey-code">{{ row.key.substring(0, 20) }}...</code>
+                <code class="apikey-code">{{ row.api_key?.substring(0, 20) }}...</code>
               </template>
             </el-table-column>
             <el-table-column prop="is_active" label="状态" width="100">
@@ -69,22 +69,6 @@
       </el-tabs>
     </el-card>
     
-    <el-dialog v-model="detailVisible" title="支付详情" width="500px">
-      <el-descriptions :column="1" border>
-        <el-descriptions-item label="类型">{{ currentItem?.type }}</el-descriptions-item>
-        <el-descriptions-item label="地址">
-          <code class="addr-code">{{ currentItem?.address }}</code>
-        </el-descriptions-item>
-        <el-descriptions-item label="网络">{{ currentItem?.network }}</el-descriptions-item>
-        <el-descriptions-item label="状态">
-          <el-tag :type="currentItem?.is_active ? 'success' : 'danger'">
-            {{ currentItem?.is_active ? '启用' : '禁用' }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ formatDate(currentItem?.created_at || '') }}</el-descriptions-item>
-      </el-descriptions>
-    </el-dialog>
-    
     <!-- 创建 API Key 对话框 -->
     <el-dialog v-model="createApiKeyVisible" title="新建 API Key" width="400px">
       <el-form :model="newApiKeyForm" label-width="80px">
@@ -103,17 +87,16 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { ApiKeyInfo } from '@/api/admin'
-import { listApiKeys, createApiKey, deleteApiKey } from '@/api/admin'
+import type { AdminApiKeyResponse } from '@/api/admin'
+import { listApiKeys, createApiKey, deleteApiKey, listUsdtWallets, updateUsdtWallet } from '@/api/admin'
 
 const activeTab = ref('usdt')
-const detailVisible = ref(false)
-const currentItem = ref<{type:string;address:string;network:string;is_active:boolean;created_at:string}|null>(null)
+const usdtLoading = ref(false)
 
 const usdtForm = reactive({ trc20: '', erc20: '' })
 const paypalForm = reactive({ client_id: '', secret: '', mode: 'sandbox' as 'sandbox' | 'live' })
 
-const apiKeys = ref<ApiKeyInfo[]>([])
+const apiKeys = ref<AdminApiKeyResponse[]>([])
 const createApiKeyVisible = ref(false)
 const newApiKeyForm = reactive({ name: '' })
 
@@ -121,19 +104,45 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
-function showDetail(row: {type:string;address:string;network:string;is_active:boolean;created_at:string}) {
-  currentItem.value = row
-  detailVisible.value = true
+// ========== USDT 钱包 ==========
+async function fetchUsdtWallets() {
+  try {
+    const res = await listUsdtWallets()
+    if (res.success && res.data) {
+      // 按 network 填充表单
+      for (const wallet of res.data) {
+        if (wallet.network === 'TRC20') usdtForm.trc20 = wallet.address
+        if (wallet.network === 'ERC20') usdtForm.erc20 = wallet.address
+      }
+    }
+  } catch {
+    // ignore
+  }
 }
 
-function handleSaveUsdt() {
-  ElMessage.success('USDT 地址已保存')
+async function handleSaveUsdt() {
+  if (!usdtForm.trc20 && !usdtForm.erc20) {
+    ElMessage.warning('请至少填写一个钱包地址')
+    return
+  }
+  usdtLoading.value = true
+  try {
+    if (usdtForm.trc20) await updateUsdtWallet('TRC20', usdtForm.trc20)
+    if (usdtForm.erc20) await updateUsdtWallet('ERC20', usdtForm.erc20)
+    ElMessage.success('USDT 钱包地址已保存')
+  } catch {
+    ElMessage.error('保存失败，请重试')
+  } finally {
+    usdtLoading.value = false
+  }
 }
 
+// ========== PayPal（后端暂无 CRUD 端点，暂时 mock）==========
 function handleSavePaypal() {
-  ElMessage.success('PayPal 配置已保存')
+  ElMessage.info('PayPal 配置管理功能开发中')
 }
 
+// ========== API Key ==========
 async function fetchApiKeys() {
   try {
     const res = await listApiKeys()
@@ -165,7 +174,7 @@ async function handleCreateApiKey() {
   }
 }
 
-async function handleDeleteApiKey(row: ApiKeyInfo) {
+async function handleDeleteApiKey(row: AdminApiKeyResponse) {
   try {
     await ElMessageBox.confirm('确定删除此 API Key？', '确认', { type: 'warning' })
     await deleteApiKey(row.id)
@@ -175,6 +184,7 @@ async function handleDeleteApiKey(row: ApiKeyInfo) {
 }
 
 onMounted(() => {
+  fetchUsdtWallets()
   fetchApiKeys()
 })
 </script>
@@ -183,5 +193,4 @@ onMounted(() => {
 .page-container { padding: 20px; }
 .apikey-header { margin-bottom: 20px; }
 .apikey-code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }
-.addr-code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; word-break: break-all; }
 </style>

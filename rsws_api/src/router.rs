@@ -34,7 +34,7 @@ pub fn create_router(state: AppState) -> Router {
                     .push(Router::with_path("<id>").get(handler::user::get_user))
                 )
 
-                // 资源相关
+                // 资源相关（无认证的查询部分）
                 .push(Router::with_path("resource")
                     .push(Router::new()
                         .get(handler::resource::list_resources)
@@ -44,6 +44,14 @@ pub fn create_router(state: AppState) -> Router {
                         .get(handler::resource::get_resource)
                         .put(handler::resource::update_resource)
                         .delete(handler::resource::delete_resource)
+                        .push(Router::with_path("purchase-check")
+                            .hoop(api_key_auth)
+                            .get(handler::order::check_purchase)
+                        )
+                        .push(Router::with_path("download")
+                            .hoop(api_key_auth)
+                            .get(handler::order::get_resource_download)
+                        )
                     )
                 )
 
@@ -89,6 +97,11 @@ pub fn create_router(state: AppState) -> Router {
                         .put(handler::admin::update_log_config)
                         .delete(handler::admin::delete_log_config)
                     )
+                )
+                // USDT 钱包配置
+                .push(Router::with_path("usdt-wallets")
+                    .get(handler::admin::list_usdt_wallets)
+                    .push(Router::with_path("<network>").put(handler::admin::update_usdt_wallet))
                 )
         )
 

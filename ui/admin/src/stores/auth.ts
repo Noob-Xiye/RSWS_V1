@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { adminLogin, getAdminInfo } from '@/api/admin'
+import { adminLogin } from '@/api/admin'
 import { setToken, getToken, removeToken, setApiKey, getApiKey, removeApiKey } from '@/utils/storage'
 import type { AdminInfo } from '@/api/admin'
 
@@ -16,31 +16,18 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await adminLogin(email, password)
       if (res.success && res.data) {
-        token.value = res.data.token
-        apiKey.value = res.data.api_key
-        setToken(res.data.token)
-        setApiKey(res.data.api_key)
-        
-        // 获取管理员信息
-        await fetchAdminInfo()
+        const { admin, token: sessionToken } = res.data
+        token.value = sessionToken
+        apiKey.value = sessionToken  // 用 session token 作为 API Key
+        adminInfo.value = admin
+        setToken(sessionToken)
+        setApiKey(sessionToken)
         return { success: true }
       }
       return { success: false, message: res.message || '登录失败' }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
       return { success: false, message: err.response?.data?.message || '网络错误' }
-    }
-  }
-
-  async function fetchAdminInfo() {
-    if (!apiKey.value) return
-    try {
-      const res = await getAdminInfo()
-      if (res.success && res.data) {
-        adminInfo.value = res.data
-      }
-    } catch {
-      // ignore
     }
   }
 
@@ -52,9 +39,9 @@ export const useAuthStore = defineStore('auth', () => {
     removeApiKey()
   }
 
-  // 初始化时获取管理员信息
+  // 初始化时获取管理员信息（已从登录响应获取 adminInfo，跳过 fetchAdminInfo）
   if (apiKey.value) {
-    fetchAdminInfo()
+    // 已通过登录获取 adminInfo，不需要重复请求
   }
 
   return {
@@ -65,6 +52,5 @@ export const useAuthStore = defineStore('auth', () => {
     adminName,
     login,
     logout,
-    fetchAdminInfo
   }
 })

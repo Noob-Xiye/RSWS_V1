@@ -36,11 +36,9 @@
               <el-button icon="Search" @click="handleSearch" />
             </template>
           </el-input>
-          <el-select v-model="category" placeholder="分类" clearable @change="handleSearch" style="width: 150px">
-            <el-option label="全部" value="" />
-            <el-option label="模板" value="template" />
-            <el-option label="插件" value="plugin" />
-            <el-option label="教程" value="tutorial" />
+          <el-select v-model="selectedCategory" placeholder="分类" clearable @change="handleSearch" style="width: 150px">
+            <el-option label="全部" :value="0" />
+            <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
           </el-select>
         </div>
 
@@ -92,12 +90,22 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 12
 const keyword = ref('')
-const category = ref('')
+const selectedCategory = ref<number>(0)
+const categories = ref<{ id: number; name: string }[]>([
+  { id: 1, name: '模板' },
+  { id: 2, name: '插件' },
+  { id: 3, name: '教程' },
+  { id: 4, name: '工具' },
+])
 
 async function fetchResources() {
   loading.value = true
   try {
-    const res = await listResources({ page: page.value, page_size: pageSize, keyword: keyword.value, category: category.value || undefined })
+    const params: any = { page: page.value, page_size: pageSize }
+    if (keyword.value) params.search = keyword.value
+    if (selectedCategory.value) params.category_id = selectedCategory.value
+    
+    const res = await listResources(params)
     if (res.success && res.data) {
       resources.value = res.data.items
       total.value = res.data.total

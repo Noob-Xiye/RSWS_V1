@@ -3,7 +3,7 @@
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_db::OrderRepository;
-use rsws_model::payment::Order;
+use rsws_model::payment::{Order, OrderDetail};
 use std::sync::Arc;
 use tracing::info;
 
@@ -55,6 +55,16 @@ impl OrderService {
         self.order_repo.list_by_user(user_id, page, limit).await
     }
 
+    /// 获取用户的订单列表（包含资源标题）
+    pub async fn list_detail_by_user(
+        &self,
+        user_id: i64,
+        page: i32,
+        limit: i32,
+    ) -> Result<(Vec<OrderDetail>, i64), RswsError> {
+        self.order_repo.list_detail_by_user(user_id, page, limit).await
+    }
+
     /// 更新订单状态
     pub async fn update_status(&self, order_id: i64, status: &str) -> Result<(), RswsError> {
         // 验证状态值
@@ -92,5 +102,10 @@ impl OrderService {
     /// 完成订单
     pub async fn complete(&self, order_id: i64) -> Result<(), RswsError> {
         self.order_repo.update_status(order_id, "completed").await
+    }
+
+    /// 检查用户是否已购买某资源（通过已完成订单）
+    pub async fn check_purchased(&self, user_id: i64, resource_id: i64) -> Result<bool, RswsError> {
+        self.order_repo.check_user_purchased(user_id, resource_id).await
     }
 }

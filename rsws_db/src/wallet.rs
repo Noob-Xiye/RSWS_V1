@@ -68,4 +68,40 @@ impl WalletRepository {
 
         Ok(wallet)
     }
+
+    /// 列出所有钱包
+    pub async fn list_all(&self) -> Result<Vec<UsdtWallet>, RswsError> {
+        let wallets = sqlx::query_as::<_, UsdtWallet>(
+            r#"SELECT id, address, network, name, is_active, total_received, created_at, updated_at FROM usdt_wallets ORDER BY created_at DESC"#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to list wallets: {}", e)))?;
+
+        Ok(wallets)
+    }
+
+    /// 创建或更新钱包
+    pub async fn upsert(&self, network: &str, address: &str, name: Option<&str>) -> Result<UsdtWallet, RswsError> {
+        let wallet = sqlx::query_as::<_, UsdtWallet>(
+            r#"
+            INSERT INTO usdt_wallets (address, network, name, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, true, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET
+                address = EXCLUDED.address,
+                name = EXCLUDED.name,
+                is_active = true,
+                updated_at = NOW()
+            RETURNING id, address, network, name, is_active, total_received, created_at, updated_at
+            "#,
+        )
+        .bind(address)
+        .bind(network)
+        .bind(name)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to upsert wallet: {}", e)))?;
+
+        Ok(wallet)
+    }
 }

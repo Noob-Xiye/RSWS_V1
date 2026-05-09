@@ -189,4 +189,14 @@ impl BlockchainService {
     pub fn validate_erc20_address(&self, address: &str) -> bool {
         address.starts_with("0x") && address.len() == 42
     }
+
+    /// 列出所有 USDT 钱包
+    pub async fn list_usdt_wallets(&self) -> Result<Vec<rsws_db::wallet::UsdtWallet>, RswsError> {
+        self.wallet_repo.list_all().await
+    }
+
+    /// 更新或创建 USDT 钱包
+    pub async fn upsert_usdt_wallet(&self, network: &str, address: &str, name: Option<&str>) -> Result<rsws_db::wallet::UsdtWallet, RswsError> {
+        self.wallet_repo.upsert(network, address, name).await
+    }
 }

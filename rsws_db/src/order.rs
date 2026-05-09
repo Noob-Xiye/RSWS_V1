@@ -3,7 +3,7 @@
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_common::snowflake;
-use rsws_model::payment::Order;
+use rsws_model::payment::{Order, OrderDetail};
 use sqlx::PgPool;
 
 /// 订单仓储
@@ -127,6 +127,46 @@ impl OrderRepository {
         limit: i32,
     ) -> Result<(Vec<Order>, i64), RswsError> {
         self.get_user_orders(user_id, page as i64, limit as i64).await
+    }
+
+    /// 获取用户订单列表（包含资源标题）
+    pub async fn list_detail_by_user(
+        &self,
+        user_id: i64,
+        page: i32,
+        limit: i32,
+    ) -> Result<(Vec<OrderDetail>, i64), RswsError> {
+        let offset = (page as i64 - 1) * limit as i64;
+
+        // JOIN resources 表获取标题
+        let orders = sqlx::query_as::<_, OrderDetail>(
+            r#"
+            SELECT o.id, o.user_id, o.resource_id, o.amount, o.status, o.payment_method,
+                   o.created_at, o.updated_at, o.expired_at, r.title as resource_title
+            FROM orders o
+            LEFT JOIN resources r ON o.resource_id = r.id
+            WHERE o.user_id = $1
+            ORDER BY o.created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit as i64)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get orders with details: {}", e)))?;
+
+        // 获取总数
+        let total: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM orders WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
+
+        Ok((orders, total.0))
     }
 
     /// 检查用户是否已购买资源

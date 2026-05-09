@@ -25,6 +25,7 @@ pub struct Resource {
     pub provider_type: String,
     pub provider_id: Option<i64>,
     pub commission_rate: i64,
+    pub download_count: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

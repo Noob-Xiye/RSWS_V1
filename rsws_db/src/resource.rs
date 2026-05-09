@@ -1,4 +1,4 @@
-//! 资源仓储层
+//! Resource repository
 
 use rsws_common::error::RswsError;
 use rsws_model::resource::{CreateResourceRequest, Resource, UpdateResourceRequest};
@@ -230,6 +230,105 @@ impl ResourceRepository {
             .await
             .map_err(|e| RswsError::internal(format!("Failed to delete resource: {}", e)))?;
 
+        Ok(())
+    }
+
+    /// 获取资源列表（支持关键词搜索）
+    pub async fn get_list_with_search(
+        &self,
+        category_id: Option<i64>,
+        search: Option<&str>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<Resource>, i64), RswsError> {
+        let offset = (page - 1) * page_size;
+
+        // 构建 WHERE 条件
+        let _base_where = "is_active = true";
+        let (resources, total) = match (category_id, search) {
+            (Some(cat_id), Some(kw)) => {
+                let kw_pattern = format!("%{}%", kw);
+                let resources = sqlx::query_as::<_, Resource>(
+                    "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE category_id = $1 AND is_active = true AND (title ILIKE $2 OR description ILIKE $2) ORDER BY created_at DESC LIMIT $3 OFFSET $4",
+                )
+                .bind(cat_id)
+                .bind(&kw_pattern)
+                .bind(page_size)
+                .bind(offset)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to get resources: {}", e)))?;
+
+                let total: (i64,) = sqlx::query_as(
+                    "SELECT COUNT(*) FROM resources WHERE category_id = $1 AND is_active = true AND (title ILIKE $2 OR description ILIKE $2)",
+                )
+                .bind(cat_id)
+                .bind(&kw_pattern)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to count resources: {}", e)))?;
+
+                (resources, total.0)
+            }
+            (Some(cat_id), None) => {
+                let resources = sqlx::query_as::<_, Resource>(
+                    "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE category_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                )
+                .bind(cat_id)
+                .bind(page_size)
+                .bind(offset)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to get resources: {}", e)))?;
+
+                let total: (i64,) = sqlx::query_as(
+                    "SELECT COUNT(*) FROM resources WHERE category_id = $1 AND is_active = true",
+                )
+                .bind(cat_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to count resources: {}", e)))?;
+
+                (resources, total.0)
+            }
+            (None, Some(kw)) => {
+                let kw_pattern = format!("%{}%", kw);
+                let resources = sqlx::query_as::<_, Resource>(
+                    "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE is_active = true AND (title ILIKE $1 OR description ILIKE $1) ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                )
+                .bind(&kw_pattern)
+                .bind(page_size)
+                .bind(offset)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to get resources: {}", e)))?;
+
+                let total: (i64,) = sqlx::query_as(
+                    "SELECT COUNT(*) FROM resources WHERE is_active = true AND (title ILIKE $1 OR description ILIKE $1)",
+                )
+                .bind(&kw_pattern)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to count resources: {}", e)))?;
+
+                (resources, total.0)
+            }
+            (None, None) => {
+                // 复用原有的无过滤查询
+                self.get_list(category_id, page, page_size).await?
+            }
+        };
+
+        Ok((resources, total))
+    }
+
+    /// 递增资源下载计数
+    pub async fn increment_download_count(&self, resource_id: i64) -> Result<(), RswsError> {
+        sqlx::query("UPDATE resources SET download_count = COALESCE(download_count, 0) + 1, updated_at = NOW() WHERE id = $1")
+            .bind(resource_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to increment download count: {}", e)))?;
         Ok(())
     }
 }

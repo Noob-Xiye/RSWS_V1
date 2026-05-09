@@ -4,39 +4,77 @@ import { login as apiLogin, register as apiRegister, getUserInfo } from '@/api/u
 import { setApiKey, getApiKey, removeApiKey } from '@/utils/storage'
 import type { User } from '@/api/user'
 
+export interface UserInfo {
+  id: number
+  email: string
+  username: string
+  nickname?: string
+  avatar_url?: string | null
+  balance?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
 export const useUserStore = defineStore('user', () => {
-  const userInfo = ref<User | null>(null)
+  const userInfo = ref<UserInfo | null>(null)
   const apiKey = ref<string | null>(getApiKey())
 
   const isLoggedIn = computed(() => !!apiKey.value)
-  const username = computed(() => userInfo.value?.username || '未登录')
+  const username = computed(() => userInfo.value?.nickname || userInfo.value?.username || '未登录')
+  const balance = computed(() => userInfo.value?.balance || '0')
 
   async function login(email: string, password: string) {
-    const res = await apiLogin(email, password)
-    if (res.success && res.data) {
-      apiKey.value = res.data.api_key
-      userInfo.value = res.data.user
-      setApiKey(res.data.api_key)
-      return { success: true }
+    try {
+      const res = await apiLogin(email, password)
+      if (res.success && res.data) {
+        apiKey.value = res.data.api_key
+        userInfo.value = res.data.user
+        setApiKey(res.data.api_key)
+        return { success: true }
+      }
+      return { success: false, message: res.message || '登录失败' }
+    } catch (err: any) {
+      return { success: false, message: err?.message || '登录失败' }
     }
-    return { success: false, message: res.message }
   }
 
-  async function register(email: string, password: string, username?: string) {
-    const res = await apiRegister(email, password, username)
-    if (res.success && res.data) {
-      apiKey.value = res.data.api_key
-      userInfo.value = res.data.user
-      setApiKey(res.data.api_key)
-      return { success: true }
+  async function register(email: string, password: string, username: string) {
+    try {
+      const res = await apiRegister(email, password, username)
+      if (res.success && res.data) {
+        apiKey.value = res.data.api_key
+        userInfo.value = res.data.user
+        setApiKey(res.data.api_key)
+        return { success: true }
+      }
+      return { success: false, message: res.message || '注册失败' }
+    } catch (err: any) {
+      return { success: false, message: err?.message || '注册失败' }
     }
-    return { success: false, message: res.message }
   }
 
   async function fetchUserInfo() {
     if (!apiKey.value) return
-    const res = await getUserInfo()
-    if (res.success && res.data) userInfo.value = res.data
+    try {
+      const res = await getUserInfo()
+      if (res.success && res.data) {
+        // 后端返回的 User 结构可能是旧版，只有 email/username/nickname/avatar_url
+        userInfo.value = {
+          id: res.data.id,
+          email: res.data.email,
+          username: res.data.username,
+          nickname: res.data.nickname,
+          avatar_url: res.data.avatar_url,
+          is_active: true,
+          created_at: '',
+          updated_at: '',
+          ...res.data,
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
 
   function logout() {
@@ -45,7 +83,18 @@ export const useUserStore = defineStore('user', () => {
     removeApiKey()
   }
 
+  // 初始化时尝试拉取用户信息
   if (apiKey.value) fetchUserInfo()
 
-  return { userInfo, apiKey, isLoggedIn, username, login, register, logout, fetchUserInfo }
+  return {
+    userInfo,
+    apiKey,
+    isLoggedIn,
+    username,
+    balance,
+    login,
+    register,
+    logout,
+    fetchUserInfo,
+  }
 })

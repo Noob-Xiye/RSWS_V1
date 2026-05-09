@@ -33,6 +33,22 @@ impl ResourceService {
         self.resource_repo.get_list(category_id, page, page_size).await
     }
 
+    /// 搜索资源列表
+    pub async fn search(
+        &self,
+        category_id: Option<i64>,
+        search: Option<&str>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<Resource>, i64), RswsError> {
+        self.resource_repo.get_list_with_search(category_id, search, page, page_size).await
+    }
+
+    /// 递增资源下载计数
+    pub async fn increment_download_count(&self, resource_id: i64) -> Result<(), RswsError> {
+        self.resource_repo.increment_download_count(resource_id).await
+    }
+
     /// 创建资源
     pub async fn create(&self, req: CreateResourceRequest, user_id: i64) -> Result<Resource, RswsError> {
         // 验证价格

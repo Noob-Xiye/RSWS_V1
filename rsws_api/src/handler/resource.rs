@@ -43,7 +43,12 @@ pub async fn list_resources(req: &mut Request, depot: &mut Depot, res: &mut Resp
 
     let state = get_state(depot);
 
-    match state.resource_service.list(query.category_id, page, page_size).await {
+    match state.resource_service.search(
+        query.category_id,
+        query.search.as_deref(),
+        page,
+        page_size,
+    ).await {
         Ok((resources, total)) => {
             let total_pages = if page_size > 0 { (total + page_size - 1) / page_size } else { 0 };
             res.success(serde_json::json!({

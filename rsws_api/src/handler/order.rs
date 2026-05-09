@@ -38,7 +38,7 @@ pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Respons
 
     let state = get_state(depot);
 
-    match state.order_service.list_by_user(user_id, page, limit).await {
+    match state.order_service.list_detail_by_user(user_id, page, limit).await {
         Ok((orders, total)) => {
             let total_pages = if limit > 0 { (total + limit as i64 - 1) / limit as i64 } else { 0 };
             res.success(serde_json::json!({
@@ -137,15 +137,64 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
 
             match state.order_service.create(user_id, data.resource_id, amount, &data.payment_method).await {
                 Ok(order) => {
-                    res.status_code(StatusCode::CREATED);
-                    res.success(serde_json::json!({
-                        "id": order.id,
-                        "resource_id": order.resource_id,
-                        "amount": order.amount,
-                        "payment_method": order.payment_method,
-                        "status": order.status,
-                        "expired_at": order.expired_at,
-                    }));
+                    // 如果是 PayPal 支付，需要创建 PayPal 订单
+                    if data.payment_method == "paypal" {
+                        match state.paypal_service.create_order(
+                            amount as f64 / 100.0, // 分转元
+                            "USDT",
+                            &format!("Resource #{}", data.resource_id),
+                            order.id,
+                        ).await {
+                            Ok(paypal_order) => {
+                                let paypal_order_id = paypal_order["id"].as_str().unwrap_or("").to_string();
+                                let approve_url = paypal_order["links"]
+                                    .as_array()
+                                    .and_then(|links| links.iter().find(|l| l["rel"] == "approve"))
+                                    .and_then(|l| l["href"].as_str().map(|s| s.to_string()));
+
+                                // 创建支付交易记录
+                                let _ = state.payment_service.create(
+                                    order.id,
+                                    user_id,
+                                    amount,
+                                    "USDT",
+                                    "paypal",
+                                ).await;
+
+                                res.status_code(StatusCode::CREATED);
+                                res.success(serde_json::json!({
+                                    "id": order.id,
+                                    "resource_id": order.resource_id,
+                                    "amount": order.amount,
+                                    "payment_method": order.payment_method,
+                                    "status": order.status,
+                                    "paypal_order_id": paypal_order_id,
+                                    "approve_url": approve_url,
+                                }));
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to create PayPal order: {}", e);
+                                res.status_code(StatusCode::CREATED);
+                                res.success(serde_json::json!({
+                                    "id": order.id,
+                                    "resource_id": order.resource_id,
+                                    "amount": order.amount,
+                                    "payment_method": order.payment_method,
+                                    "status": order.status,
+                                    "message": "Order created but PayPal unavailable. Please use USDT payment.",
+                                }));
+                            }
+                        }
+                    } else {
+                        res.status_code(StatusCode::CREATED);
+                        res.success(serde_json::json!({
+                            "id": order.id,
+                            "resource_id": order.resource_id,
+                            "amount": order.amount,
+                            "payment_method": order.payment_method,
+                            "status": order.status,
+                        }));
+                    }
                 }
                 Err(e) => {
                     res.error(e);
@@ -238,6 +287,110 @@ pub async fn check_order_status(req: &mut Request, depot: &mut Depot, res: &mut 
         }
         Ok(None) => {
             res.error(RswsError::from(ErrorCode::ORDER_NOT_FOUND));
+        }
+        Err(e) => {
+            res.error(e);
+        }
+    }
+}
+
+/// 检查用户是否已购买某资源
+#[endpoint(
+    parameters(
+        ("resource_id", description = "资源ID"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 401, description = "未认证"),
+    )
+)]
+pub async fn check_purchase(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let resource_id: i64 = req.param("resource_id").unwrap_or(0);
+
+    let user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
+    };
+
+    if resource_id <= 0 {
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid resource ID"
+        );
+        return;
+    }
+
+    let state = get_state(depot);
+
+    match state.order_service.check_purchased(user_id, resource_id).await {
+        Ok(purchased) => {
+            res.success(serde_json::json!({
+                "purchased": purchased,
+                "resource_id": resource_id
+            }));
+        }
+        Err(e) => {
+            res.error(e);
+        }
+    }
+}
+
+/// 获取资源下载信息
+#[endpoint(
+    parameters(
+        ("resource_id", description = "资源ID"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 403, description = "未购买，无权下载"),
+    )
+)]
+pub async fn get_resource_download(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let resource_id: i64 = req.param("resource_id").unwrap_or(0);
+
+    let user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
+    };
+
+    if resource_id <= 0 {
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid resource ID"
+        );
+        return;
+    }
+
+    let state = get_state(depot);
+
+    // 检查是否已购买
+    match state.order_service.check_purchased(user_id, resource_id).await {
+        Ok(false) => {
+            res.error_msg(
+                RswsError::from(ErrorCode::AUTH_PERMISSION_DENIED),
+                "Please purchase this resource first"
+            );
+        }
+        Ok(true) => {
+            // 获取资源下载链接
+            match state.resource_service.get(resource_id).await {
+                Ok(Some(resource)) => {
+                    // 递增下载计数
+                    let _ = state.resource_service.increment_download_count(resource_id).await;
+
+                    res.success(serde_json::json!({
+                        "file_url": resource.file_url,
+                        "file_name": format!("{}.zip", resource.title.replace(" ", "_"))
+                    }));
+                }
+                Ok(None) => {
+                    res.error(RswsError::from(ErrorCode::RESOURCE_NOT_FOUND));
+                }
+                Err(e) => {
+                    res.error(e);
+                }
+            }
         }
         Err(e) => {
             res.error(e);
