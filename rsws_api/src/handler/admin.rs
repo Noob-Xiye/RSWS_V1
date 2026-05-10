@@ -295,6 +295,116 @@ pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Re
     }
 }
 
+/// 激活管理员
+#[endpoint(
+    parameters(
+        ("id", description = "管理员ID"),
+    ),
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "管理员不存在"),
+    )
+)]
+pub async fn activate_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied()
+        .unwrap_or(false);
+
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let operator_id: i64 = match depot.get("user_id") {
+        Ok(id) => *id,
+        Err(_) => {
+            res.http_error(StatusCode::UNAUTHORIZED, "Not authenticated");
+            return;
+        }
+    };
+
+    let id: i64 = req.param("id").unwrap_or(0);
+    if id <= 0 {
+        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid admin ID");
+        return;
+    }
+
+    let ip_address = req.header::<String>("X-Forwarded-For")
+        .or_else(|| req.header::<String>("X-Real-IP"))
+        .map(|s| s.to_string());
+
+    let state = get_state(depot);
+    match state.admin_service.activate_admin(id, operator_id, ip_address.as_deref()).await {
+        Ok(()) => res.success(serde_json::json!({
+            "id": id,
+            "message": "Admin activated successfully"
+        })),
+        Err(e) => res.error(e),
+    }
+}
+
+/// 重置管理员密码
+#[endpoint(
+    parameters(
+        ("id", description = "管理员ID"),
+    ),
+    request_body = ResetPasswordBody,
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "管理员不存在"),
+    )
+)]
+pub async fn reset_admin_password(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied()
+        .unwrap_or(false);
+
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let operator_id: i64 = match depot.get("user_id") {
+        Ok(id) => *id,
+        Err(_) => {
+            res.http_error(StatusCode::UNAUTHORIZED, "Not authenticated");
+            return;
+        }
+    };
+
+    let id: i64 = req.param("id").unwrap_or(0);
+    if id <= 0 {
+        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid admin ID");
+        return;
+    }
+
+    let ip_address = req.header::<String>("X-Forwarded-For")
+        .or_else(|| req.header::<String>("X-Real-IP"))
+        .map(|s| s.to_string());
+
+    let body: Result<ResetPasswordBody, _> = req.parse_json().await;
+    match body {
+        Ok(data) => {
+            let state = get_state(depot);
+            match state.admin_service.reset_password(id, &data.password, operator_id, ip_address.as_deref()).await {
+                Ok(()) => res.success(serde_json::json!({
+                    "id": id,
+                    "message": "Password reset successfully"
+                })),
+                Err(e) => res.error(e),
+            }
+        }
+        Err(e) => {
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
+pub struct ResetPasswordBody {
+    pub password: String,
+}
+
 // ==================== Admin API Key 管理 ====================
 
 /// 创建管理员 API Key 请求
@@ -427,6 +537,64 @@ pub async fn delete_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
             "deleted": deleted
         })),
         Err(e) => res.error(e),
+    }
+}
+
+// ==================== Admin API Key 管理 (续) ====================
+
+/// 切换管理员 API Key 状态请求
+#[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
+pub struct ToggleApiKeyStatusBody {
+    pub is_active: bool,
+}
+
+/// 切换管理员 API Key 状态
+#[endpoint(
+    parameters(
+        ("key_id", description = "API Key ID"),
+    ),
+    request_body = ToggleApiKeyStatusBody,
+    responses(
+        (status_code = 200, description = "切换成功"),
+        (status_code = 403, description = "非管理员"),
+    )
+)]
+pub async fn toggle_api_key_status(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied()
+        .unwrap_or(false);
+
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let admin_id: i64 = match depot.get("user_id") {
+        Ok(id) => *id,
+        Err(_) => {
+            res.http_error(StatusCode::UNAUTHORIZED, "Not authenticated");
+            return;
+        }
+    };
+
+    let key_id: i64 = req.param("key_id").unwrap_or(0);
+    if key_id <= 0 {
+        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid API key ID");
+        return;
+    }
+
+    let body: Result<ToggleApiKeyStatusBody, _> = req.parse_json().await;
+    
+    match body {
+        Ok(data) => {
+            let state = get_state(depot);
+            match state.admin_service.toggle_api_key_status(key_id, admin_id, data.is_active).await {
+                Ok(_) => res.success("API key status updated"),
+                Err(e) => res.error(e),
+            }
+        }
+        Err(e) => {
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
+        }
     }
 }
 

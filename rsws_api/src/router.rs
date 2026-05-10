@@ -28,11 +28,13 @@ pub fn create_router(state: AppState) -> Router {
                 // 用户相关
                 .push(Router::with_path("user")
                     .push(Router::new()
-                        .get(handler::user::get_current_user)
+                        .get(handler::user::get_current_user)  // GET /api/v1/user
+                        .push(Router::with_path("info").get(handler::user::get_current_user))  // GET /api/v1/user/info (前端对齐)
                         .push(Router::with_path("register").post(handler::user::register))
                         .push(Router::with_path("login").post(handler::user::login))
                         .push(Router::with_path("profile").put(handler::user::update_profile))
-                        .push(Router::with_path("password").put(handler::user::change_password))
+                        .push(Router::with_path("password").put(handler::user::change_password))  // PUT /api/v1/user/password
+                        .push(Router::with_path("change-password").post(handler::user::change_password))  // POST /api/v1/user/change-password (前端对齐)
                     )
                     .push(Router::with_path("<id>").get(handler::user::get_user))
                 )
@@ -68,6 +70,8 @@ pub fn create_router(state: AppState) -> Router {
                         .get(handler::order::get_order)
                         .push(Router::with_path("cancel").post(handler::order::cancel_order))
                         .push(Router::with_path("status").get(handler::order::check_order_status))
+                        .push(Router::with_path("refund").post(handler::order::refund_order))
+                        .push(Router::with_path("complete").post(handler::order::complete_order))
                     )
                 )
 
@@ -81,6 +85,7 @@ pub fn create_router(state: AppState) -> Router {
                             .get(handler::admin::list_api_keys)
                             .post(handler::admin::create_api_key)
                         )
+                        .push(Router::with_path("<key_id>/api-keys").delete(handler::admin::delete_api_key))
                         // 日志配置管理
                         .push(Router::with_path("log-configs")
                             .get(handler::admin::list_log_configs)
@@ -94,7 +99,11 @@ pub fn create_router(state: AppState) -> Router {
                     .push(Router::with_path("<id>")
                         .get(handler::admin::get_admin)
                         .push(Router::with_path("deactivate").post(handler::admin::deactivate_admin))
-                        .push(Router::with_path("api-keys/<key_id>").delete(handler::admin::delete_api_key))
+                        .push(Router::with_path("activate").post(handler::admin::activate_admin))
+                        .push(Router::with_path("reset-password").post(handler::admin::reset_admin_password))
+                        .push(Router::with_path("api-keys/<key_id>")
+                            .put(handler::admin::toggle_api_key_status)
+                            .delete(handler::admin::delete_api_key))
                     )
                     // 日志配置详情/更新/删除
                     .push(Router::with_path("log-configs/<key>")

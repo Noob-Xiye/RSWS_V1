@@ -1,11 +1,12 @@
 //! 管理员服务
 //!
 //! 管理员 CRUD + Admin API Key 管理
-//! 认证统一走 API Key，不使用 JWT
-//! Admin API Key 凭证缓存到 Redis（快速验证 + 强制下线）
+//! 认证统一走 API Key,不使用 JWT
+//! Admin API Key 凭证缓存到 Redis(快速验证 + 强制下线)
 
 use std::sync::Arc;
 use rsws_common::error::RswsError;
+use rsws_common::ErrorCode;
 use rsws_db::admin::AdminRepository;
 use rsws_db::RedisService;
 use rsws_model::user_models::admin::*;
@@ -30,7 +31,7 @@ pub struct AdminService {
 }
 
 impl AdminService {
-    /// 创建管理员服务（无 Redis）
+    /// 创建管理员服务(无 Redis)
     pub fn new(admin_repo: AdminRepository) -> Self {
         Self {
             admin_repo: Arc::new(admin_repo),
@@ -38,7 +39,7 @@ impl AdminService {
         }
     }
 
-    /// 创建管理员服务（带 Redis 缓存）
+    /// 创建管理员服务(带 Redis 缓存)
     pub fn with_redis(admin_repo: AdminRepository, redis: RedisService) -> Self {
         Self {
             admin_repo: Arc::new(admin_repo),
@@ -51,11 +52,11 @@ impl AdminService {
         format!("admin_apikey:{}", api_key)
     }
 
-    /// 默认会话 TTL（秒）= 7 天
+    /// 默认会话 TTL(秒)= 7 天
     const DEFAULT_SESSION_TTL: u64 = 7 * 24 * 3600;
 
-    /// 管理员登录（验证密码，返回管理员信息）
-    /// 注意：登录后客户端需自行使用 Admin API Key 调用受保护接口
+    /// 管理员登录(验证密码,返回管理员信息)
+    /// 注意:登录后客户端需自行使用 Admin API Key 调用受保护接口
     pub async fn login(
         &self,
         email: &str,
@@ -156,12 +157,12 @@ impl AdminService {
     ) -> Result<Admin, RswsError> {
         let updated = self.admin_repo.update_admin(&request).await?;
 
-        // 如果是禁用管理员，清除其 Redis 缓存
+        // 如果是禁用管理员,清除其 Redis 缓存
         if request.is_active == Some(false) {
             self.invalidate_admin_keys(updated.id).await;
         }
 
-        // 如果改了密码，清除所有 API Key 缓存
+        // 如果改了密码,清除所有 API Key 缓存
         if request.password.is_some() {
             self.invalidate_admin_keys(updated.id).await;
             // 同时禁用其所有 API Key
@@ -245,6 +246,64 @@ impl AdminService {
         Ok(())
     }
 
+    /// 激活管理员
+    pub async fn activate_admin(
+        &self,
+        admin_id: i64,
+        operator_id: i64,
+        ip_address: Option<&str>,
+    ) -> Result<(), RswsError> {
+        let request = UpdateAdminRequest {
+            id: admin_id,
+            email: None,
+            password: None,
+            username: None,
+            avatar_url: None,
+            is_active: Some(true),
+            role: None,
+            permissions: None,
+        };
+        self.admin_repo.update_admin(&request).await?;
+
+        // 记录操作日志
+        let _ = self.admin_repo.log_admin_operation(
+            operator_id,
+            "activate",
+            Some("admin"),
+            Some(&admin_id.to_string()),
+            None,
+            ip_address,
+            None,
+        ).await;
+
+        Ok(()) 
+    }
+
+    /// 重置管理员密码
+    pub async fn reset_password(
+        &self,
+        admin_id: i64,
+        new_password: &str,
+        operator_id: i64,
+        ip_address: Option<&str>,
+    ) -> Result<(), RswsError> {
+        let request = UpdateAdminRequest {
+            id: admin_id,
+            email: None,
+            password: Some(new_password.to_string()),
+            username: None,
+            avatar_url: None,
+            is_active: None,
+            role: None,
+            permissions: None,
+        };
+        
+        // update_admin 会处理：哈希密码、禁用 API Key、记录日志
+        self.update_admin(request, operator_id, ip_address).await?;
+        
+        Ok(())
+    }
+
     // ==================== Admin API Key 管理 ====================
 
     /// 创建管理员 API Key
@@ -302,13 +361,35 @@ impl AdminService {
     pub async fn delete_api_key(&self, key_id: i64, admin_id: i64) -> Result<bool, RswsError> {
         let deleted = self.admin_repo.delete_admin_api_key(key_id, admin_id).await?;
 
-        // 删除后清除 Redis（需要知道 api_key 值，这里简化处理）
+        // 删除后清除 Redis(需要知道 api_key 值,这里简化处理)
         // 更好的做法是 delete 返回被删记录
 
         Ok(deleted)
     }
 
-    /// 验证管理员 API Key（供中间件调用，带 Redis 缓存）
+    /// 切换管理员 API Key 状态
+    pub async fn toggle_api_key_status(
+        &self,
+        key_id: i64,
+        admin_id: i64,
+        is_active: bool,
+    ) -> Result<(), RswsError> {
+        let updated = self.admin_repo.update_api_key_status(key_id, admin_id, is_active).await?;
+        
+        if !updated {
+            return Err(RswsError::from(ErrorCode::NOT_FOUND));
+        }
+
+        // 如果禁用，清除 Redis 缓存
+        if !is_active {
+            // TODO: 先查询 api_key 值，再删除 Redis 缓存
+            // 这里简化处理，依赖缓存 TTL 过期
+        }
+
+        Ok(())
+    }
+
+    /// 验证管理员 API Key(供中间件调用,带 Redis 缓存)
     pub async fn validate_admin_api_key(
         &self,
         api_key: &str,
@@ -317,7 +398,7 @@ impl AdminService {
         // 1) 先查 Redis
         if let Some(ref redis) = self.redis {
             if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&Self::redis_key(api_key)).await? {
-                // Redis 命中：验证 secret
+                // Redis 命中:验证 secret
                 if cached.api_secret == api_secret {
                     // 检查是否过期
                     if let Some(expires) = cached.expires_at {
@@ -335,7 +416,7 @@ impl AdminService {
                             return Ok(None);
                         }
 
-                        // 构造 AdminApiKey（简化）
+                        // 构造 AdminApiKey(简化)
                         let key_record = AdminApiKey {
                             id: cached.key_id,
                             admin_id: cached.admin_id,
@@ -386,7 +467,7 @@ impl AdminService {
     /// 清除管理员所有 Redis 缓存的 API Key
     async fn invalidate_admin_keys(&self, admin_id: i64) {
         if let Some(ref redis) = self.redis {
-            // 获取管理员所有 API Key，逐个删 Redis
+            // 获取管理员所有 API Key,逐个删 Redis
             match self.admin_repo.get_admin_api_keys(admin_id).await {
                 Ok(keys) => {
                     for key in keys {

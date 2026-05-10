@@ -376,6 +376,26 @@ impl AdminRepository {
         Ok(result.rows_affected() > 0)
     }
 
+    /// 更新管理员 API Key 状态
+    pub async fn update_api_key_status(
+        &self,
+        key_id: i64,
+        admin_id: i64,
+        is_active: bool,
+    ) -> Result<bool, RswsError> {
+        let result = sqlx::query(
+            "UPDATE admin_api_keys SET is_active = $1, updated_at = NOW() WHERE id = $2 AND admin_id = $3"
+        )
+        .bind(is_active)
+        .bind(key_id)
+        .bind(admin_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to update API key status: {}", e)))?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
     /// 禁用管理员所有 API Key（停用管理员 / 改密码时使用）
     pub async fn deactivate_admin_api_keys(&self, admin_id: i64) -> Result<u64, RswsError> {
         let result = sqlx::query("UPDATE admin_api_keys SET is_active = false WHERE admin_id = $1 AND is_active = true")

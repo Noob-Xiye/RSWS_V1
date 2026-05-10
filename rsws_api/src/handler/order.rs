@@ -253,6 +253,92 @@ pub async fn cancel_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
     }
 }
 
+/// 退款订单
+#[endpoint(
+    parameters(
+        ("id", description = "订单ID"),
+    ),
+    responses(
+        (status_code = 200, description = "退款成功"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "订单不存在"),
+    )
+)]
+pub async fn refund_order(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let id: i64 = req.param("id").unwrap_or(0);
+
+    if id <= 0 {
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid order ID"
+        );
+        return;
+    }
+
+    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let state = get_state(depot);
+    match state.order_service.refund(id).await {
+        Ok(()) => {
+            res.success(serde_json::json!({
+                "id": id,
+                "status": "refunded",
+                "message": "Order refunded successfully"
+            }));
+        }
+        Err(e) => {
+            res.error(e);
+        }
+    }
+}
+
+/// 完成订单
+#[endpoint(
+    parameters(
+        ("id", description = "订单ID"),
+    ),
+    responses(
+        (status_code = 200, description = "完成成功"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "订单不存在"),
+    )
+)]
+pub async fn complete_order(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let id: i64 = req.param("id").unwrap_or(0);
+
+    if id <= 0 {
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid order ID"
+        );
+        return;
+    }
+
+    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let state = get_state(depot);
+    match state.order_service.complete(id).await {
+        Ok(()) => {
+            res.success(serde_json::json!({
+                "id": id,
+                "status": "completed",
+                "message": "Order completed successfully"
+            }));
+        }
+        Err(e) => {
+            res.error(e);
+        }
+    }
+}
+
 /// 检查订单状态（USDT 支付轮询）
 #[endpoint(
     parameters(

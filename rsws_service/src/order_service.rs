@@ -104,6 +104,11 @@ impl OrderService {
         self.order_repo.update_status(order_id, "completed").await
     }
 
+    /// 退款订单
+    pub async fn refund(&self, order_id: i64) -> Result<(), RswsError> {
+        self.order_repo.update_status(order_id, "refunded").await
+    }
+
     /// 检查用户是否已购买某资源（通过已完成订单）
     pub async fn check_purchased(&self, user_id: i64, resource_id: i64) -> Result<bool, RswsError> {
         self.order_repo.check_user_purchased(user_id, resource_id).await
