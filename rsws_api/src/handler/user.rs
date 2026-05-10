@@ -3,6 +3,7 @@
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
 use salvo::prelude::*;
+use serde::Deserialize;
 use salvo_oapi::endpoint;
 use rsws_common::{ResponseExt, AuthHandler, error_code::ErrorCode, RswsError};
 use rsws_model::user_models::user::{RegisterRequest, LoginRequest, ChangePasswordRequest, UpdateProfileRequest};
@@ -216,6 +217,45 @@ pub async fn change_password(req: &mut Request, depot: &mut Depot, res: &mut Res
                 Ok(()) => {
                     res.success(serde_json::json!({
                         "message": "Password changed successfully"
+                    }));
+                }
+                Err(e) => {
+                    res.error(e);
+                }
+            }
+        }
+        Err(e) => {
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
+        }
+    }
+}
+
+/// 发送验证码
+#[derive(Debug, Deserialize)]
+pub struct SendCodeRequest {
+    pub email: String,
+    pub scene: String,
+}
+
+#[endpoint(
+    responses(
+        (status_code = 200, description = "发送成功"),
+        (status_code = 400, description = "请求格式错误"),
+        (status_code = 429, description = "发送过于频繁"),
+    )
+)]
+pub async fn send_code(req: &mut Request, _depot: &mut Depot, res: &mut Response) {
+    let body = req.parse_json::<SendCodeRequest>().await;
+
+    match body {
+        Ok(data) => {
+            let state = get_state(_depot);
+
+            match state.user_service.send_verification_code(&data.email, &data.scene).await {
+                Ok(_ttl) => {
+                    res.success(serde_json::json!({
+                        "success": true,
+                        "message": "Verification code sent"
                     }));
                 }
                 Err(e) => {

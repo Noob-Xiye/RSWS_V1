@@ -931,6 +931,80 @@ pub async fn update_usdt_wallet(req: &mut Request, depot: &mut Depot, res: &mut 
     }
 }
 
+// ==================== 管理员用户管理 ====================
+
+/// 禁用用户（管理员操作）
+#[endpoint(
+    parameters(
+        ("id", description = "用户ID"),
+    ),
+    responses(
+        (status_code = 200, description = "禁用成功"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "用户不存在"),
+    )
+)]
+pub async fn deactivate_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied()
+        .unwrap_or(false);
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let user_id: i64 = req.param("id").unwrap_or(0);
+    if user_id <= 0 {
+        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid user ID");
+        return;
+    }
+
+    let state = get_state(depot);
+    match state.user_service.deactivate_user(user_id).await {
+        Ok(()) => res.success(serde_json::json!({
+            "id": user_id,
+            "is_active": false,
+            "message": "User deactivated successfully"
+        })),
+        Err(e) => res.error(e),
+    }
+}
+
+/// 启用用户（管理员操作）
+#[endpoint(
+    parameters(
+        ("id", description = "用户ID"),
+    ),
+    responses(
+        (status_code = 200, description = "启用成功"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "用户不存在"),
+    )
+)]
+pub async fn activate_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied()
+        .unwrap_or(false);
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let user_id: i64 = req.param("id").unwrap_or(0);
+    if user_id <= 0 {
+        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid user ID");
+        return;
+    }
+
+    let state = get_state(depot);
+    match state.user_service.activate_user(user_id).await {
+        Ok(()) => res.success(serde_json::json!({
+            "id": user_id,
+            "is_active": true,
+            "message": "User activated successfully"
+        })),
+        Err(e) => res.error(e),
+    }
+}
+
 // ==================== Dashboard 统计面板 ====================
 
 /// 获取 Dashboard 统计面板数据
@@ -1021,4 +1095,135 @@ pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Re
     };
 
     res.success(stats);
+}
+
+/// 收入图表
+#[endpoint(
+    parameters(
+        ("days", description = "天数，默认30天"),
+    ),
+    responses(
+        (status_code = 200, description = "获取成功"),
+    )
+)]
+pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let state = get_state(depot);
+    let pool = &state.pool;
+
+    // 解析参数
+    let days: i64 = req.param("days").unwrap_or(30).max(1).min(365);
+
+    // 查询每日收入
+    let rows: Vec<(String, i64)> = match sqlx::query_as(
+        r#"
+        SELECT DATE(completed_at AT TIME ZONE 'UTC')::text AS date, COALESCE(SUM(amount), 0)::bigint AS revenue
+        FROM orders
+        WHERE status = 'completed'
+          AND completed_at >= NOW() - ($1 || ' days')::interval
+        GROUP BY DATE(completed_at AT TIME ZONE 'UTC')
+        ORDER BY date ASC
+        "#,
+    )
+    .bind(days)
+    .fetch_all(pool)
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            res.error(RswsError::internal(format!("Failed to query revenue chart: {}", e)));
+            return;
+        }
+    };
+
+    let dates: Vec<String> = rows.iter().map(|(d, _)| d.clone()).collect();
+    let revenues: Vec<i64> = rows.iter().map(|(_, r)| *r).collect();
+
+    let chart = serde_json::json!({
+        "dates": dates,
+        "revenues": revenues,
+    });
+
+    res.success(chart);
+}
+
+/// 禁用用户
+#[endpoint(
+    parameters(
+        ("id", description = "用户ID"),
+    ),
+    responses(
+        (status_code = 200, description = "禁用成功"),
+        (status_code = 403, description = "无权限"),
+        (status_code = 404, description = "用户不存在"),
+    )
+)]
+pub async fn deactivate_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let id: i64 = req.param("id").unwrap_or(0);
+    if id <= 0 {
+        res.http_error(StatusCode::BAD_REQUEST, "Invalid user ID");
+        return;
+    }
+
+    let state = get_state(depot);
+
+    match state.user_service.deactivate_user(id).await {
+        Ok(()) => {
+            res.success(serde_json::json!({
+                "message": "User deactivated successfully"
+            }));
+        }
+        Err(e) => {
+            res.error(e);
+        }
+    }
+}
+
+/// 启用用户
+#[endpoint(
+    parameters(
+        ("id", description = "用户ID"),
+    ),
+    responses(
+        (status_code = 200, description = "启用成功"),
+        (status_code = 403, description = "无权限"),
+        (status_code = 404, description = "用户不存在"),
+    )
+)]
+pub async fn activate_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
+    if !is_admin {
+        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    let id: i64 = req.param("id").unwrap_or(0);
+    if id <= 0 {
+        res.http_error(StatusCode::BAD_REQUEST, "Invalid user ID");
+        return;
+    }
+
+    let state = get_state(depot);
+
+    match state.user_service.activate_user(id).await {
+        Ok(()) => {
+            res.success(serde_json::json!({
+                "message": "User activated successfully"
+            }));
+        }
+        Err(e) => {
+            res.error(e);
+        }
+    }
 }

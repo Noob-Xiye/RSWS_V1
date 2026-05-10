@@ -35,6 +35,7 @@ pub fn create_router(state: AppState) -> Router {
                         .push(Router::with_path("profile").put(handler::user::update_profile))
                         .push(Router::with_path("password").put(handler::user::change_password))  // PUT /api/v1/user/password
                         .push(Router::with_path("change-password").post(handler::user::change_password))  // POST /api/v1/user/change-password (前端对齐)
+                        .push(Router::with_path("send-code").post(handler::user::send_code))  // POST /api/v1/user/send-code
                     )
                     .push(Router::with_path("<id>").get(handler::user::get_user))
                 )
@@ -95,6 +96,10 @@ pub fn create_router(state: AppState) -> Router {
                         .push(Router::with_path("logs/system").get(handler::admin::query_system_logs))
                         // Dashboard 统计
                         .push(Router::with_path("dashboard/stats").get(handler::admin::dashboard_stats))
+                        .push(Router::with_path("dashboard/revenue-chart").get(handler::admin::revenue_chart))
+                        // 用户管理
+                        .push(Router::with_path("user/<id>/deactivate").post(handler::admin::deactivate_user))
+                        .push(Router::with_path("user/<id>/activate").post(handler::admin::activate_user))
                     )
                     .push(Router::with_path("<id>")
                         .get(handler::admin::get_admin)

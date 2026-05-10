@@ -112,6 +112,18 @@ impl UserRepository {
         Ok(())
     }
 
+    /// 更新用户激活状态
+    pub async fn update_user_active(&self, user_id: i64, is_active: bool) -> Result<(), RswsError> {
+        sqlx::query("UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2")
+            .bind(is_active)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to update user active status: {}", e)))?;
+
+        Ok(())
+    }
+
     /// 更新用户资料
     pub async fn update_user_profile(
         &self,

@@ -80,6 +80,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { listResources } from '@/api/resource'
 import type { Resource } from '@/api/resource'
+import { getCategoryList } from '@/api/category'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -91,12 +92,16 @@ const page = ref(1)
 const pageSize = 12
 const keyword = ref('')
 const selectedCategory = ref<number>(0)
-const categories = ref<{ id: number; name: string }[]>([
-  { id: 1, name: '模板' },
-  { id: 2, name: '插件' },
-  { id: 3, name: '教程' },
-  { id: 4, name: '工具' },
-])
+const categories = ref<{ id: number; name: string }[]>([])
+
+async function fetchCategories() {
+  try {
+    const res = await getCategoryList()
+    categories.value = res.filter((c: any) => c.is_active !== false)
+  } catch {
+    categories.value = []
+  }
+}
 
 async function fetchResources() {
   loading.value = true
@@ -127,7 +132,10 @@ function handleLogout() {
   router.push('/')
 }
 
-onMounted(() => fetchResources())
+onMounted(() => {
+  fetchCategories()
+  fetchResources()
+})
 </script>
 
 <style scoped>

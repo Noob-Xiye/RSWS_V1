@@ -343,6 +343,89 @@ impl UserService {
         info!("Password changed for user: {}", user_id);
         Ok(())
     }
+
+    /// 发送验证码（通用，支持 register / login / reset_password）
+    pub async fn send_verification_code(&self, email: &str, scene: &str) -> Result<i64, RswsError> {
+        let redis = self.redis.as_ref()
+            .ok_or_else(|| RswsError::internal("Redis not configured"))?;
+
+        // register 场景不检查用户存在性，login / reset_password 需要检查
+        if scene != "register" {
+            let user = self.user_repo.find_user_by_email(email).await?
+                .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
+            if !user.is_active {
+                return Err(RswsError::business(ErrorCode::USER_DISABLED));
+            }
+        }
+
+        // 检查是否已有验证码（防止频繁发送）
+        if redis.has_verification_code(email, scene).await? {
+            return Err(RswsError::business_with_message(
+                ErrorCode::RATE_LIMIT_EXCEEDED,
+                "验证码已发送，请稍后再试"
+            ));
+        }
+
+        // 生成 6 位验证码
+        let code = format!("{:06}", rand::random::<u32>() % 1_000_000);
+
+        // 存储验证码
+        redis.set_verification_code(email, scene, &code).await?;
+
+        // 发送邮件
+        if let Some(ref email_service) = self.email_service {
+            email_service.send_verification_code(email, &code, scene).await?;
+        }
+
+        info!("Verification code sent to {} for scene: {}", email, scene);
+        Ok(300)
+    }
+
+    /// 禁用用户（管理员操作）
+    pub async fn deactivate_user(&self, user_id: i64) -> Result<(), RswsError> {
+        let user = self.user_repo.find_user_by_id(user_id).await?
+            .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
+
+        if !user.is_active {
+            return Err(RswsError::business_with_message(
+                ErrorCode::INVALID_PARAMETER,
+                "用户已被禁用"
+            ));
+        }
+
+        self.user_repo.update_user_active(user_id, false).await?;
+
+        // 清除缓存
+        if let Some(ref redis) = self.redis {
+            let _ = redis.clear_user_cache(user_id).await;
+        }
+
+        info!("User {} deactivated by admin", user_id);
+        Ok(())
+    }
+
+    /// 启用用户（管理员操作）
+    pub async fn activate_user(&self, user_id: i64) -> Result<(), RswsError> {
+        let user = self.user_repo.find_user_by_id(user_id).await?
+            .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
+
+        if user.is_active {
+            return Err(RswsError::business_with_message(
+                ErrorCode::INVALID_PARAMETER,
+                "用户已启用"
+            ));
+        }
+
+        self.user_repo.update_user_active(user_id, true).await?;
+
+        // 清除缓存
+        if let Some(ref redis) = self.redis {
+            let _ = redis.clear_user_cache(user_id).await;
+        }
+
+        info!("User {} activated by admin", user_id);
+        Ok(())
+    }
 }
 
 // ==================== 单元测试 ====================
