@@ -1,5 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+
+// 需要登录的路由
+const protectedRoutes = ['/user', '/orders']
+
+// 登录后不能访问的路由 (如 login, register)
+const guestRoutes = ['/login', '/register']
 
 const routes: RouteRecordRaw[] = [
   {
@@ -58,6 +65,22 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  const userStore = useUserStore()
+  const isLoggedIn = userStore.isLoggedIn
+  
+  // 需要登录的路由但用户未登录
+  if (protectedRoutes.some(path => to.path.startsWith(path)) && !isLoggedIn) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+    return
+  }
+  
+  // 已登录用户访问登录/注册页，跳转到用户中心
+  if (guestRoutes.includes(to.path) && isLoggedIn) {
+    next('/user')
+    return
+  }
+  
+  // 更新页面标题
   document.title = `${to.meta.title || ''} - RSWS`
   next()
 })

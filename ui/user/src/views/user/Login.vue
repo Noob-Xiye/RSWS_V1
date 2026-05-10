@@ -81,13 +81,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { sendVerificationCode } from '@/api/user'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
@@ -137,7 +138,9 @@ async function handleLogin() {
     const res = await userStore.login(form.username, loginType.value === 'password' ? form.password : form.code, loginType.value)
     if (res.success) {
       ElMessage.success('登录成功')
-      router.push('/')
+      // 登录后重定向到原始页面或用户中心
+      const redirect = route.query.redirect as string
+      router.push(redirect || '/user')
     } else {
       ElMessage.error(res.message || '登录失败')
     }

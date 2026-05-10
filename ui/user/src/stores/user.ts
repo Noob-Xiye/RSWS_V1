@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { register as apiRegister, getUserInfo, login as apiLogin } from '@/api/user'
-import { setApiKey, getApiKey, removeApiKey } from '@/utils/storage'
+import { setApiKey, getApiKey, removeApiKey, setApiSecret, getApiSecret, removeApiSecret } from '@/utils/storage'
 import type { User } from '@/api/user'
 
 export interface UserInfo {
@@ -19,6 +19,7 @@ export interface UserInfo {
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(null)
   const apiKey = ref<string | null>(getApiKey())
+  const apiSecret = ref<string | null>(getApiSecret())
 
   const isLoggedIn = computed(() => !!apiKey.value)
   const username = computed(() => userInfo.value?.nickname || userInfo.value?.username || '未登录')
@@ -34,6 +35,13 @@ export const useUserStore = defineStore('user', () => {
       })
       if (res.success && res.data?.success && res.data.session_data?.api_key) {
         apiKey.value = res.data.session_data.api_key
+        // Store api_secret if provided
+        if (res.data.session_data.api_secret) {
+          apiSecret.value = res.data.session_data.api_secret
+          setApiSecret(res.data.session_data.api_secret)
+        }
+        setApiKey(res.data.session_data.api_key)
+        // Set user info if provided
         if (res.data.user_info) {
           userInfo.value = {
             id: res.data.user_info.id ?? 0,
@@ -46,7 +54,6 @@ export const useUserStore = defineStore('user', () => {
             updated_at: '',
           }
         }
-        setApiKey(res.data.session_data.api_key)
         return { success: true }
       }
       return { success: false, message: res.data?.message || res.message || '登录失败' }
@@ -62,6 +69,11 @@ export const useUserStore = defineStore('user', () => {
         if (res.data.session_data?.api_key) {
           apiKey.value = res.data.session_data.api_key
           setApiKey(res.data.session_data.api_key)
+          // Store api_secret if provided
+          if (res.data.session_data.api_secret) {
+            apiSecret.value = res.data.session_data.api_secret
+            setApiSecret(res.data.session_data.api_secret)
+          }
         }
         userInfo.value = {
           id: res.data.user_info.id ?? 0,
@@ -105,6 +117,7 @@ export const useUserStore = defineStore('user', () => {
   function logout() {
     userInfo.value = null
     apiKey.value = null
+    apiSecret.value = null
     removeApiKey()
   }
 

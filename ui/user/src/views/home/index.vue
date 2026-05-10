@@ -52,7 +52,7 @@
               <div class="resource-info">
                 <div class="resource-title">{{ item.title }}</div>
                 <div class="resource-meta">
-                  <span class="price">{{ item.price }} USDT</span>
+                  <span class="price">{{ (item.price / 100).toFixed(2) }} USDT</span>
                   <span class="downloads">{{ item.download_count }} 下载</span>
                 </div>
               </div>

@@ -30,7 +30,9 @@
         <el-table-column prop="order_no" label="订单号" width="200" />
         <el-table-column prop="user_name" label="买家" width="120" />
         <el-table-column prop="resource_title" label="资源" min-width="200" />
-        <el-table-column prop="amount" label="金额 (USDT)" width="120" />
+        <el-table-column prop="amount" label="金额 (USDT)" width="120">
+          <template #default="{ row }">{{ (Number(row.amount) / 100).toFixed(2) }}</template>
+        </el-table-column>
         <el-table-column prop="payment_method" label="支付方式" width="100">
           <template #default="{ row }">{{ getPaymentMethod(row.payment_method) }}</template>
         </el-table-column>
@@ -74,7 +76,7 @@
           <el-descriptions-item label="支付方式">{{ getPaymentMethod(currentOrder.payment_method) }}</el-descriptions-item>
           <el-descriptions-item label="买家">{{ currentOrder.user_name || currentOrder.user_email || '-' }}</el-descriptions-item>
           <el-descriptions-item label="订单金额">
-            <span class="amount">{{ currentOrder.amount }} USDT</span>
+            <span class="amount">{{ (Number(currentOrder.amount) / 100).toFixed(2) }} USDT</span>
           </el-descriptions-item>
           <el-descriptions-item label="资源" :span="2">{{ currentOrder.resource_title || '-' }}</el-descriptions-item>
           <el-descriptions-item label="创建时间" :span="2">{{ formatDate(currentOrder.created_at) }}</el-descriptions-item>

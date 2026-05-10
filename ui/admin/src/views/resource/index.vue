@@ -32,7 +32,9 @@
       <el-table :data="resources" v-loading="loading" stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="200" />
-        <el-table-column prop="price" label="价格 (USDT)" width="120" />
+        <el-table-column prop="price" label="价格 (USDT)" width="120">
+          <template #default="{ row }">{{ (Number(row.price) / 100).toFixed(2) }}</template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
@@ -70,7 +72,7 @@
         <el-descriptions-item label="ID">{{ currentResource?.id }}</el-descriptions-item>
         <el-descriptions-item label="标题">{{ currentResource?.title }}</el-descriptions-item>
         <el-descriptions-item label="分类">{{ currentResource?.category }}</el-descriptions-item>
-        <el-descriptions-item label="价格">{{ currentResource?.price }} USDT</el-descriptions-item>
+        <el-descriptions-item label="价格">{{ currentResource ? (Number(currentResource.price) / 100).toFixed(2) : '0.00' }} USDT</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(currentResource?.status || '')">{{ getStatusText(currentResource?.status || '') }}</el-tag>
         </el-descriptions-item>
