@@ -1,77 +1,118 @@
 <template>
-  <div class="home-page">
-    <el-container>
-      <el-header class="header">
-        <div class="logo">RSWS</div>
-        <el-menu mode="horizontal" :ellipsis="false" router>
-          <el-menu-item index="/">首页</el-menu-item>
-          <el-menu-item index="/orders" v-if="userStore.isLoggedIn">我的订单</el-menu-item>
-        </el-menu>
-        <div class="user-area">
-          <template v-if="userStore.isLoggedIn">
-            <el-dropdown>
-              <span class="user-link">
-                <el-icon><User /></el-icon>
-                {{ userStore.username }}
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="$router.push('/user')">用户中心</el-dropdown-item>
-                  <el-dropdown-item @click="handleLogout">退出</el-dropdown-item>
-                </el-dropdown-menu>
+  <ModernLayout>
+    <!-- Hero 区域 -->
+    <section class="hero">
+      <div class="hero-content">
+        <h1 class="hero-title">
+          <span class="gradient-text">优质资源</span>
+          <span>触手可及</span>
+        </h1>
+        <p class="hero-subtitle">发现、购买、下载高质量数字资源</p>
+
+        <div class="search-container">
+          <div class="search-box">
+            <el-input
+              v-model="keyword"
+              placeholder="搜索你想要的资源..."
+              size="large"
+              clearable
+              @keyup.enter="handleSearch"
+              class="search-input"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
               </template>
-            </el-dropdown>
-          </template>
-          <template v-else>
-            <el-button type="primary" size="small" @click="$router.push('/login')">登录</el-button>
-            <el-button size="small" @click="$router.push('/register')">注册</el-button>
-          </template>
-        </div>
-      </el-header>
+            </el-input>
+            <el-button type="primary" size="large" class="search-btn" @click="handleSearch">
+              搜索
+            </el-button>
+          </div>
 
-      <el-main class="main">
-        <div class="search-bar">
-          <el-input v-model="keyword" placeholder="搜索资源" clearable @keyup.enter="handleSearch" style="max-width: 400px">
-            <template #append>
-              <el-button icon="Search" @click="handleSearch" />
-            </template>
-          </el-input>
-          <el-select v-model="selectedCategory" placeholder="分类" clearable @change="handleSearch" style="width: 150px">
-            <el-option label="全部" :value="0" />
-            <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
-          </el-select>
+          <div class="category-tags">
+            <span
+              class="category-tag"
+              :class="{ active: selectedCategory === 0 }"
+              @click="selectCategory(0)"
+            >全部</span>
+            <span
+              v-for="cat in categories"
+              :key="cat.id"
+              class="category-tag"
+              :class="{ active: selectedCategory === cat.id }"
+              @click="selectCategory(cat.id)"
+            >{{ cat.name }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-bg">
+        <div class="bg-blob blob-1"></div>
+        <div class="bg-blob blob-2"></div>
+        <div class="bg-blob blob-3"></div>
+      </div>
+    </section>
+
+    <!-- 资源列表 -->
+    <section class="resources-section">
+      <div class="section-container">
+        <div class="section-header">
+          <h2 class="section-title">
+            <span class="gradient-text">热门资源</span>
+          </h2>
+          <span class="resource-count">共 {{ total }} 个资源</span>
         </div>
 
-        <el-row :gutter="20" v-loading="loading">
-          <el-col :span="6" v-for="item in resources" :key="item.id">
-            <el-card class="resource-card" shadow="hover" @click="$router.push(`/resource/${item.id}`)">
-              <div class="resource-cover">
-                <el-image v-if="item.cover_image" :src="item.cover_image" fit="cover" />
-                <el-icon v-else :size="60"><Document /></el-icon>
+        <div v-loading="loading" class="resources-grid">
+          <div
+            v-for="item in resources"
+            :key="item.id"
+            class="resource-card"
+            @click="$router.push(`/resource/${item.id}`)"
+          >
+            <div class="card-cover">
+              <el-image v-if="item.cover_image" :src="item.cover_image" fit="cover" class="cover-image" />
+              <div v-else class="cover-placeholder">
+                <el-icon :size="48"><Document /></el-icon>
               </div>
-              <div class="resource-info">
-                <div class="resource-title">{{ item.title }}</div>
-                <div class="resource-meta">
-                  <span class="price">{{ (item.price / 100).toFixed(2) }} USDT</span>
-                  <span class="downloads">{{ item.download_count }} 下载</span>
+              <div class="card-overlay">
+                <span class="view-btn">查看详情</span>
+              </div>
+            </div>
+            <div class="card-content">
+              <h3 class="card-title">{{ item.title }}</h3>
+              <p class="card-desc">{{ item.description || '暂无描述' }}</p>
+              <div class="card-footer">
+                <div class="card-price">
+                  <span class="price-value">{{ (item.price / 100).toFixed(2) }}</span>
+                  <span class="price-unit">USDT</span>
+                </div>
+                <div class="card-stats">
+                  <el-icon><Download /></el-icon>
+                  <span>{{ item.download_count }}</span>
                 </div>
               </div>
-            </el-card>
-          </el-col>
-        </el-row>
+            </div>
+          </div>
+        </div>
 
-        <div class="pagination">
+        <div v-if="!loading && resources.length === 0" class="empty-state">
+          <el-icon :size="64"><FolderOpened /></el-icon>
+          <p>暂无资源</p>
+        </div>
+
+        <div v-if="total > pageSize" class="pagination">
           <el-pagination
             v-model:current-page="page"
             :page-size="pageSize"
             :total="total"
             layout="prev, pager, next"
+            :background="true"
             @current-change="fetchResources"
           />
         </div>
-      </el-main>
-    </el-container>
-  </div>
+      </div>
+    </section>
+  </ModernLayout>
 </template>
 
 <script setup lang="ts">
@@ -81,6 +122,7 @@ import { useUserStore } from '@/stores/user'
 import { listResources } from '@/api/resource'
 import type { Resource } from '@/api/resource'
 import { getCategoryList } from '@/api/category'
+import ModernLayout from '@/components/ModernLayout.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -109,7 +151,7 @@ async function fetchResources() {
     const params: any = { page: page.value, page_size: pageSize }
     if (keyword.value) params.search = keyword.value
     if (selectedCategory.value) params.category_id = selectedCategory.value
-    
+
     const res = await listResources(params)
     if (res.success && res.data) {
       resources.value = res.data.items
@@ -127,9 +169,10 @@ function handleSearch() {
   fetchResources()
 }
 
-function handleLogout() {
-  userStore.logout()
-  router.push('/')
+function selectCategory(catId: number) {
+  selectedCategory.value = catId
+  page.value = 1
+  fetchResources()
 }
 
 onMounted(() => {
@@ -139,97 +182,371 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.home-page {
-  min-height: 100vh;
-  background: #f5f5f5;
+/* Hero 区域 */
+.hero {
+  position: relative;
+  padding: 80px 24px 60px;
+  text-align: center;
+  overflow: hidden;
 }
 
-.header {
-  background: #fff;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.logo {
-  font-size: 24px;
-  font-weight: bold;
-  color: #409eff;
-  margin-right: 40px;
-}
-
-.user-area {
-  margin-left: auto;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.user-link {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-}
-
-.main {
-  max-width: 1200px;
+.hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 20px;
 }
 
-.search-bar {
+.hero-title {
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+}
+
+.hero-title span {
+  display: block;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 48px;
+}
+
+/* 搜索栏 */
+.search-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.search-box {
   display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
-.resource-card {
+.search-input {
+  flex: 1;
+}
+
+.search-input :deep(.el-input__wrapper) {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.search-input :deep(.el-input__inner) {
+  color: #fff;
+}
+
+.search-input :deep(.el-input__inner::placeholder) {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.search-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 12px;
+  padding: 0 32px;
+}
+
+.search-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.category-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.category-tag {
+  padding: 8px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  margin-bottom: 20px;
+  transition: all 0.3s;
 }
 
-.resource-cover {
-  height: 150px;
+.category-tag:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.category-tag.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* 背景装饰 */
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+}
+
+.blob-1 {
+  width: 400px;
+  height: 400px;
+  background: #667eea;
+  top: -100px;
+  right: -100px;
+  animation: float 8s ease-in-out infinite;
+}
+
+.blob-2 {
+  width: 300px;
+  height: 300px;
+  background: #764ba2;
+  bottom: 0;
+  left: -50px;
+  animation: float 10s ease-in-out infinite reverse;
+}
+
+.blob-3 {
+  width: 200px;
+  height: 200px;
+  background: #f093fb;
+  top: 50%;
+  left: 50%;
+  animation: float 12s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, -30px); }
+}
+
+/* 资源列表 */
+.resources-section {
+  padding: 20px 24px 80px;
+}
+
+.section-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.resource-count {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+
+.resources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+/* 资源卡片 */
+.resource-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.resource-card:hover {
+  transform: translateY(-8px);
+  border-color: rgba(102, 126, 234, 0.5);
+  box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
+}
+
+.card-cover {
+  position: relative;
+  height: 180px;
+  overflow: hidden;
+}
+
+.cover-image {
+  width: 100%;
+  height: 100%;
+}
+
+.cover-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0f0f0;
-  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+  color: rgba(255, 255, 255, 0.5);
 }
 
-.resource-info {
-  padding: 10px 0;
+.card-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 15, 26, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
-.resource-title {
+.resource-card:hover .card-overlay {
+  opacity: 1;
+}
+
+.view-btn {
+  padding: 12px 28px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
+}
+
+.card-content {
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.resource-meta {
+.card-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 16px;
+}
+
+.card-footer {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
+}
+
+.card-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.price-value {
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.price-unit {
   font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
-.price {
-  color: #f56c6c;
-  font-weight: bold;
+.card-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
 }
 
-.downloads {
-  color: #909399;
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
+.empty-state p {
+  margin-top: 16px;
+  font-size: 16px;
+}
+
+/* 分页 */
 .pagination {
   display: flex;
   justify-content: center;
-  margin-top: 30px;
+  margin-top: 48px;
+}
+
+.pagination :deep(.el-pagination.is-background .el-pager li) {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.pagination :deep(.el-pagination.is-background .el-pager li:hover) {
+  color: #fff;
+}
+
+.pagination :deep(.el-pagination.is-background .el-pager li.is-active) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.pagination :deep(.btn-prev),
+.pagination :deep(.btn-next) {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 36px;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+  }
+
+  .search-box {
+    flex-direction: column;
+  }
+
+  .search-btn {
+    width: 100%;
+  }
+
+  .resources-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

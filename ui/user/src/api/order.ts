@@ -4,6 +4,7 @@ import request, { type ApiResponse } from './request'
 
 export interface Order {
   id: number
+  order_no?: string
   user_id: number
   resource_id: number
   amount: number  // 后端是 i64（分），前端显示时需转换
