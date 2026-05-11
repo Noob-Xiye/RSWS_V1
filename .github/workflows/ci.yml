@@ -54,6 +54,9 @@ jobs:
         with:
           workspaces: ${{ github.workspace }} -> target
 
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client redis-tools
+
       - name: Wait for services
         run: |
           until pg_isready -h localhost -p 5432; do sleep 1; done
