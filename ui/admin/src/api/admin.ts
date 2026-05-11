@@ -45,7 +45,6 @@ export interface AdminApiKeyResponse {
   id: number
   name: string
   api_key: string
-  api_secret?: string
   permissions: string[]
   rate_limit: number | null
   expires_at: string | null

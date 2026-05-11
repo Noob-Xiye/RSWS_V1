@@ -14,7 +14,7 @@ pub struct PlatformConfig {
     pub platform_name: String,
     pub api_endpoint: String,
     pub api_key: Option<String>,
-    pub api_secret: Option<String>,
+    pub signing_key: Option<String>,
     pub webhook_url: Option<String>,
     pub is_active: bool,
 }
@@ -103,7 +103,7 @@ impl CrossPlatformService {
             "timestamp": Utc::now().to_rfc3339(),
         });
 
-        // 签名：HMAC-SHA256(api_secret, body_json) — 如果配置了 api_secret
+        // 签名：HMAC-SHA256(signing_key, body_json) — 如果配置了 signing_key
         let mut request = self
             .client
             .post(&url)
@@ -113,11 +113,11 @@ impl CrossPlatformService {
             request = request.header("X-Api-Key", api_key);
         }
 
-        if let Some(ref api_secret) = config.api_secret {
+        if let Some(ref signing_key) = config.signing_key {
             let body_str = serde_json::to_string(&body).map_err(|e| {
                 RswsError::internal(format!("Failed to serialize sync body: {}", e))
             })?;
-            let signature = hmac_sha256(api_secret.as_bytes(), body_str.as_bytes());
+            let signature = hmac_sha256(signing_key.as_bytes(), body_str.as_bytes());
             request = request.header("X-Signature", signature.clone());
             body["signature"] = Value::String(signature);
         }

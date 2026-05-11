@@ -1,53 +1,53 @@
 // ========== 本地存储工具 ==========
+//
+// 新设计（Cregis 方案）：
+// - 只存储 api_key（签名密钥），不存储 api_secret
+// - 前端用 api_key 计算签名，请求中不传输 api_key 本身
 
 const KEY_PREFIX = 'rsws_admin_'
-const TOKEN_KEY = `${KEY_PREFIX}token`
-const API_KEY_KEY = `${KEY_PREFIX}api_key`
-const API_SECRET_KEY = `${KEY_PREFIX}api_secret`
 
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
-}
-
-export function removeToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
-}
-
+// API Key（用于签名，不随请求传输）
 export function setApiKey(key: string): void {
-  localStorage.setItem(API_KEY_KEY, key)
+  localStorage.setItem(`${KEY_PREFIX}api_key`, key)
 }
 
 export function getApiKey(): string | null {
-  return localStorage.getItem(API_KEY_KEY)
+  return localStorage.getItem(`${KEY_PREFIX}api_key`)
 }
 
 export function removeApiKey(): void {
-  localStorage.removeItem(API_KEY_KEY)
-  localStorage.removeItem(API_SECRET_KEY)
+  localStorage.removeItem(`${KEY_PREFIX}api_key`)
 }
 
-// 单独移除 API Secret
-// 注意：removeApiKey 会同时移除 secret，如果只需要移除 secret 使用此函数
-export function removeApiSecret(): void {
-  localStorage.removeItem(API_SECRET_KEY)
+// Admin ID（公开标识符，随请求传输）
+export function setAdminId(adminId: string): void {
+  localStorage.setItem(`${KEY_PREFIX}admin_id`, adminId)
 }
 
-// API Secret 用于签名
-export function setApiSecret(secret: string): void {
-  localStorage.setItem(API_SECRET_KEY, secret)
+export function getAdminId(): string | null {
+  return localStorage.getItem(`${KEY_PREFIX}admin_id`)
 }
 
-export function getApiSecret(): string | null {
-  return localStorage.getItem(API_SECRET_KEY)
+export function removeAdminId(): void {
+  localStorage.removeItem(`${KEY_PREFIX}admin_id`)
+}
+
+// Token（如果使用 session token）
+export function setToken(token: string): void {
+  localStorage.setItem(`${KEY_PREFIX}token`, token)
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem(`${KEY_PREFIX}token`)
+}
+
+export function removeToken(): void {
+  localStorage.removeItem(`${KEY_PREFIX}token`)
 }
 
 // 清除所有存储
 export function clearAll(): void {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(API_KEY_KEY)
-  localStorage.removeItem(API_SECRET_KEY)
+  localStorage.removeItem(`${KEY_PREFIX}api_key`)
+  localStorage.removeItem(`${KEY_PREFIX}admin_id`)
+  localStorage.removeItem(`${KEY_PREFIX}token`)
 }

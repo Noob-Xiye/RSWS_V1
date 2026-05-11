@@ -7,10 +7,14 @@ import CryptoJS from 'crypto-js'
  * 算法：
  * 1. 收集所有参数（排除 sign 本身）
  * 2. 按 key ASCII 升序排序
- * 3. 拼接参数字符串：api_secret + key1 + value1 + key2 + value2 + ...
+ * 3. 拼接参数字符串：apiKey + key1 + value1 + key2 + value2 + ...
  * 4. MD5 计算并转小写 hex
+ * 
+ * @param params 参数字典（排除 sign）
+ * @param apiKey 签名密钥（不随请求传输）
+ * @returns MD5 小写 hex 签名
  */
-export function generateSignature(params: Record<string, string>, apiSecret: string): string {
+export function generateSignature(params: Record<string, string>, apiKey: string): string {
   // 1. 获取所有 key（排除 sign），排序
   const keys = Object.keys(params)
     .filter(key => key !== 'sign')
@@ -19,8 +23,8 @@ export function generateSignature(params: Record<string, string>, apiSecret: str
   // 2. 按 ASCII 顺序拼接 key + value
   const paramStr = keys.map(key => key + params[key]).join('')
   
-  // 3. 拼接 api_secret（拼在前面，与 Cregis 方案一致）
-  const signStr = apiSecret + paramStr
+  // 3. apiKey 拼在前面（Cregis 方案）
+  const signStr = apiKey + paramStr
   
   // 4. MD5 + 小写 hex
   return CryptoJS.MD5(signStr).toString()
@@ -46,45 +50,47 @@ export function generateNonce(length: number = 16): string {
 }
 
 /**
- * 请求签名参数
+ * 请求签名参数接口
  */
 export interface SignParams {
+  /** 公开用户标识符（随请求传输） */
+  userId: string
+  /** 签名密钥（不随请求传输） */
   apiKey: string
-  apiSecret: string
+  /** 请求路径 */
   path: string
+  /** 请求体参数（可选） */
   body?: Record<string, unknown>
 }
 
 /**
  * 生成签名请求参数
  * 
- * @param options 包含 apiKey, apiSecret, path, body
- * @returns 签名参数对象 { api_key, timestamp, nonce, sign }
+ * @param options 包含 userId, apiKey, path, body
+ * @returns 签名参数对象 { user_id, timestamp, nonce, sign }
  */
 export function generateSignParams(options: SignParams): Record<string, string> {
   const timestamp = getTimestamp()
   const nonce = generateNonce()
   
-  // 构建参数字典（包含 api_key, timestamp, nonce）
+  // 构建参数字典（包含 user_id, timestamp, nonce）
   const params: Record<string, string> = {
-    api_key: options.apiKey,
+    user_id: options.userId,
     timestamp: timestamp.toString(),
     nonce: nonce,
   }
   
   // 如果有 body，添加 body 参数
   if (options.body && Object.keys(options.body).length > 0) {
-    // 注意：后端会从查询参数收集其他参数，这里将 body 转换为 key-value 字符串
-    // 实际使用时，可能需要将 body 序列化后作为参数传递
     const bodyStr = JSON.stringify(options.body)
     params.body = bodyStr
   }
   
-  // 计算签名
-  const sign = generateSignature(params, options.apiSecret)
+  // 计算签名（使用 apiKey 作为签名密钥）
+  const sign = generateSignature(params, options.apiKey)
   
   return {
-    api_key: options.apiKey,
+    user_id: options.userId,
     timestamp: timestamp.toString(),
     nonce: nonce,
     sign: sign,
@@ -95,6 +101,7 @@ export function generateSignParams(options: SignParams): Record<string, string> 
  * 构建带签名的 URL
  * 
  * @param baseUrl 基础 URL
+ * @param path 路径
  * @param params 签名参数
  * @returns 带查询参数的完整 URL
  */

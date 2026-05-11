@@ -28,7 +28,6 @@ pub struct AdminApiKey {
     pub admin_id: i64,
     pub name: String,
     pub api_key: String,
-    pub api_secret_encrypted: String,
     pub permissions: serde_json::Value,
     pub rate_limit: Option<i32>,
     pub last_used_at: Option<DateTime<Utc>>,
@@ -72,7 +71,8 @@ pub struct AdminLoginRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdminLoginResponse {
     pub admin: AdminInfo,
-    pub token: String,
+    /// 签名密钥（前端持有用于签名，不随请求传输）
+    pub api_key: String,
     pub expires_at: DateTime<Utc>,
 }
 
@@ -116,7 +116,6 @@ pub struct AdminApiKeyResponse {
     pub id: i64,
     pub name: String,
     pub api_key: String,
-    pub api_secret: Option<String>,
     pub permissions: Vec<String>,
     pub rate_limit: Option<i32>,
     pub last_used_at: Option<DateTime<Utc>>,

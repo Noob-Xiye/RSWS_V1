@@ -17,7 +17,6 @@ use salvo::prelude::*;
 use salvo_oapi::endpoint;
 use serde::Deserialize;
 use sqlx::PgPool;
-use uuid::Uuid;
 
 /// 管理员登录请求
 #[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
@@ -27,6 +26,11 @@ pub struct AdminLoginBody {
 }
 
 /// 管理员登录（无需 API Key，使用邮箱+密码）
+///
+/// 流程：
+/// 1. 验证邮箱+密码
+/// 2. 创建 admin_api_key（持久化到 admin_api_keys 表）
+/// 3. 返回 admin 信息 + api_key
 #[endpoint(
     request_body = AdminLoginBody,
     responses(
@@ -52,14 +56,36 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
                 .await
             {
                 Ok(info) => {
-                    let token = Uuid::new_v4().to_string();
-                    let expires_at = Utc::now() + Duration::days(30);
-                    let login_resp = AdminLoginResponse {
-                        admin: info,
-                        token,
-                        expires_at,
-                    };
-                    res.success(login_resp)
+                    // 为管理员创建 admin_api_key（Cregis 双密钥方案）
+                    match state
+                        .admin_service
+                        .create_api_key(
+                            info.id,
+                            "login_session",
+                            vec!["all".to_string()],
+                            Some(1000),
+                            Some(30),
+                        )
+                        .await
+                    {
+                        Ok(api_key_resp) => {
+                            let login_resp = AdminLoginResponse {
+                                admin: info,
+                                api_key: api_key_resp.api_key,
+                                expires_at: api_key_resp
+                                    .expires_at
+                                    .unwrap_or_else(|| Utc::now() + Duration::days(30)),
+                            };
+                            res.success(login_resp);
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to create admin api_key: {}", e);
+                            res.http_error(
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "Login succeeded but session creation failed",
+                            );
+                        }
+                    }
                 }
                 Err(e) => res.error(e),
             }

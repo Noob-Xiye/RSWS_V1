@@ -13,12 +13,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Redis 中缓存的管理员 API Key 会话信息
+/// Redis 中缓存的管理员 API Key 会话信息（单密钥方案）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedAdminApiKey {
     pub admin_id: i64,
     pub key_id: i64,
-    pub api_secret: String,
+    pub api_key: String,
     pub role: String,
     pub permissions: Vec<String>,
     pub rate_limit: Option<i32>,
@@ -337,20 +337,20 @@ impl AdminService {
         rate_limit: Option<i32>,
         expires_in_days: Option<i32>,
     ) -> Result<AdminApiKeyResponse, RswsError> {
-        let (record, secret) = self
+        let record = self
             .admin_repo
             .create_admin_api_key(admin_id, name, permissions, rate_limit, expires_in_days)
             .await?;
 
-        // 创建后写入 Redis 缓存
+        // 写入 Redis 缓存
         if let Some(ref redis) = self.redis {
             let perms: Vec<String> =
                 serde_json::from_value(record.permissions.clone()).unwrap_or_default();
             let cached = CachedAdminApiKey {
                 admin_id: record.admin_id,
                 key_id: record.id,
-                api_secret: secret.clone(),
-                role: String::new(), // role 会在 validate 时从 DB 补充
+                api_key: record.api_key.clone(),
+                role: String::new(),
                 permissions: perms,
                 rate_limit: record.rate_limit,
                 expires_at: record.expires_at,
@@ -371,7 +371,6 @@ impl AdminService {
             id: record.id,
             name: record.name,
             api_key: record.api_key,
-            api_secret: Some(secret),
             permissions: perms,
             rate_limit: record.rate_limit,
             last_used_at: record.last_used_at,
@@ -424,92 +423,12 @@ impl AdminService {
         Ok(())
     }
 
-    /// 验证管理员 API Key(供中间件调用,带 Redis 缓存)
+    /// 验证管理员 API Key 是否存在且活跃（单密钥方案）
     pub async fn validate_admin_api_key(
         &self,
         api_key: &str,
-        api_secret: &str,
     ) -> Result<Option<(AdminApiKey, Admin)>, RswsError> {
-        // 1) 先查 Redis
-        if let Some(ref redis) = self.redis {
-            if let Some(cached) = redis
-                .get_json::<CachedAdminApiKey>(&Self::redis_key(api_key))
-                .await?
-            {
-                // Redis 命中:验证 secret
-                if cached.api_secret == api_secret {
-                    // 检查是否过期
-                    if let Some(expires) = cached.expires_at {
-                        if expires < chrono::Utc::now() {
-                            let _ = redis.del(&Self::redis_key(api_key)).await;
-                            return Ok(None);
-                        }
-                    }
-
-                    // 需要补查 admin 信息
-                    let admin = self.admin_repo.get_admin_by_id(cached.admin_id).await?;
-                    if let Some(admin) = admin {
-                        if !admin.is_active {
-                            let _ = redis.del(&Self::redis_key(api_key)).await;
-                            return Ok(None);
-                        }
-
-                        // 构造 AdminApiKey(简化)
-                        let key_record = AdminApiKey {
-                            id: cached.key_id,
-                            admin_id: cached.admin_id,
-                            name: String::new(),
-                            api_key: api_key.to_string(),
-                            api_secret_encrypted: String::new(), // Redis 中不需要
-                            permissions: serde_json::to_value(&cached.permissions)
-                                .unwrap_or_default(),
-                            rate_limit: cached.rate_limit,
-                            last_used_at: None,
-                            expires_at: cached.expires_at,
-                            is_active: true,
-                            created_at: chrono::Utc::now(),
-                            updated_at: chrono::Utc::now(),
-                        };
-
-                        return Ok(Some((key_record, admin)));
-                    }
-                }
-                // secret 不匹配
-                let _ = redis.del(&Self::redis_key(api_key)).await;
-            }
-        }
-
-        // 2) Redis miss → 查 DB
-        let result = self
-            .admin_repo
-            .validate_admin_api_key(api_key, api_secret)
-            .await?;
-
-        // 3) DB 验证通过 → 写入 Redis
-        if let Some((ref key_record, ref admin)) = result {
-            if let Some(ref redis) = self.redis {
-                let permissions: Vec<String> =
-                    serde_json::from_value(key_record.permissions.clone()).unwrap_or_default();
-                let cached = CachedAdminApiKey {
-                    admin_id: admin.id,
-                    key_id: key_record.id,
-                    api_secret: api_secret.to_string(),
-                    role: admin.role.clone(),
-                    permissions,
-                    rate_limit: key_record.rate_limit,
-                    expires_at: key_record.expires_at,
-                };
-                let _ = redis
-                    .set_json(
-                        &Self::redis_key(api_key),
-                        &cached,
-                        Self::DEFAULT_SESSION_TTL,
-                    )
-                    .await;
-            }
-        }
-
-        Ok(result)
+        self.admin_repo.validate_admin_api_key(api_key).await
     }
 
     /// 清除管理员所有 Redis 缓存的 API Key
@@ -529,100 +448,64 @@ impl AdminService {
         }
     }
 
-    /// 验证管理员签名认证（符合 Cregis 方案）
-    pub async fn validate_admin_api_key_signature(
+    /// 验证管理员签名认证（单密钥 Cregis 方案）
+    ///
+    /// 前端传 admin_id (=user_id) + timestamp + nonce + sign
+    /// 后端通过 admin_id 查找 api_key，用 api_key 重算签名验签
+    pub async fn validate_signature_by_admin_id(
         &self,
-        api_key: &str,
+        admin_id: i64,
         params: &HashMap<String, String>,
         sign: &str,
-    ) -> Result<Option<(AdminApiKey, Admin)>, RswsError> {
-        // 1) 获取 api_secret（先查 Redis 缓存）
-        let api_secret = if let Some(ref redis) = self.redis {
-            if let Some(cached) = redis
-                .get_json::<CachedAdminApiKey>(&Self::redis_key(api_key))
-                .await?
-            {
-                Some(cached.api_secret)
-            } else {
-                None
-            }
-        } else {
-            None
+    ) -> Result<bool, RswsError> {
+        let record = match self
+            .admin_repo
+            .get_active_key_by_admin_id(admin_id)
+            .await?
+        {
+            Some(r) => r,
+            None => return Ok(false),
         };
 
-        let api_secret = match api_secret {
-            Some(s) => s,
-            None => {
-                // Redis miss，从 DB 获取
-                let record = self.admin_repo.get_admin_api_key_by_key(api_key).await?;
-                match record {
-                    Some(r) => {
-                        // 写入 Redis 缓存
-                        if let Some(ref redis) = self.redis {
-                            let permissions: Vec<String> =
-                                serde_json::from_value(r.permissions.clone()).unwrap_or_default();
-                            let cached = CachedAdminApiKey {
-                                admin_id: r.admin_id,
-                                key_id: r.id,
-                                api_secret: r.api_secret_encrypted.clone(),
-                                role: String::new(),
-                                permissions,
-                                rate_limit: r.rate_limit,
-                                expires_at: r.expires_at,
-                            };
-                            let _ = redis
-                                .set_json(
-                                    &Self::redis_key(api_key),
-                                    &cached,
-                                    Self::DEFAULT_SESSION_TTL,
-                                )
-                                .await;
-                        }
-                        r.api_secret_encrypted
-                    }
-                    None => return Ok(None),
-                }
-            }
-        };
+        // 单密钥方案：使用 api_key 作为签名密钥
+        let computed_sign = Self::compute_signature(params, &record.api_key);
 
-        // 2) 重算签名
-        let computed_sign = compute_signature(params, &api_secret);
-
-        // 3) 对比签名
         if computed_sign == sign {
-            // 签名正确，获取完整的记录
-            let result = self
+            // 更新 last_used
+            let _ = self
                 .admin_repo
-                .validate_admin_api_key(api_key, &api_secret)
-                .await?;
-            Ok(result)
+                .update_admin_api_key_last_used(record.id)
+                .await;
+            Ok(true)
         } else {
             tracing::warn!(
-                "Admin signature mismatch for api_key: {}. Expected: {}, Got: {}",
-                api_key,
+                "Admin signature mismatch for admin_id: {}. Expected: {}, Got: {}",
+                admin_id,
                 computed_sign,
                 sign
             );
-            Ok(None)
+            Ok(false)
         }
     }
-}
 
-/// 计算签名（符合 Cregis 方案）
-fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> String {
-    // 1. 获取所有 key（排除 sign），排序
-    let mut keys: Vec<&String> = params.keys().filter(|k| (*k).as_str() != "sign").collect();
-    keys.sort();
+    /// 计算签名（符合 Cregis 单密钥方案）
+    ///
+    /// api_key 作为签名密钥，前置到排序后的参数字符串
+    fn compute_signature(params: &HashMap<String, String>, api_key: &str) -> String {
+        // 1. 获取所有 key（排除 sign），排序
+        let mut keys: Vec<&String> = params.keys().filter(|k| (*k).as_str() != "sign").collect();
+        keys.sort();
 
-    // 2. 按 ASCII 顺序拼接 key + value
-    let param_str: String = keys
-        .iter()
-        .map(|k| format!("{}{}", k, params[*k]))
-        .collect();
+        // 2. 按 ASCII 顺序拼接 key + value
+        let param_str: String = keys
+            .iter()
+            .map(|k| format!("{}{}", k, params[*k]))
+            .collect();
 
-    // 3. 拼接 api_secret（拼在前面，与 Cregis 方案一致）
-    let sign_str = format!("{}{}", api_secret, param_str);
+        // 3. 拼接 api_key（前置，与 Cregis 方案一致）
+        let sign_str = format!("{}{}", api_key, param_str);
 
-    // 4. MD5 + 小写 hex
-    format!("{:x}", md5::compute(sign_str.as_bytes()))
+        // 4. MD5 + 小写 hex
+        format!("{:x}", md5::compute(sign_str.as_bytes()))
+    }
 }

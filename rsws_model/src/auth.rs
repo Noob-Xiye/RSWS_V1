@@ -9,7 +9,6 @@ pub struct UserSession {
     pub user_id: i64,
     pub session_token: String,
     pub api_key: String,
-    pub api_secret: String,
     pub device_info: Option<serde_json::Value>,
     pub ip_address: Option<IpAddr>,
     pub user_agent: Option<String>,
@@ -38,7 +37,6 @@ pub struct DeviceInfo {
 pub struct LoginResponse {
     pub session_token: String,
     pub api_key: String,
-    pub api_secret: String,
     pub expires_at: DateTime<Utc>,
     pub user_info: UserInfo,
 }

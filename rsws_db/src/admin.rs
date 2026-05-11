@@ -252,11 +252,10 @@ impl AdminRepository {
 
     // ==================== Admin API Key ====================
 
-    /// 验证管理员 API Key，返回 AdminApiKey + Admin
+    /// 验证管理员 API Key 是否存在且活跃（单密钥方案）
     pub async fn validate_admin_api_key(
         &self,
         api_key: &str,
-        api_secret: &str,
     ) -> Result<Option<(AdminApiKey, Admin)>, RswsError> {
         let key_record = sqlx::query_as::<_, AdminApiKey>(
             r#"
@@ -274,13 +273,6 @@ impl AdminRepository {
             Some(k) => k,
             None => return Ok(None),
         };
-
-        // 验证 api_secret（admin_api_keys 存储的是 api_secret_encrypted）
-        // 使用 PasswordService 做常量时间比较
-        let is_valid = PasswordService::verify(api_secret, &key_record.api_secret_encrypted)?;
-        if !is_valid {
-            return Ok(None);
-        }
 
         // 查关联的 admin
         let admin =
@@ -310,7 +302,7 @@ impl AdminRepository {
         Ok(())
     }
 
-    /// 创建管理员 API Key
+    /// 创建管理员 API Key（单密钥方案，不生成 api_secret）
     pub async fn create_admin_api_key(
         &self,
         admin_id: i64,
@@ -318,7 +310,7 @@ impl AdminRepository {
         permissions: Vec<String>,
         rate_limit: Option<i32>,
         expires_in_days: Option<i32>,
-    ) -> Result<(AdminApiKey, String), RswsError> {
+    ) -> Result<AdminApiKey, RswsError> {
         use base64::{engine::general_purpose, Engine as _};
         use rand::{Rng, SeedableRng};
 
@@ -329,15 +321,6 @@ impl AdminRepository {
             general_purpose::URL_SAFE_NO_PAD.encode(key_bytes)
         );
 
-        let secret_bytes: [u8; 64] = rng.random();
-        let api_secret = format!(
-            "adm_sk_{}",
-            general_purpose::URL_SAFE_NO_PAD.encode(secret_bytes)
-        );
-
-        // 用 Argon2 加密 secret 存储
-        let api_secret_encrypted = PasswordService::hash(&api_secret)?;
-
         let permissions_json = serde_json::to_value(&permissions)
             .map_err(|e| RswsError::internal(format!("Failed to serialize permissions: {}", e)))?;
 
@@ -345,15 +328,14 @@ impl AdminRepository {
 
         let record = sqlx::query_as::<_, AdminApiKey>(
             r#"
-            INSERT INTO admin_api_keys (admin_id, name, api_key, api_secret_encrypted, permissions, rate_limit, expires_at, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+            INSERT INTO admin_api_keys (admin_id, name, api_key, permissions, rate_limit, expires_at, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, true)
             RETURNING *
             "#,
         )
         .bind(admin_id)
         .bind(name)
         .bind(&api_key)
-        .bind(&api_secret_encrypted)
         .bind(&permissions_json)
         .bind(rate_limit)
         .bind(expires_at)
@@ -361,7 +343,7 @@ impl AdminRepository {
         .await
         .map_err(|e| RswsError::internal(format!("Failed to create admin API key: {}", e)))?;
 
-        Ok((record, api_secret))
+        Ok(record)
     }
 
     /// 获取管理员的所有 API Key
@@ -387,6 +369,28 @@ impl AdminRepository {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| RswsError::internal(format!("Failed to get admin API key by key: {}", e)))
+    }
+
+    /// 根据 admin_id 获取活跃的 API Key（用于签名验证）
+    ///
+    /// 单密钥 Cregis 方案：前端传 admin_id，后端用 admin_id 查找 api_key 验签
+    pub async fn get_active_key_by_admin_id(
+        &self,
+        admin_id: i64,
+    ) -> Result<Option<AdminApiKey>, RswsError> {
+        sqlx::query_as::<_, AdminApiKey>(
+            r#"
+            SELECT * FROM admin_api_keys
+            WHERE admin_id = $1 AND is_active = true
+            AND (expires_at IS NULL OR expires_at > NOW())
+            ORDER BY created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(admin_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get admin API key by admin_id: {}", e)))
     }
 
     /// 删除管理员 API Key

@@ -1,4 +1,8 @@
 //! API Key 模型
+//!
+//! 新设计：api_key 即为签名密钥（Cregis 方案）
+//! - api_key: 随机文本，用于计算 MD5 签名，不随请求传输
+//! - 请求中传 user_id（公开标识）+ timestamp + nonce + sign
 
 use chrono::{DateTime, Utc};
 use salvo_oapi::ToSchema;
@@ -6,12 +10,15 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// API Key
+///
+/// api_key 既是记录标识也是签名密钥。
+/// 前端持有 api_key 用于签名，后端通过 user_id 查库获取 api_key 验签。
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct ApiKey {
     pub id: i64,
     pub user_id: i64,
+    /// 签名密钥（随机文本）。前端持有此值计算签名，但不随请求传输。
     pub api_key: String,
-    pub api_secret: String,
     pub name: String,
     pub permissions: serde_json::Value,
     pub rate_limit: i32,
@@ -45,13 +52,13 @@ pub struct CreateApiKeyRequest {
     pub expires_in_days: Option<i32>,
 }
 
-/// API Key 响应
+/// API Key 响应（登录/创建时返回给前端）
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiKeyResponse {
     pub id: i64,
     pub name: String,
+    /// 签名密钥。前端保存此值用于后续 API 调用签名。
     pub api_key: String,
-    pub api_secret: Option<String>,
     pub permissions: Vec<String>,
     pub rate_limit: i32,
     pub last_used_at: Option<DateTime<Utc>>,

@@ -49,7 +49,6 @@ export interface UserInfo {
 /** Session 数据 */
 export interface SessionData {
   api_key: string
-  api_secret?: string
   expires_at?: string
 }
 

@@ -27,7 +27,6 @@ export interface LoginResponse {
   user_info?: Partial<User>
   session_data?: {
     api_key: string
-    api_secret?: string
     expires_at?: string
   }
 }
@@ -45,7 +44,6 @@ export interface RegisterResponse {
   user_info?: Partial<User>
   session_data?: {
     api_key: string
-    api_secret?: string
     expires_at?: string
   }
 }

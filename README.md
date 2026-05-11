@@ -207,30 +207,49 @@ USDT 监听服务检测交易 → 匹配订单 → 确认支付
 
 所有受保护的 API 端点需要在 Query 参数中携带签名：
 
-| 参数 | 说明 |
-|------|------|
-| `api_key` | API Key (登录后获取) |
-| `timestamp` | 时间戳 (毫秒) |
-| `nonce` | 随机字符串 |
-| `sign` | MD5 签名 |
+| 参数 | 说明 | 传输？ |
+|------|------|--------|
+| `user_id` | 用户 ID（公开标识符） | ✅ 传输 |
+| `timestamp` | 时间戳 (毫秒) | ✅ 传输 |
+| `nonce` | 随机字符串 (6位) | ✅ 传输 |
+| `sign` | MD5 签名 | ✅ 传输 |
+| `api_key` | API 密钥（签名密钥） | ❌ **不传输** |
 
-### 签名算法
+### 签名算法（Cregis 单密钥方案）
 
 ```
 1. 排除 sign 参数，按 key ASCII 升序排序
-2. 拼接: api_secret + key1 + value1 + key2 + value2 + ...
-3. MD5 计算并转小写 hex
+2. 拼接: key1 + value1 + key2 + value2 + ...
+3. 将 api_key 拼接到字符串最前面（Cregis 方案）
+4. MD5 计算并转小写 hex
 ```
 
-### 示例
+> **注意**: `api_key` 是签名密钥，**不传输**；`user_id` 是公开标识符，**传输**，用于查库获取 `api_key`。
+
+### 示例（Cregis 方案）
 
 ```
-参数: api_key=test&timestamp=1234567890&nonce=abc123
-API Secret: my_secret
+API Key（密钥，不传输）: f502a9ac9ca54327986f29c03b271491
 
-排序后: api_key, nonce, timestamp
-拼接: my_secret + api_key + test + nonce + abc123 + timestamp + 1234567890
-MD5: f6b5f8c3e2a1d4c7b9e0f1a2b3c4d5e6
+签名输入（API Key 前置到排序参数）:
+f502a9ac9ca54327986f29c03b271491  ← API Key（密钥）
++ address=TXsmKpEuW7qWnXzJLGP9eDLvWPR2GRn1FS
++ amount=1.1
++ nonce=hwlkk6
++ timestamp=1688004243314
+→ MD5 → sign = d6eef2de79e39f434a38efb910213ba6
+```
+
+**最终发送的请求**（包含 `sign`，**不包含 `api_key`**）:
+```json
+{
+  "user_id": 123,
+  "address": "TXsmKpEuW7qWnXzJLGP9eDLvWWPR2GRn1FS",
+  "amount": "1.1",
+  "nonce": "hwlkk6",
+  "timestamp": 1688004243314,
+  "sign": "d6eef2de79e39f434a38efb910213ba6"
+}
 ```
 
 ### 时间戳验证
@@ -238,23 +257,45 @@ MD5: f6b5f8c3e2a1d4c7b9e0f1a2b3c4d5e6
 - 允许 ±5 分钟偏差
 - 防止请求被重放攻击
 
-### 前端实现
+### 前端实现（Cregis 单密钥方案）
 
 ```typescript
-import CryptoJS from 'crypto-js';
+import { MD5 } from 'crypto-js';
 
-function generateSignature(params: Record<string, string>, apiSecret: string): string {
+interface SignParams {
+  [key: string]: string;
+}
+
+function generateSignParams(params: SignParams, apiKey: string): SignParams {
+  // 1. 添加防重放字段
+  params['timestamp'] = Date.now().toString();
+  params['nonce'] = Math.random().toString(36).substring(2, 8);
+  
+  // 2. 排除 sign，按 key ASCII 升序排序
   const keys = Object.keys(params)
     .filter(key => key !== 'sign')
     .sort();
   
+  // 3. 拼接参数字符串（key + value）
   const paramStr = keys.map(key => key + params[key]).join('');
-  const signStr = apiSecret + paramStr;
-  return CryptoJS.MD5(signStr).toString();
+  
+  // 4. 将 apiKey 拼到最前面（Cregis 方案）
+  const signStr = apiKey + paramStr;
+  
+  // 5. MD5 + 小写 hex
+  params['sign'] = MD5(signStr).toString();
+  
+  return params;
 }
+
+// 使用示例
+const apiKey = localStorage.getItem('apiKey'); // api_key，不传输
+const params = { user_id: '123', page: '1', size: '20' };
+const signedParams = generateSignParams(params, apiKey);
+// signedParams 包含 sign，不包含 apiKey
 ```
 
-### 后端验证
+### 后端验证（Cregis 单密钥方案）
 
 Rust 实现使用 `md5` crate:
 
@@ -262,18 +303,51 @@ Rust 实现使用 `md5` crate:
 use std::collections::HashMap;
 use md5;
 
-fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> String {
+/// 计算签名（Cregis 方案：api_key 前置）
+fn compute_signature(params: &HashMap<String, String>, api_key: &str) -> String {
+    // 1. 获取所有 key（排除 sign），排序
     let mut keys: Vec<&String> = params.keys()
         .filter(|k| (*k).as_str() != "sign")
         .collect();
     keys.sort();
     
-    let param_str: String = keys.iter()
+    // 2. 按 ASCII 顺序拼接 key + value
+    let param_str: String = keys
+        .iter()
         .map(|k| format!("{}{}", k, params[*k]))
         .collect();
     
-    let sign_str = format!("{}{}", api_secret, param_str);
+    // 3. api_key 拼在最前面（Cregis 方案）
+    let sign_str = format!("{}{}", api_key, param_str);
+    
+    // 4. MD5 + 小写 hex
     format!("{:x}", md5::compute(sign_str.as_bytes()))
+}
+
+/// 验证签名
+async fn verify_signature(
+    user_id: i64,
+    params: &HashMap<String, String>,
+    sign: &str,
+) -> Result<i64, RswsError> {
+    // 1. 通过 user_id 查找 api_key
+    let api_key_record = api_key_repo
+        .get_active_key_by_user_id(user_id)
+        .await?
+        .ok_or_else(|| RswsError::business(ErrorCode::AUTH_INVALID_API_KEY))?;
+    
+    // 2. 重算签名
+    let computed_sign = compute_signature(params, &api_key_record.api_key);
+    
+    // 3. 对比签名
+    if computed_sign != sign {
+        return Err(RswsError::business(ErrorCode::AUTH_INVALID_SIGNATURE));
+    }
+    
+    // 4. 更新最后使用时间
+    api_key_repo.update_last_used(api_key_record.id).await?;
+    
+    Ok(user_id)
 }
 ```
 

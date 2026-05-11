@@ -124,11 +124,11 @@ pub struct UserInfo {
     pub is_active: bool,
 }
 
-/// 会话数据
+/// 会话数据（Cregis 单密钥方案）
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SessionData {
+    /// 签名密钥（前端持有，不随请求传输）
     pub api_key: String,
-    pub api_secret: String,
     pub expires_at: DateTime<Utc>,
 }
 

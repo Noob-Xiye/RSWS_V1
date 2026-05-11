@@ -1,14 +1,12 @@
 //! 用户服务
 
-use chrono::{Duration, Utc};
 use rsws_common::email::EmailService;
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_common::password::PasswordService;
-use rsws_common::snowflake;
 use rsws_db::{RedisService, UserRepository};
 use rsws_model::user_models::user::{
-    LoginRequest, LoginResponse, RegisterRequest, SessionData, User, UserInfo,
+    LoginRequest, LoginResponse, RegisterRequest, User, UserInfo,
 };
 use rsws_model::user_models::AdminUserView;
 use tracing::{info, warn};
@@ -229,12 +227,10 @@ impl UserService {
     }
 
     /// 创建登录响应
+    ///
+    /// 注意：session_data 由 handler 层通过 api_key_service.create() 生成并附加
+    /// 这样确保 api_key 正确持久化到数据库，供后续验签查找
     async fn create_login_response(&self, user: User) -> Result<LoginResponse, RswsError> {
-        // 生成会话
-        let api_key = format!("ak_{}", snowflake::next_id());
-        let api_secret = format!("sk_{}", snowflake::next_id());
-        let expires_at = Utc::now() + Duration::days(7);
-
         info!("User logged in: {} ({})", user.id, user.username);
 
         Ok(LoginResponse {
@@ -248,11 +244,7 @@ impl UserService {
                 avatar_url: user.avatar_url.clone(),
                 is_active: user.is_active,
             }),
-            session_data: Some(SessionData {
-                api_key,
-                api_secret,
-                expires_at,
-            }),
+            session_data: None, // handler 层填充
         })
     }
 

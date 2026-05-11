@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getApiKey, getApiSecret, removeApiKey, removeApiSecret } from '@/utils/storage'
+import { getApiKey, getAdminId, removeApiKey, removeAdminId } from '@/utils/storage'
 import { generateSignParams } from '@/utils/signature'
 
 // API 基础地址
@@ -17,21 +17,26 @@ const request = axios.create({
 // 请求拦截器 - 添加 API Key 签名 (Cregis 方案)
 request.interceptors.request.use(async (config) => {
   const apiKey = getApiKey()
-  const apiSecret = getApiSecret()
+  const adminId = getAdminId()
   
-  if (apiKey && apiSecret) {
+  if (apiKey && adminId) {
     // 生成签名参数 (Cregis 方案)
+    // 注意：只传 admin_id（后端存为 user_id），不传 api_key
     const signParams = generateSignParams({
+      adminId,
       apiKey,
-      apiSecret,
       path: config.url || '/',
       body: config.data,
     })
     
     // 将签名参数添加到查询参数
+    // 注意：不包含 api_key！api_key 只用于计算签名
     config.params = {
       ...config.params,
-      ...signParams,
+      user_id: signParams.user_id,
+      timestamp: signParams.timestamp,
+      nonce: signParams.nonce,
+      sign: signParams.sign,
     }
   }
   
@@ -51,7 +56,7 @@ request.interceptors.response.use(
       // 401 未授权，跳转登录
       if (response.status === 401) {
         removeApiKey()
-        removeApiSecret()
+        removeAdminId()
         window.location.href = '/login'
       }
       return Promise.reject(response.data || { message: '请求失败' })

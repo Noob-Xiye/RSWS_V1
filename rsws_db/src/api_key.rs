@@ -1,4 +1,9 @@
 //! API Key 仓储层
+//!
+//! 新设计（Cregis 方案）：
+//! - api_key: 签名密钥，前端持有用于签名，不随请求传输
+//! - 后端通过 user_id 查找 api_key 用于验签
+//! - 不再需要 api_secret
 
 use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
@@ -18,26 +23,18 @@ impl ApiKeyRepository {
         Self { pool }
     }
 
-    /// 生成 API Key 和 Secret
-    fn generate_credentials() -> (String, String) {
+    /// 生成 API Key（作为签名密钥使用）
+    ///
+    /// 格式：ak_ + base64(random 32 bytes)
+    /// 前端持有此值用于计算签名，但不随请求传输。
+    fn generate_credentials() -> String {
         use rand::SeedableRng;
         let mut rng = rand::rngs::StdRng::from_os_rng();
-
-        // 生成 32 字节的随机数据作为 API Key
         let api_key_bytes: [u8; 32] = rng.random();
-        let api_key = format!(
+        format!(
             "ak_{}",
             general_purpose::URL_SAFE_NO_PAD.encode(api_key_bytes)
-        );
-
-        // 生成 64 字节的随机数据作为 API Secret
-        let secret_bytes: [u8; 64] = rng.random();
-        let api_secret = format!(
-            "sk_{}",
-            general_purpose::URL_SAFE_NO_PAD.encode(secret_bytes)
-        );
-
-        (api_key, api_secret)
+        )
     }
 
     /// 创建 API Key
@@ -45,8 +42,8 @@ impl ApiKeyRepository {
         &self,
         user_id: i64,
         request: &CreateApiKeyRequest,
-    ) -> Result<(ApiKey, String), RswsError> {
-        let (api_key, api_secret) = Self::generate_credentials();
+    ) -> Result<ApiKey, RswsError> {
+        let api_key = Self::generate_credentials();
 
         // 计算过期时间
         let expires_at = request
@@ -58,14 +55,13 @@ impl ApiKeyRepository {
 
         let api_key_record = sqlx::query_as::<_, ApiKey>(
             r#"
-            INSERT INTO api_keys (user_id, api_key, api_secret, name, permissions, rate_limit, expires_at, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW(), NOW())
-            RETURNING id, user_id, api_key, api_secret, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at
+            INSERT INTO api_keys (user_id, api_key, name, permissions, rate_limit, expires_at, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, true, NOW(), NOW())
+            RETURNING id, user_id, api_key, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at
             "#
         )
         .bind(user_id)
         .bind(&api_key)
-        .bind(&api_secret)
         .bind(&request.name)
         .bind(&permissions_json)
         .bind(request.rate_limit.unwrap_or(1000))
@@ -74,13 +70,13 @@ impl ApiKeyRepository {
         .await
         .map_err(|e| RswsError::internal(format!("Failed to create API key: {}", e)))?;
 
-        Ok((api_key_record, api_secret))
+        Ok(api_key_record)
     }
 
-    /// 根据 API Key 获取记录
+    /// 根据 API Key 获取记录（保留，用于旧 Header 兼容）
     pub async fn get_by_api_key(&self, api_key: &str) -> Result<Option<ApiKey>, RswsError> {
         let api_key_record = sqlx::query_as::<_, ApiKey>(
-            "SELECT id, user_id, api_key, api_secret, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at FROM api_keys WHERE api_key = $1 AND is_active = true"
+            "SELECT id, user_id, api_key, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at FROM api_keys WHERE api_key = $1 AND is_active = true"
         )
         .bind(api_key)
         .fetch_optional(&self.pool)
@@ -90,25 +86,46 @@ impl ApiKeyRepository {
         Ok(api_key_record)
     }
 
-    /// 验证 API Key 和 Secret
+    /// 根据 user_id 获取活跃的 API Key（用于签名验证）
+    ///
+    /// Cregis 方案：前端传 user_id，后端用 user_id 查找 api_key 验签
+    pub async fn get_active_key_by_user_id(&self, user_id: i64) -> Result<Option<ApiKey>, RswsError> {
+        let api_key_record = sqlx::query_as::<_, ApiKey>(
+            r#"
+            SELECT id, user_id, api_key, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at
+            FROM api_keys 
+            WHERE user_id = $1 AND is_active = true
+            AND (expires_at IS NULL OR expires_at > NOW())
+            ORDER BY created_at DESC
+            LIMIT 1
+            "#
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get API key by user_id: {}", e)))?;
+
+        Ok(api_key_record)
+    }
+
+    /// 验证 API Key（旧方式，保留用于降级兼容）
+    /// 现在只验证 api_key 是否存在且活跃，不再验证 api_secret
     pub async fn validate(
         &self,
         api_key: &str,
-        api_secret: &str,
     ) -> Result<Option<ApiKey>, RswsError> {
         let api_key_record = sqlx::query_as::<_, ApiKey>(
             r#"
-            SELECT id, user_id, api_key, api_secret, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at
+            SELECT id, user_id, api_key, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at
             FROM api_keys 
-            WHERE api_key = $1 AND api_secret = $2 AND is_active = true
+            WHERE api_key = $1 AND is_active = true
             AND (expires_at IS NULL OR expires_at > NOW())
             "#
         )
         .bind(api_key)
-        .bind(api_secret)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| RswsError::internal(format!("Failed to validate credentials: {}", e)))?;
+        .map_err(|e| RswsError::internal(format!("Failed to validate API key: {}", e)))?;
 
         Ok(api_key_record)
     }
@@ -127,7 +144,7 @@ impl ApiKeyRepository {
     /// 获取用户的所有 API Key
     pub async fn get_user_api_keys(&self, user_id: i64) -> Result<Vec<ApiKey>, RswsError> {
         let api_keys = sqlx::query_as::<_, ApiKey>(
-            "SELECT id, user_id, api_key, api_secret, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC"
+            "SELECT id, user_id, api_key, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC"
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -173,7 +190,7 @@ impl ApiKeyRepository {
     /// 获取用户所有活跃 API Key（用于 Redis 缓存清理）
     pub async fn get_active_keys_by_user(&self, user_id: i64) -> Result<Vec<ApiKey>, RswsError> {
         let keys = sqlx::query_as::<_, ApiKey>(
-            "SELECT id, user_id, api_key, api_secret, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at FROM api_keys WHERE user_id = $1 AND is_active = true"
+            "SELECT id, user_id, api_key, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at FROM api_keys WHERE user_id = $1 AND is_active = true"
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -191,20 +208,17 @@ mod tests {
 
     #[test]
     fn test_generate_credentials() {
-        let (api_key, api_secret) = ApiKeyRepository::generate_credentials();
+        let api_key = ApiKeyRepository::generate_credentials();
 
         assert!(api_key.starts_with("ak_"));
-        assert!(api_secret.starts_with("sk_"));
         assert!(api_key.len() > 10);
-        assert!(api_secret.len() > 10);
     }
 
     #[test]
     fn test_generate_credentials_unique() {
-        let (key1, secret1) = ApiKeyRepository::generate_credentials();
-        let (key2, secret2) = ApiKeyRepository::generate_credentials();
+        let key1 = ApiKeyRepository::generate_credentials();
+        let key2 = ApiKeyRepository::generate_credentials();
 
         assert_ne!(key1, key2);
-        assert_ne!(secret1, secret2);
     }
 }
