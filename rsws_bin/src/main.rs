@@ -16,11 +16,47 @@ use rsws_common::error::RswsError;
 use sqlx::postgres::PgPoolOptions;
 use tracing::{info, error, warn};
 use rsws_db::RedisPool;
+use tracing_subscriber::EnvFilter;
+
+/// 初始化结构化日志
+///
+/// 支持环境变量控制:
+/// - `RUST_LOG`: 日志级别过滤 (e.g., "info,rsws=debug")
+/// - `LOG_FORMAT`: 输出格式，"json" (默认) 或 "pretty" (开发)
+fn init_logging() {
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+
+    let format = std::env::var("LOG_FORMAT").unwrap_or_else(|_| "json".to_string());
+
+    if format == "pretty" {
+        // 开发环境：彩色可读格式
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .with_target(true)
+            .with_thread_ids(true)
+            .with_line_number(true)
+            .pretty()
+            .init();
+    } else {
+        // 生产环境：JSON 结构化格式
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .with_target(true)
+            .with_thread_ids(true)
+            .with_line_number(true)
+            .json()
+            .init();
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), RswsError> {
-    // 初始化日志
-    tracing_subscriber::fmt::init();
+    // 初始化结构化日志
+    init_logging();
+
+    // 尝试从 .env 文件加载环境变量（开发环境使用，生产环境忽略）
+    dotenvy::dotenv().ok();
 
     info!("Starting RSWS server...");
 
@@ -156,6 +192,7 @@ async fn main() -> Result<(), RswsError> {
     // 创建 AppState
     let app_state = AppState::new(
         pool.clone(),
+        config.clone(),
         user_service,
         order_service,
         resource_service,

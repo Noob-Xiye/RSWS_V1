@@ -8,6 +8,7 @@ use rsws_common::password::PasswordService;
 use rsws_common::snowflake;
 use rsws_db::{RedisService, UserRepository};
 use rsws_model::user_models::user::{User, LoginRequest, LoginResponse, UserInfo, SessionData, RegisterRequest};
+use rsws_model::user_models::AdminUserView;
 use tracing::{info, warn};
 
 /// 用户服务
@@ -425,6 +426,27 @@ impl UserService {
 
         info!("User {} activated by admin", user_id);
         Ok(())
+    }
+
+    /// 获取用户列表（管理员分页查询）
+    pub async fn list_users(
+        &self,
+        page: i64,
+        page_size: i64,
+        email: Option<&str>,
+        username: Option<&str>,
+        is_active: Option<bool>,
+    ) -> Result<(Vec<AdminUserView>, i64), RswsError> {
+        let users = self.user_repo
+            .get_users(page, page_size, email, username, is_active)
+            .await?
+            .into_iter()
+            .map(AdminUserView::from)
+            .collect();
+        let total = self.user_repo
+            .get_users_count(email, username, is_active)
+            .await?;
+        Ok((users, total))
     }
 }
 

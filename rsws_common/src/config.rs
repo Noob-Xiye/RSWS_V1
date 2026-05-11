@@ -16,6 +16,11 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub cors_origins: Vec<String>,
+    /// 可信代理 IP 列表（用于获取真实客户端 IP）
+    /// 生产环境应配置 Nginx/Cloudflare 等 CDN 的 IP
+    /// 开发环境可配置为空或 ["127.0.0.1"]
+    #[serde(default)]
+    pub trusted_proxies: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

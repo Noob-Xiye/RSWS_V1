@@ -5,6 +5,7 @@
 use std::sync::Arc;
 use salvo::prelude::*;
 use sqlx::PgPool;
+use rsws_common::config::AppConfig;
 use rsws_service::{
     UserService, OrderService, ResourceService,
     ApiKeyService, PayPalService, BlockchainService,
@@ -18,6 +19,7 @@ use rsws_db::CategoryRepository;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    pub config: AppConfig,
     pub user_service: Arc<UserService>,
     pub order_service: Arc<OrderService>,
     pub resource_service: Arc<ResourceService>,
@@ -37,6 +39,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(
         pool: PgPool,
+        config: AppConfig,
         user_service: UserService,
         order_service: OrderService,
         resource_service: ResourceService,
@@ -54,6 +57,7 @@ impl AppState {
     ) -> Self {
         Self {
             pool: pool.clone(),
+            config,
             user_service: Arc::new(user_service),
             order_service: Arc::new(order_service),
             resource_service: Arc::new(resource_service),

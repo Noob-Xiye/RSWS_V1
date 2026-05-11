@@ -4,6 +4,7 @@
 //! 认证统一走 API Key,不使用 JWT
 //! Admin API Key 凭证缓存到 Redis(快速验证 + 强制下线)
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use rsws_common::error::RswsError;
 use rsws_common::ErrorCode;
@@ -480,4 +481,88 @@ impl AdminService {
             }
         }
     }
+
+    /// 验证管理员签名认证（符合 Cregis 方案）
+    pub async fn validate_admin_api_key_signature(
+        &self,
+        api_key: &str,
+        params: &HashMap<String, String>,
+        sign: &str,
+    ) -> Result<Option<(AdminApiKey, Admin)>, RswsError> {
+        // 1) 获取 api_secret（先查 Redis 缓存）
+        let api_secret = if let Some(ref redis) = self.redis {
+            if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&Self::redis_key(api_key)).await? {
+                Some(cached.api_secret)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let api_secret = match api_secret {
+            Some(s) => s,
+            None => {
+                // Redis miss，从 DB 获取
+                let record = self.admin_repo.get_admin_api_key_by_key(api_key).await?;
+                match record {
+                    Some(r) => {
+                        // 写入 Redis 缓存
+                        if let Some(ref redis) = self.redis {
+                            let permissions: Vec<String> = serde_json::from_value(r.permissions.clone())
+                                .unwrap_or_default();
+                            let cached = CachedAdminApiKey {
+                                admin_id: r.admin_id,
+                                key_id: r.id,
+                                api_secret: r.api_secret_encrypted.clone(),
+                                role: String::new(),
+                                permissions,
+                                rate_limit: r.rate_limit,
+                                expires_at: r.expires_at,
+                            };
+                            let _ = redis.set_json(&Self::redis_key(api_key), &cached, Self::DEFAULT_SESSION_TTL).await;
+                        }
+                        r.api_secret_encrypted
+                    }
+                    None => return Ok(None),
+                }
+            }
+        };
+
+        // 2) 重算签名
+        let computed_sign = compute_signature(params, &api_secret);
+
+        // 3) 对比签名
+        if computed_sign == sign {
+            // 签名正确，获取完整的记录
+            let result = self.admin_repo.validate_admin_api_key(api_key, &api_secret).await?;
+            Ok(result)
+        } else {
+            tracing::warn!(
+                "Admin signature mismatch for api_key: {}. Expected: {}, Got: {}",
+                api_key, computed_sign, sign
+            );
+            Ok(None)
+        }
+    }
+}
+
+/// 计算签名（符合 Cregis 方案）
+fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> String {
+    // 1. 获取所有 key（排除 sign），排序
+    let mut keys: Vec<&String> = params.keys()
+        .filter(|k| (*k).as_str() != "sign")
+        .collect();
+    keys.sort();
+
+    // 2. 按 ASCII 顺序拼接 key + value
+    let param_str: String = keys.iter()
+        .map(|k| format!("{}{}", k, params[*k]))
+        .collect();
+
+    // 3. 拼接 api_secret（拼在前面，与 Cregis 方案一致）
+    let sign_str = format!("{}{}", api_secret, param_str);
+
+    // 4. MD5 + 小写 hex
+    format!("{:x}", md5::compute(sign_str.as_bytes()))
 }

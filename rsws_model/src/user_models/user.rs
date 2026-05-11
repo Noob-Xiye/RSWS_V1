@@ -132,6 +132,30 @@ pub struct SessionData {
     pub expires_at: DateTime<Utc>,
 }
 
+/// 管理员视图用户信息（分页列表用）
+#[derive(Debug, Serialize, ToSchema, FromRow)]
+pub struct AdminUserView {
+    pub id: i64,
+    pub email: String,
+    pub username: String,
+    pub avatar_url: Option<String>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<User> for AdminUserView {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            avatar_url: user.avatar_url,
+            is_active: user.is_active,
+            created_at: user.created_at,
+        }
+    }
+}
+
 // ==================== 单元测试 ====================
 
 #[cfg(test)]

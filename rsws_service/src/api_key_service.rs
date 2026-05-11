@@ -4,7 +4,9 @@
 //! 禁用 key → 删 Redis 缓存 → 强制下线。
 //! 改密码 → 清用户所有 Redis API Key 缓存。
 
+use std::collections::HashMap;
 use std::sync::Arc;
+use md5;
 use rsws_db::{ApiKeyRepository, RedisService};
 use rsws_model::api_key::{ApiKey, CreateApiKeyRequest, ApiKeyResponse};
 use rsws_common::error::RswsError;
@@ -229,4 +231,99 @@ impl ApiKeyService {
 
         Ok(())
     }
+
+    /// 验证签名认证（符合 Cregis 方案）
+    ///
+    /// 流程：
+    /// 1. 用 api_key 查 DB 获取 api_secret
+    /// 2. 用同样算法重算签名
+    /// 3. 对比签名，一致则通过
+    pub async fn validate_signature(
+        &self,
+        api_key: &str,
+        params: &HashMap<String, String>,
+        sign: &str,
+    ) -> Result<Option<ApiKey>, RswsError> {
+        // 1) 获取 api_secret（先查 Redis 缓存）
+        let api_secret = if let Some(ref redis) = self.redis {
+            if let Some(cached) = redis.get_json::<CachedApiKey>(&Self::redis_key(api_key)).await? {
+                Some(cached.api_secret)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let api_secret = match api_secret {
+            Some(s) => s,
+            None => {
+                // Redis miss，从 DB 获取
+                let record = self.repository.get_by_api_key(api_key).await?;
+                match record {
+                    Some(r) => {
+                        // 写入 Redis 缓存
+                        if let Some(ref redis) = self.redis {
+                            let permissions: Vec<String> = serde_json::from_value(r.permissions.clone())
+                                .unwrap_or_default();
+                            let cached = CachedApiKey {
+                                user_id: r.user_id,
+                                api_key_id: r.id,
+                                api_secret: r.api_secret.clone(),
+                                permissions,
+                                rate_limit: r.rate_limit,
+                                expires_at: r.expires_at,
+                            };
+                            let ttl = self.session_ttl().await;
+                            let _ = redis.set_json(&Self::redis_key(api_key), &cached, ttl).await;
+                        }
+                        r.api_secret
+                    }
+                    None => return Ok(None),
+                }
+            }
+        };
+
+        // 2) 重算签名
+        let computed_sign = compute_signature(params, &api_secret);
+
+        // 3) 对比签名
+        if computed_sign == sign {
+            // 签名正确，获取完整的 ApiKey 记录
+            let record = self.repository.get_by_api_key(api_key).await?;
+            Ok(record)
+        } else {
+            tracing::warn!(
+                "Signature mismatch for api_key: {}. Expected: {}, Got: {}",
+                api_key, computed_sign, sign
+            );
+            Ok(None)
+        }
+    }
+}
+
+/// 计算签名（符合 Cregis 方案）
+///
+/// 算法：
+/// 1. 排除 sign 字段，按 key ASCII 升序排序
+/// 2. 拼接参数字符串（key + value）
+/// 3. 拼接 api_secret 到字符串末尾
+/// 4. MD5 计算并转小写 hex
+fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> String {
+    // 1. 获取所有 key（排除 sign），排序
+    let mut keys: Vec<&String> = params.keys()
+        .filter(|k| (*k).as_str() != "sign")
+        .collect();
+    keys.sort();
+
+    // 2. 按 ASCII 顺序拼接 key + value
+    let param_str: String = keys.iter()
+        .map(|k| format!("{}{}", k, params[*k]))
+        .collect();
+
+    // 3. 拼接 api_secret（拼在前面，与 Cregis 方案一致）
+    let sign_str = format!("{}{}", api_secret, param_str);
+
+    // 4. MD5 + 小写 hex
+    format!("{:x}", md5::compute(sign_str.as_bytes()))
 }

@@ -68,9 +68,20 @@ struct TronTxData {
 impl TronClient {
     /// 创建新客户端
     pub fn new(config: &UsdtConfig) -> Self {
+        // 强制使用 HTTPS 防止 API Key 和交易数据在传输中被截获
+        let api_url = if config.api_url.starts_with("https://") {
+            config.api_url.clone()
+        } else {
+            tracing::warn!(
+                "[Security] TronGrid API URL should use HTTPS. Got: {}. Forcing HTTPS.",
+                config.api_url
+            );
+            config.api_url.replace("http://", "https://")
+        };
+
         Self {
             client: Client::new(),
-            api_url: config.api_url.clone(),
+            api_url,
             api_key: config.api_key.clone(),
             usdt_contract: config.usdt_contract.clone(),
             min_confirmations: config.min_confirmations,

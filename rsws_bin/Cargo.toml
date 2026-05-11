@@ -16,6 +16,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 config = { workspace = true }
+dotenvy = { workspace = true }
 
 [[bin]]
 name = "rsws"

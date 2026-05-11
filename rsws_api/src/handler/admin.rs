@@ -1,7 +1,11 @@
 //! 管理员处理器
 //!
 //! 管理员登录、CRUD、API Key 管理
-//! 认证统一走 API Key，handler 内检查 is_admin 标识
+//!
+//! **权限说明：**
+//! - 所有 handler 已通过 `require_admin` 中间件保护
+//! - 中间件确保 `is_admin == true` 才能访问
+//! - handler 内部无需再检查权限
 
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
@@ -76,15 +80,6 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     )
 )]
 pub async fn get_current_admin(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    // 检查是否管理员
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let admin_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
         Err(_) => {
@@ -119,14 +114,6 @@ pub struct CreateAdminBody {
     )
 )]
 pub async fn create_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let operator_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
         Err(_) => {
@@ -184,14 +171,6 @@ pub async fn create_admin(req: &mut Request, depot: &mut Depot, res: &mut Respon
     )
 )]
 pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let page: i64 = req.query("page").unwrap_or(1);
     let page_size: i64 = req.query("page_size").unwrap_or(20);
     let role: Option<String> = req.query("role");
@@ -225,14 +204,6 @@ pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Respons
     )
 )]
 pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
         res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid admin ID");
@@ -258,14 +229,6 @@ pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response)
     )
 )]
 pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let id: i64 = req.param("id").unwrap_or(0);
     let operator_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
@@ -307,14 +270,6 @@ pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Re
     )
 )]
 pub async fn activate_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let operator_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
         Err(_) => {
@@ -356,14 +311,6 @@ pub async fn activate_admin(req: &mut Request, depot: &mut Depot, res: &mut Resp
     )
 )]
 pub async fn reset_admin_password(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let operator_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
         Err(_) => {
@@ -425,14 +372,6 @@ pub struct CreateAdminApiKeyBody {
     )
 )]
 pub async fn create_api_key(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let admin_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
         Err(_) => {
@@ -474,14 +413,6 @@ pub async fn create_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
     )
 )]
 pub async fn list_api_keys(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let admin_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
         Err(_) => {
@@ -509,14 +440,6 @@ pub async fn list_api_keys(_req: &mut Request, depot: &mut Depot, res: &mut Resp
     )
 )]
 pub async fn delete_api_key(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let admin_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
         Err(_) => {
@@ -608,14 +531,6 @@ pub async fn toggle_api_key_status(req: &mut Request, depot: &mut Depot, res: &m
     )
 )]
 pub async fn list_log_configs(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let state = get_state(depot);
     match state.log_service.list_log_configs().await {
         Ok(configs) => res.success(configs),
@@ -635,14 +550,6 @@ pub async fn list_log_configs(_req: &mut Request, depot: &mut Depot, res: &mut R
     )
 )]
 pub async fn get_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let key: String = req.param("key").unwrap_or_default();
     if key.is_empty() {
         res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Config key is required");
@@ -675,14 +582,6 @@ pub struct SetLogConfigBody {
     )
 )]
 pub async fn create_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let body: Result<SetLogConfigBody, _> = req.parse_json().await;
     match body {
         Ok(data) => {
@@ -729,14 +628,6 @@ pub struct UpdateLogConfigBody {
     )
 )]
 pub async fn update_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let key: String = req.param("key").unwrap_or_default();
     if key.is_empty() {
         res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Config key is required");
@@ -776,14 +667,6 @@ pub async fn update_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
     )
 )]
 pub async fn delete_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let key: String = req.param("key").unwrap_or_default();
     if key.is_empty() {
         res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Config key is required");
@@ -814,14 +697,6 @@ pub async fn delete_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
     )
 )]
 pub async fn query_system_logs(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let level: Option<String> = req.query("level");
     let page: i64 = req.query("page").unwrap_or(1);
     let page_size: i64 = req.query("page_size").unwrap_or(20);
@@ -865,14 +740,6 @@ pub struct UsdtWalletRequest {
     )
 )]
 pub async fn list_usdt_wallets(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let state = get_state(depot);
     match state.blockchain_service.list_usdt_wallets().await {
         Ok(wallets) => res.success(serde_json::json!({ "items": wallets })),
@@ -892,14 +759,6 @@ pub async fn list_usdt_wallets(_req: &mut Request, depot: &mut Depot, res: &mut 
     )
 )]
 pub async fn update_usdt_wallet(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let network: String = req.param("network").unwrap_or_else(|| "tron".to_string());
     if network != "tron" && network != "ethereum" {
         res.http_error(StatusCode::BAD_REQUEST, "Invalid network, use 'tron' or 'ethereum'");
@@ -931,81 +790,7 @@ pub async fn update_usdt_wallet(req: &mut Request, depot: &mut Depot, res: &mut 
     }
 }
 
-// ==================== 管理员用户管理 ====================
-
-/// 禁用用户（管理员操作）
-#[endpoint(
-    parameters(
-        ("id", description = "用户ID"),
-    ),
-    responses(
-        (status_code = 200, description = "禁用成功"),
-        (status_code = 403, description = "非管理员"),
-        (status_code = 404, description = "用户不存在"),
-    )
-)]
-pub async fn deactivate_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
-    let user_id: i64 = req.param("id").unwrap_or(0);
-    if user_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid user ID");
-        return;
-    }
-
-    let state = get_state(depot);
-    match state.user_service.deactivate_user(user_id).await {
-        Ok(()) => res.success(serde_json::json!({
-            "id": user_id,
-            "is_active": false,
-            "message": "User deactivated successfully"
-        })),
-        Err(e) => res.error(e),
-    }
-}
-
-/// 启用用户（管理员操作）
-#[endpoint(
-    parameters(
-        ("id", description = "用户ID"),
-    ),
-    responses(
-        (status_code = 200, description = "启用成功"),
-        (status_code = 403, description = "非管理员"),
-        (status_code = 404, description = "用户不存在"),
-    )
-)]
-pub async fn activate_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
-    let user_id: i64 = req.param("id").unwrap_or(0);
-    if user_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid user ID");
-        return;
-    }
-
-    let state = get_state(depot);
-    match state.user_service.activate_user(user_id).await {
-        Ok(()) => res.success(serde_json::json!({
-            "id": user_id,
-            "is_active": true,
-            "message": "User activated successfully"
-        })),
-        Err(e) => res.error(e),
-    }
-}
-
-// ==================== Dashboard 统计面板 ====================
+// ==================== // ==================== Dashboard 统计面板 ====================
 
 /// 获取 Dashboard 统计面板数据
 #[endpoint(
@@ -1015,14 +800,6 @@ pub async fn activate_user_handler(req: &mut Request, depot: &mut Depot, res: &m
     )
 )]
 pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let state = get_state(depot);
     let pool: PgPool = state.pool();
 
@@ -1107,12 +884,6 @@ pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Re
     )
 )]
 pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let state = get_state(depot);
     let pool = &state.pool;
 
@@ -1164,12 +935,6 @@ pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Respo
     )
 )]
 pub async fn deactivate_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
         res.http_error(StatusCode::BAD_REQUEST, "Invalid user ID");
@@ -1202,12 +967,6 @@ pub async fn deactivate_user(req: &mut Request, depot: &mut Depot, res: &mut Res
     )
 )]
 pub async fn activate_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
         res.http_error(StatusCode::BAD_REQUEST, "Invalid user ID");
@@ -1226,4 +985,46 @@ pub async fn activate_user(req: &mut Request, depot: &mut Depot, res: &mut Respo
             res.error(e);
         }
     }
+}
+
+/// 用户列表（管理员分页查询）
+#[endpoint(
+    parameters(
+        ("page", Query, description = "页码，默认1"),
+        ("page_size", Query, description = "每页条数，默认20"),
+        ("email", Query, description = "邮箱筛选（模糊匹配）"),
+        ("username", Query, description = "用户名筛选（模糊匹配）"),
+        ("is_active", Query, description = "是否启用筛选"),
+    ),
+    responses(
+        (status_code = 200, description = "获取成功"),
+        (status_code = 403, description = "无权限"),
+    )
+)]
+pub async fn list_users(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let state = get_state(depot);
+
+    let page: i64 = req.query::<i64>("page").unwrap_or(1).max(1);
+    let page_size: i64 = req.query::<i64>("page_size").unwrap_or(20).clamp(1, 100);
+    let email: Option<String> = req.query("email");
+    let username: Option<String> = req.query("username");
+    let is_active: Option<bool> = req.query::<bool>("is_active");
+
+    let (users, total) = match state.user_service
+        .list_users(page, page_size, email.as_deref(), username.as_deref(), is_active)
+        .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            res.error(e);
+            return;
+        }
+    };
+
+    res.success(serde_json::json!({
+        "data": users,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }));
 }

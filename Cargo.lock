@@ -1571,6 +1571,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "md5"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae960838283323069879657ca3de837e9f7bbb4c7bf6ea7f1b290d5e9476d2e0"
+
+[[package]]
 name = "memchr"
 version = "2.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2394,6 +2400,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "deadpool-redis",
+ "md5",
  "rsws_common",
  "rsws_db",
  "rsws_model",
@@ -2415,6 +2422,7 @@ version = "0.1.0"
 dependencies = [
  "config",
  "deadpool-redis",
+ "dotenvy",
  "rsws_api",
  "rsws_common",
  "rsws_db",
@@ -2498,6 +2506,7 @@ dependencies = [
  "deadpool-redis",
  "hmac",
  "lettre",
+ "md5",
  "rand 0.9.2",
  "reqwest",
  "rsws_common",
@@ -3782,6 +3791,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-serde"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "704b1aeb7be0d0a84fc9828cae51dab5970fee5088f83d1dd7ee6f6246fc6ff1"
+dependencies = [
+ "serde",
+ "tracing-core",
+]
+
+[[package]]
 name = "tracing-subscriber"
 version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3791,12 +3810,15 @@ dependencies = [
  "nu-ansi-term",
  "once_cell",
  "regex",
+ "serde",
+ "serde_json",
  "sharded-slab",
  "smallvec",
  "thread_local",
  "tracing",
  "tracing-core",
  "tracing-log",
+ "tracing-serde",
 ]
 
 [[package]]

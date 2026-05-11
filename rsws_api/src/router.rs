@@ -8,7 +8,8 @@ use salvo_cors::Any;
 use salvo::http::Method;
 use salvo_oapi::swagger_ui::SwaggerUi;
 use crate::handler;
-use crate::middleware::auth::{api_key_auth, rate_limit};
+use crate::middleware::auth::{api_key_auth, rate_limit, require_admin};
+use crate::middleware::request_id::request_id_middleware;
 use crate::state::AppState;
 
 /// 创建路由（带 State 注入 + OpenAPI 文档）
@@ -76,60 +77,65 @@ pub fn create_router(state: AppState) -> Router {
                     )
                 )
 
-                // 管理后台（同样使用 API Key 认证，handler 内检查 is_admin）
-                .push(Router::with_path("admin")
-                    .push(Router::new()
-                        .get(handler::admin::get_current_admin)
-                        .push(Router::with_path("list").get(handler::admin::list_admins))
-                        .push(Router::with_path("create").post(handler::admin::create_admin))
-                        .push(Router::with_path("api-keys")
-                            .get(handler::admin::list_api_keys)
-                            .post(handler::admin::create_api_key)
+                // 管理后台（需要 Admin 权限）
+                .push(
+                    Router::with_path("admin")
+                        .hoop(require_admin)  // 统一 Admin 权限检查
+                        // Dashboard
+                        .push(Router::with_path("dashboard/stats").get(handler::admin::dashboard_stats))
+                        .push(Router::with_path("dashboard/revenue-chart").get(handler::admin::revenue_chart))
+                        // 管理员管理
+                        .push(Router::new()
+                            .get(handler::admin::get_current_admin)
+                            .push(Router::with_path("list").get(handler::admin::list_admins))
+                            .push(Router::with_path("create").post(handler::admin::create_admin))
+                            .push(Router::with_path("api-keys")
+                                .get(handler::admin::list_api_keys)
+                                .post(handler::admin::create_api_key)
+                            )
+                            .push(Router::with_path("<key_id>/api-keys").delete(handler::admin::delete_api_key))
                         )
-                        .push(Router::with_path("<key_id>/api-keys").delete(handler::admin::delete_api_key))
+                        .push(Router::with_path("<id>")
+                            .get(handler::admin::get_admin)
+                            .push(Router::with_path("deactivate").post(handler::admin::deactivate_admin))
+                            .push(Router::with_path("activate").post(handler::admin::activate_admin))
+                            .push(Router::with_path("reset-password").post(handler::admin::reset_admin_password))
+                            .push(Router::with_path("api-keys/<key_id>")
+                                .put(handler::admin::toggle_api_key_status)
+                                .delete(handler::admin::delete_api_key))
+                        )
+                        // 用户管理
+                        .push(Router::with_path("user")
+                            .get(handler::admin::list_users)
+                            .push(Router::with_path("<id>/deactivate").post(handler::admin::deactivate_user))
+                            .push(Router::with_path("<id>/activate").post(handler::admin::activate_user))
+                        )
                         // 日志配置管理
                         .push(Router::with_path("log-configs")
                             .get(handler::admin::list_log_configs)
                             .post(handler::admin::create_log_config)
                         )
+                        .push(Router::with_path("log-configs/<key>")
+                            .get(handler::admin::get_log_config)
+                            .put(handler::admin::update_log_config)
+                            .delete(handler::admin::delete_log_config)
+                        )
                         // 日志查询
                         .push(Router::with_path("logs/system").get(handler::admin::query_system_logs))
-                        // Dashboard 统计
-                        .push(Router::with_path("dashboard/stats").get(handler::admin::dashboard_stats))
-                        .push(Router::with_path("dashboard/revenue-chart").get(handler::admin::revenue_chart))
-                        // 用户管理
-                        .push(Router::with_path("user/<id>/deactivate").post(handler::admin::deactivate_user))
-                        .push(Router::with_path("user/<id>/activate").post(handler::admin::activate_user))
-                    )
-                    .push(Router::with_path("<id>")
-                        .get(handler::admin::get_admin)
-                        .push(Router::with_path("deactivate").post(handler::admin::deactivate_admin))
-                        .push(Router::with_path("activate").post(handler::admin::activate_admin))
-                        .push(Router::with_path("reset-password").post(handler::admin::reset_admin_password))
-                        .push(Router::with_path("api-keys/<key_id>")
-                            .put(handler::admin::toggle_api_key_status)
-                            .delete(handler::admin::delete_api_key))
-                    )
-                    // 日志配置详情/更新/删除
-                    .push(Router::with_path("log-configs/<key>")
-                        .get(handler::admin::get_log_config)
-                        .put(handler::admin::update_log_config)
-                        .delete(handler::admin::delete_log_config)
-                    )
-                )
-                // USDT 钱包配置
-                .push(Router::with_path("usdt-wallets")
-                    .get(handler::admin::list_usdt_wallets)
-                    .push(Router::with_path("<network>").put(handler::admin::update_usdt_wallet))
-                )
-                // PayPal 配置管理
-                .push(Router::with_path("paypal-configs")
-                    .get(handler::admin_paypal::list_paypal_configs)
-                    .push(Router::with_path("<id>")
-                        .get(handler::admin_paypal::get_paypal_config)
-                        .put(handler::admin_paypal::update_paypal_config)
-                        .push(Router::with_path("active/<active>").post(handler::admin_paypal::set_paypal_config_active))
-                    )
+                        // USDT 钱包配置
+                        .push(Router::with_path("usdt-wallets")
+                            .get(handler::admin::list_usdt_wallets)
+                            .push(Router::with_path("<network>").put(handler::admin::update_usdt_wallet))
+                        )
+                        // PayPal 配置管理
+                        .push(Router::with_path("paypal-configs")
+                            .get(handler::admin_paypal::list_paypal_configs)
+                            .push(Router::with_path("<id>")
+                                .get(handler::admin_paypal::get_paypal_config)
+                                .put(handler::admin_paypal::update_paypal_config)
+                                .push(Router::with_path("active/<active>").post(handler::admin_paypal::set_paypal_config_active))
+                            )
+                        )
                 )
         )
 
@@ -158,15 +164,32 @@ pub fn create_router(state: AppState) -> Router {
     let doc = OpenApi::new("RSWS API", "0.1.0")
         .merge_router(&api_routes);
 
-    // CORS 中间件 — 允许前端跨域访问
-    let cors = Cors::new()
-        .allow_origin(Any)
-        .allow_methods(vec![Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
-        .allow_headers(vec!["Content-Type", "Authorization", "X-Api-Key", "X-Signature"])
-        .allow_credentials(true)
-        .max_age(3600);
+    // CORS 中间件 — 从配置读取允许的域名
+    let cors_origins = &state.config.server.cors_origins;
+    let cors = if cors_origins.contains(&"*".to_string()) || cors_origins.is_empty() {
+        // 开发模式：允许所有来源（不建议在生产环境使用）
+        tracing::warn!("CORS allow_origin set to '*' — not recommended for production");
+        Cors::new()
+            .allow_origin(Any)
+            .allow_methods(vec![Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+            .allow_headers(vec!["Content-Type", "Authorization", "X-Api-Key", "X-Signature"])
+            .allow_credentials(false)  // ⚠️ 当 allow_origin 为 * 时，必须为 false
+            .max_age(3600)
+    } else {
+        // 生产模式：仅允许配置的域名（取第一个，salvo-cors 单域名支持更好）
+        let allowed_origin = &cors_origins[0];
+        tracing::info!("CORS allow_origin set to: {}", allowed_origin);
+        Cors::new()
+            .allow_origin(allowed_origin.as_str())
+            .allow_methods(vec![Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+            .allow_headers(vec!["Content-Type", "Authorization", "X-Api-Key", "X-Signature"])
+            .allow_credentials(true)
+            .max_age(3600)
+    };
 
     Router::new()
+        // Request ID 追踪（所有请求）
+        .hoop(request_id_middleware)
         .hoop(cors.into_handler())
         .hoop(affix_state::inject(state))
         // Swagger UI

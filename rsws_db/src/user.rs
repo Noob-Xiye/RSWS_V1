@@ -173,6 +173,73 @@ impl UserRepository {
             }
         }
     }
+
+    /// 分页获取用户列表（管理员用）
+    pub async fn get_users(
+        &self,
+        page: i64,
+        page_size: i64,
+        email_filter: Option<&str>,
+        username_filter: Option<&str>,
+        is_active_filter: Option<bool>,
+    ) -> Result<Vec<User>, RswsError> {
+        let mut query_builder = sqlx::QueryBuilder::new("SELECT * FROM users WHERE 1=1 ");
+
+        if let Some(email) = email_filter {
+            query_builder.push(" AND email ILIKE ");
+            query_builder.push_bind(format!("%{}%", email));
+        }
+        if let Some(username) = username_filter {
+            query_builder.push(" AND username ILIKE ");
+            query_builder.push_bind(format!("%{}%", username));
+        }
+        if let Some(is_active) = is_active_filter {
+            query_builder.push(" AND is_active = ");
+            query_builder.push_bind(is_active);
+        }
+
+        query_builder.push(" ORDER BY id DESC LIMIT ");
+        query_builder.push_bind(page_size);
+        query_builder.push(" OFFSET ");
+        query_builder.push_bind((page.saturating_sub(1)).saturating_mul(page_size));
+
+        let query = query_builder.build_query_as::<User>();
+        query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to get users: {}", e)))
+    }
+
+    /// 获取用户总数
+    pub async fn get_users_count(
+        &self,
+        email_filter: Option<&str>,
+        username_filter: Option<&str>,
+        is_active_filter: Option<bool>,
+    ) -> Result<i64, RswsError> {
+        let mut query_builder = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM users WHERE 1=1 ");
+
+        if let Some(email) = email_filter {
+            query_builder.push(" AND email ILIKE ");
+            query_builder.push_bind(format!("%{}%", email));
+        }
+        if let Some(username) = username_filter {
+            query_builder.push(" AND username ILIKE ");
+            query_builder.push_bind(format!("%{}%", username));
+        }
+        if let Some(is_active) = is_active_filter {
+            query_builder.push(" AND is_active = ");
+            query_builder.push_bind(is_active);
+        }
+
+        let count: (i64,) = query_builder
+            .build_query_as()
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to count users: {}", e)))?;
+        Ok(count.0)
+    }
+
     /// 获取基础统计（用户总数 + 过去30天新增用户数）
     pub async fn get_basic_stats(&self) -> Result<(i64, i64), RswsError> {
         let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")

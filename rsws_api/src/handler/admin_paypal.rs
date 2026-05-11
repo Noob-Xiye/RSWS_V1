@@ -1,4 +1,8 @@
 //! PayPal 配置管理处理器
+//!
+//! **权限说明：**
+//! - 所有 handler 已通过 `require_admin` 中间件保护
+//! - handler 内部无需再检查权限
 
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
@@ -18,13 +22,6 @@ use crate::state::get_state;
     )
 )]
 pub async fn list_paypal_configs(depot: &mut Depot, res: &mut Response) {
-    // 检查管理员权限
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !is_admin {
-        res.error(RswsError::forbidden("Admin access required"));
-        return;
-    }
-
     let pool = get_state(depot).pool();
     let repo = PayPalConfigRepository::new(pool);
 
@@ -46,12 +43,6 @@ pub async fn list_paypal_configs(depot: &mut Depot, res: &mut Response) {
     )
 )]
 pub async fn get_paypal_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !is_admin {
-        res.error(RswsError::forbidden("Admin access required"));
-        return;
-    }
-
     let id: i32 = match req.param("id") {
         Some(id) => id,
         None => {
@@ -83,12 +74,6 @@ pub async fn get_paypal_config(req: &mut Request, depot: &mut Depot, res: &mut R
     )
 )]
 pub async fn update_paypal_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !is_admin {
-        res.error(RswsError::forbidden("Admin access required"));
-        return;
-    }
-
     let id: i32 = match req.param("id") {
         Some(id) => id,
         None => {
@@ -126,12 +111,6 @@ pub async fn update_paypal_config(req: &mut Request, depot: &mut Depot, res: &mu
     )
 )]
 pub async fn set_paypal_config_active(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !is_admin {
-        res.error(RswsError::forbidden("Admin access required"));
-        return;
-    }
-
     let id: i32 = match req.param("id") {
         Some(id) => id,
         None => {

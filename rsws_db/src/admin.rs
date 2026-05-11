@@ -364,6 +364,17 @@ impl AdminRepository {
         .map_err(|e| RswsError::internal(format!("Failed to get admin API keys: {}", e)))
     }
 
+    /// 根据 api_key 值获取管理员 API Key 记录
+    pub async fn get_admin_api_key_by_key(&self, api_key: &str) -> Result<Option<AdminApiKey>, RswsError> {
+        sqlx::query_as::<_, AdminApiKey>(
+            "SELECT * FROM admin_api_keys WHERE api_key = $1 AND is_active = true"
+        )
+        .bind(api_key)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get admin API key by key: {}", e)))
+    }
+
     /// 删除管理员 API Key
     pub async fn delete_admin_api_key(&self, key_id: i64, admin_id: i64) -> Result<bool, RswsError> {
         let result = sqlx::query("DELETE FROM admin_api_keys WHERE id = $1 AND admin_id = $2")
