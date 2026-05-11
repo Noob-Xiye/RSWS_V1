@@ -17,7 +17,7 @@ pub const REQUEST_ID_HEADER: &str = "X-Request-ID";
 /// Request ID 中间件
 ///
 /// 用法:
-/// ```rust
+/// ```rust,ignore
 /// let router = Router::new()
 ///     .hoop(request_id_middleware)
 ///     .push(...);
