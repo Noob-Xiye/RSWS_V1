@@ -7,7 +7,9 @@ use rsws_common::error_code::ErrorCode;
 use rsws_common::password::PasswordService;
 use rsws_common::snowflake;
 use rsws_db::{RedisService, UserRepository};
-use rsws_model::user_models::user::{User, LoginRequest, LoginResponse, UserInfo, SessionData, RegisterRequest};
+use rsws_model::user_models::user::{
+    LoginRequest, LoginResponse, RegisterRequest, SessionData, User, UserInfo,
+};
 use rsws_model::user_models::AdminUserView;
 use tracing::{info, warn};
 
@@ -51,10 +53,7 @@ impl UserService {
     }
 
     /// 创建用户服务实例（带 Email，无 Redis）
-    pub fn with_redis_and_email(
-        user_repo: UserRepository,
-        email_service: EmailService,
-    ) -> Self {
+    pub fn with_redis_and_email(user_repo: UserRepository, email_service: EmailService) -> Self {
         Self {
             user_repo,
             redis: None,
@@ -65,12 +64,22 @@ impl UserService {
     /// 用户注册
     pub async fn register(&self, req: &RegisterRequest) -> Result<User, RswsError> {
         // 检查用户名是否已存在
-        if self.user_repo.find_user_by_username(&req.username).await?.is_some() {
+        if self
+            .user_repo
+            .find_user_by_username(&req.username)
+            .await?
+            .is_some()
+        {
             return Err(RswsError::business(ErrorCode::USER_USERNAME_EXISTS));
         }
 
         // 检查邮箱是否已存在
-        if self.user_repo.find_user_by_email(&req.email).await?.is_some() {
+        if self
+            .user_repo
+            .find_user_by_email(&req.email)
+            .await?
+            .is_some()
+        {
             return Err(RswsError::business(ErrorCode::USER_EMAIL_EXISTS));
         }
 
@@ -78,13 +87,9 @@ impl UserService {
         let password_hash = PasswordService::hash(&req.password)?;
 
         // 创建用户
-        let user = self.user_repo
-            .create_user(
-                &req.username,
-                &req.nickname,
-                &req.email,
-                &password_hash,
-            )
+        let user = self
+            .user_repo
+            .create_user(&req.username, &req.nickname, &req.email, &password_hash)
             .await?;
 
         info!("User registered: {} ({})", user.id, user.username);
@@ -103,9 +108,13 @@ impl UserService {
 
     /// 用户名 + 密码登录
     async fn login_by_password(&self, req: &LoginRequest) -> Result<LoginResponse, RswsError> {
-        let username = req.username.as_ref()
+        let username = req
+            .username
+            .as_ref()
             .ok_or_else(|| RswsError::business(ErrorCode::INVALID_PARAMETER))?;
-        let password = req.password.as_ref()
+        let password = req
+            .password
+            .as_ref()
             .ok_or_else(|| RswsError::business(ErrorCode::INVALID_PARAMETER))?;
 
         // 先从 Redis 缓存读取
@@ -115,10 +124,12 @@ impl UserService {
                     info!("User {} found in Redis cache", username);
                     cached
                 } else {
-                    self.find_and_cache_user_by_username(username, redis).await?
+                    self.find_and_cache_user_by_username(username, redis)
+                        .await?
                 }
             } else {
-                self.find_and_cache_user_by_username(username, redis).await?
+                self.find_and_cache_user_by_username(username, redis)
+                    .await?
             }
         } else {
             // 无缓存，直接查数据库
@@ -145,21 +156,30 @@ impl UserService {
 
     /// 邮箱 + 验证码登录
     async fn login_by_code(&self, req: &LoginRequest) -> Result<LoginResponse, RswsError> {
-        let email = req.email.as_ref()
+        let email = req
+            .email
+            .as_ref()
             .ok_or_else(|| RswsError::business(ErrorCode::INVALID_PARAMETER))?;
-        let code = req.verification_code.as_ref()
+        let code = req
+            .verification_code
+            .as_ref()
             .ok_or_else(|| RswsError::business(ErrorCode::INVALID_PARAMETER))?;
 
         // 验证验证码
-        let redis = self.redis.as_ref()
+        let redis = self
+            .redis
+            .as_ref()
             .ok_or_else(|| RswsError::internal("Redis not configured"))?;
 
         let (valid, remaining) = redis.verify_code(email, "login", code).await?;
         if !valid {
-            warn!("Invalid verification code for email: {} (remaining attempts: {})", email, remaining);
+            warn!(
+                "Invalid verification code for email: {} (remaining attempts: {})",
+                email, remaining
+            );
             return Err(RswsError::business_with_message(
                 ErrorCode::AUTH_INVALID_CREDENTIALS,
-                format!("验证码错误，剩余尝试次数: {}", remaining)
+                format!("验证码错误，剩余尝试次数: {}", remaining),
             ));
         }
 
@@ -180,7 +200,8 @@ impl UserService {
         username: &str,
         redis: &RedisService,
     ) -> Result<User, RswsError> {
-        let user = self.user_repo
+        let user = self
+            .user_repo
             .find_user_by_username(username)
             .await?
             .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
@@ -196,7 +217,8 @@ impl UserService {
         email: &str,
         redis: &RedisService,
     ) -> Result<User, RswsError> {
-        let user = self.user_repo
+        let user = self
+            .user_repo
             .find_user_by_email(email)
             .await?
             .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
@@ -236,11 +258,16 @@ impl UserService {
 
     /// 发送登录验证码
     pub async fn send_login_code(&self, email: &str) -> Result<i64, RswsError> {
-        let redis = self.redis.as_ref()
+        let redis = self
+            .redis
+            .as_ref()
             .ok_or_else(|| RswsError::internal("Redis not configured"))?;
 
         // 检查用户是否存在
-        let user = self.user_repo.find_user_by_email(email).await?
+        let user = self
+            .user_repo
+            .find_user_by_email(email)
+            .await?
             .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
 
         if !user.is_active {
@@ -251,7 +278,7 @@ impl UserService {
         if redis.has_verification_code(email, "login").await? {
             return Err(RswsError::business_with_message(
                 ErrorCode::RATE_LIMIT_EXCEEDED,
-                "验证码已发送，请稍后再试"
+                "验证码已发送，请稍后再试",
             ));
         }
 
@@ -263,7 +290,9 @@ impl UserService {
 
         // 发送邮件
         if let Some(ref email_service) = self.email_service {
-            email_service.send_verification_code(email, &code, "login").await?;
+            email_service
+                .send_verification_code(email, &code, "login")
+                .await?;
         }
 
         info!("Login verification code sent to: {}", email);
@@ -280,7 +309,8 @@ impl UserService {
         }
 
         // 从数据库读取
-        let user = self.user_repo
+        let user = self
+            .user_repo
             .find_user_by_id(user_id)
             .await?
             .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
@@ -294,12 +324,9 @@ impl UserService {
     }
 
     /// 更新用户昵称
-    pub async fn update_nickname(
-        &self,
-        user_id: i64,
-        nickname: &str,
-    ) -> Result<User, RswsError> {
-        let user = self.user_repo
+    pub async fn update_nickname(&self, user_id: i64, nickname: &str) -> Result<User, RswsError> {
+        let user = self
+            .user_repo
             .update_user_nickname(user_id, nickname)
             .await?;
 
@@ -347,12 +374,17 @@ impl UserService {
 
     /// 发送验证码（通用，支持 register / login / reset_password）
     pub async fn send_verification_code(&self, email: &str, scene: &str) -> Result<i64, RswsError> {
-        let redis = self.redis.as_ref()
+        let redis = self
+            .redis
+            .as_ref()
             .ok_or_else(|| RswsError::internal("Redis not configured"))?;
 
         // register 场景不检查用户存在性，login / reset_password 需要检查
         if scene != "register" {
-            let user = self.user_repo.find_user_by_email(email).await?
+            let user = self
+                .user_repo
+                .find_user_by_email(email)
+                .await?
                 .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
             if !user.is_active {
                 return Err(RswsError::business(ErrorCode::USER_DISABLED));
@@ -363,7 +395,7 @@ impl UserService {
         if redis.has_verification_code(email, scene).await? {
             return Err(RswsError::business_with_message(
                 ErrorCode::RATE_LIMIT_EXCEEDED,
-                "验证码已发送，请稍后再试"
+                "验证码已发送，请稍后再试",
             ));
         }
 
@@ -375,7 +407,9 @@ impl UserService {
 
         // 发送邮件
         if let Some(ref email_service) = self.email_service {
-            email_service.send_verification_code(email, &code, scene).await?;
+            email_service
+                .send_verification_code(email, &code, scene)
+                .await?;
         }
 
         info!("Verification code sent to {} for scene: {}", email, scene);
@@ -384,13 +418,16 @@ impl UserService {
 
     /// 禁用用户（管理员操作）
     pub async fn deactivate_user(&self, user_id: i64) -> Result<(), RswsError> {
-        let user = self.user_repo.find_user_by_id(user_id).await?
+        let user = self
+            .user_repo
+            .find_user_by_id(user_id)
+            .await?
             .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
 
         if !user.is_active {
             return Err(RswsError::business_with_message(
                 ErrorCode::INVALID_PARAMETER,
-                "用户已被禁用"
+                "用户已被禁用",
             ));
         }
 
@@ -407,13 +444,16 @@ impl UserService {
 
     /// 启用用户（管理员操作）
     pub async fn activate_user(&self, user_id: i64) -> Result<(), RswsError> {
-        let user = self.user_repo.find_user_by_id(user_id).await?
+        let user = self
+            .user_repo
+            .find_user_by_id(user_id)
+            .await?
             .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
 
         if user.is_active {
             return Err(RswsError::business_with_message(
                 ErrorCode::INVALID_PARAMETER,
-                "用户已启用"
+                "用户已启用",
             ));
         }
 
@@ -437,13 +477,15 @@ impl UserService {
         username: Option<&str>,
         is_active: Option<bool>,
     ) -> Result<(Vec<AdminUserView>, i64), RswsError> {
-        let users = self.user_repo
+        let users = self
+            .user_repo
             .get_users(page, page_size, email, username, is_active)
             .await?
             .into_iter()
             .map(AdminUserView::from)
             .collect();
-        let total = self.user_repo
+        let total = self
+            .user_repo
             .get_users_count(email, username, is_active)
             .await?;
         Ok((users, total))
@@ -454,7 +496,6 @@ impl UserService {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_user_service_new() {

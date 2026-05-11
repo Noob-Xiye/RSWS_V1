@@ -2,8 +2,8 @@
 //!
 //! 统一的错误处理体系，支持错误码转换
 
-use thiserror::Error;
 use super::error_code::ErrorCode;
+use thiserror::Error;
 
 /// RSWS 核心错误类型
 #[derive(Error, Debug)]

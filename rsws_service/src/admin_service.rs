@@ -4,14 +4,14 @@
 //! 认证统一走 API Key,不使用 JWT
 //! Admin API Key 凭证缓存到 Redis(快速验证 + 强制下线)
 
-use std::collections::HashMap;
-use std::sync::Arc;
 use rsws_common::error::RswsError;
 use rsws_common::ErrorCode;
 use rsws_db::admin::AdminRepository;
 use rsws_db::RedisService;
 use rsws_model::user_models::admin::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Redis 中缓存的管理员 API Key 会话信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,7 +64,8 @@ impl AdminService {
         password: &str,
         ip_address: Option<&str>,
     ) -> Result<AdminInfo, RswsError> {
-        let admin = self.admin_repo
+        let admin = self
+            .admin_repo
             .verify_admin_credentials(email, password)
             .await?
             .ok_or_else(|| RswsError::unauthorized("Invalid email or password"))?;
@@ -74,21 +75,18 @@ impl AdminService {
         }
 
         // 更新登录信息
-        self.admin_repo.update_admin_login(admin.id, ip_address).await?;
+        self.admin_repo
+            .update_admin_login(admin.id, ip_address)
+            .await?;
 
         // 记录操作日志
-        let _ = self.admin_repo.log_admin_operation(
-            admin.id,
-            "login",
-            None,
-            None,
-            None,
-            ip_address,
-            None,
-        ).await;
+        let _ = self
+            .admin_repo
+            .log_admin_operation(admin.id, "login", None, None, None, ip_address, None)
+            .await;
 
-        let permissions: Vec<String> = serde_json::from_value(admin.permissions.clone())
-            .unwrap_or_default();
+        let permissions: Vec<String> =
+            serde_json::from_value(admin.permissions.clone()).unwrap_or_default();
 
         Ok(AdminInfo {
             id: admin.id,
@@ -102,11 +100,14 @@ impl AdminService {
 
     /// 通过 ID 获取管理员信息
     pub async fn get_admin_info(&self, id: i64) -> Result<AdminInfo, RswsError> {
-        let admin = self.admin_repo.get_admin_by_id(id).await?
+        let admin = self
+            .admin_repo
+            .get_admin_by_id(id)
+            .await?
             .ok_or_else(|| RswsError::not_found("Admin not found"))?;
 
-        let permissions: Vec<String> = serde_json::from_value(admin.permissions.clone())
-            .unwrap_or_default();
+        let permissions: Vec<String> =
+            serde_json::from_value(admin.permissions.clone()).unwrap_or_default();
 
         Ok(AdminInfo {
             id: admin.id,
@@ -132,18 +133,24 @@ impl AdminService {
             return Err(RswsError::conflict("Email already exists"));
         }
 
-        let admin = self.admin_repo.create_admin(email, password, username, role).await?;
+        let admin = self
+            .admin_repo
+            .create_admin(email, password, username, role)
+            .await?;
 
         if let Some(creator_id) = creator_id {
-            let _ = self.admin_repo.log_admin_operation(
-                creator_id,
-                "create",
-                Some("admin"),
-                Some(&admin.id.to_string()),
-                Some(&format!("Created admin: {}", admin.username)),
-                ip_address,
-                None,
-            ).await;
+            let _ = self
+                .admin_repo
+                .log_admin_operation(
+                    creator_id,
+                    "create",
+                    Some("admin"),
+                    Some(&admin.id.to_string()),
+                    Some(&format!("Created admin: {}", admin.username)),
+                    ip_address,
+                    None,
+                )
+                .await;
         }
 
         Ok(admin)
@@ -167,18 +174,23 @@ impl AdminService {
         if request.password.is_some() {
             self.invalidate_admin_keys(updated.id).await;
             // 同时禁用其所有 API Key
-            self.admin_repo.deactivate_admin_api_keys(updated.id).await?;
+            self.admin_repo
+                .deactivate_admin_api_keys(updated.id)
+                .await?;
         }
 
-        let _ = self.admin_repo.log_admin_operation(
-            updater_id,
-            "update",
-            Some("admin"),
-            Some(&updated.id.to_string()),
-            Some(&format!("Updated admin: {}", updated.username)),
-            ip_address,
-            None,
-        ).await;
+        let _ = self
+            .admin_repo
+            .log_admin_operation(
+                updater_id,
+                "update",
+                Some("admin"),
+                Some(&updated.id.to_string()),
+                Some(&format!("Updated admin: {}", updated.username)),
+                ip_address,
+                None,
+            )
+            .await;
 
         Ok(updated)
     }
@@ -193,18 +205,21 @@ impl AdminService {
         let admins = self.admin_repo.get_admins(page, page_size, role).await?;
         let total = self.admin_repo.get_admins_count(role).await?;
 
-        let admin_infos = admins.into_iter().map(|admin| {
-            let permissions: Vec<String> = serde_json::from_value(admin.permissions.clone())
-                .unwrap_or_default();
-            AdminInfo {
-                id: admin.id,
-                email: admin.email,
-                username: admin.username,
-                avatar_url: admin.avatar_url,
-                role: admin.role,
-                permissions,
-            }
-        }).collect();
+        let admin_infos = admins
+            .into_iter()
+            .map(|admin| {
+                let permissions: Vec<String> =
+                    serde_json::from_value(admin.permissions.clone()).unwrap_or_default();
+                AdminInfo {
+                    id: admin.id,
+                    email: admin.email,
+                    username: admin.username,
+                    avatar_url: admin.avatar_url,
+                    role: admin.role,
+                    permissions,
+                }
+            })
+            .collect();
 
         Ok((admin_infos, total))
     }
@@ -234,15 +249,18 @@ impl AdminService {
         // 清除 Redis 缓存
         self.invalidate_admin_keys(admin_id).await;
 
-        let _ = self.admin_repo.log_admin_operation(
-            operator_id,
-            "deactivate",
-            Some("admin"),
-            Some(&admin_id.to_string()),
-            None,
-            ip_address,
-            None,
-        ).await;
+        let _ = self
+            .admin_repo
+            .log_admin_operation(
+                operator_id,
+                "deactivate",
+                Some("admin"),
+                Some(&admin_id.to_string()),
+                None,
+                ip_address,
+                None,
+            )
+            .await;
 
         Ok(())
     }
@@ -267,17 +285,20 @@ impl AdminService {
         self.admin_repo.update_admin(&request).await?;
 
         // 记录操作日志
-        let _ = self.admin_repo.log_admin_operation(
-            operator_id,
-            "activate",
-            Some("admin"),
-            Some(&admin_id.to_string()),
-            None,
-            ip_address,
-            None,
-        ).await;
+        let _ = self
+            .admin_repo
+            .log_admin_operation(
+                operator_id,
+                "activate",
+                Some("admin"),
+                Some(&admin_id.to_string()),
+                None,
+                ip_address,
+                None,
+            )
+            .await;
 
-        Ok(()) 
+        Ok(())
     }
 
     /// 重置管理员密码
@@ -298,10 +319,10 @@ impl AdminService {
             role: None,
             permissions: None,
         };
-        
+
         // update_admin 会处理：哈希密码、禁用 API Key、记录日志
         self.update_admin(request, operator_id, ip_address).await?;
-        
+
         Ok(())
     }
 
@@ -316,14 +337,15 @@ impl AdminService {
         rate_limit: Option<i32>,
         expires_in_days: Option<i32>,
     ) -> Result<AdminApiKeyResponse, RswsError> {
-        let (record, secret) = self.admin_repo
+        let (record, secret) = self
+            .admin_repo
             .create_admin_api_key(admin_id, name, permissions, rate_limit, expires_in_days)
             .await?;
 
         // 创建后写入 Redis 缓存
         if let Some(ref redis) = self.redis {
-            let perms: Vec<String> = serde_json::from_value(record.permissions.clone())
-                .unwrap_or_default();
+            let perms: Vec<String> =
+                serde_json::from_value(record.permissions.clone()).unwrap_or_default();
             let cached = CachedAdminApiKey {
                 admin_id: record.admin_id,
                 key_id: record.id,
@@ -333,11 +355,17 @@ impl AdminService {
                 rate_limit: record.rate_limit,
                 expires_at: record.expires_at,
             };
-            let _ = redis.set_json(&Self::redis_key(&record.api_key), &cached, Self::DEFAULT_SESSION_TTL).await;
+            let _ = redis
+                .set_json(
+                    &Self::redis_key(&record.api_key),
+                    &cached,
+                    Self::DEFAULT_SESSION_TTL,
+                )
+                .await;
         }
 
-        let perms: Vec<String> = serde_json::from_value(record.permissions.clone())
-            .unwrap_or_default();
+        let perms: Vec<String> =
+            serde_json::from_value(record.permissions.clone()).unwrap_or_default();
 
         Ok(AdminApiKeyResponse {
             id: record.id,
@@ -360,7 +388,10 @@ impl AdminService {
 
     /// 删除管理员 API Key
     pub async fn delete_api_key(&self, key_id: i64, admin_id: i64) -> Result<bool, RswsError> {
-        let deleted = self.admin_repo.delete_admin_api_key(key_id, admin_id).await?;
+        let deleted = self
+            .admin_repo
+            .delete_admin_api_key(key_id, admin_id)
+            .await?;
 
         // 删除后清除 Redis(需要知道 api_key 值,这里简化处理)
         // 更好的做法是 delete 返回被删记录
@@ -375,8 +406,11 @@ impl AdminService {
         admin_id: i64,
         is_active: bool,
     ) -> Result<(), RswsError> {
-        let updated = self.admin_repo.update_api_key_status(key_id, admin_id, is_active).await?;
-        
+        let updated = self
+            .admin_repo
+            .update_api_key_status(key_id, admin_id, is_active)
+            .await?;
+
         if !updated {
             return Err(RswsError::from(ErrorCode::NOT_FOUND));
         }
@@ -398,7 +432,10 @@ impl AdminService {
     ) -> Result<Option<(AdminApiKey, Admin)>, RswsError> {
         // 1) 先查 Redis
         if let Some(ref redis) = self.redis {
-            if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&Self::redis_key(api_key)).await? {
+            if let Some(cached) = redis
+                .get_json::<CachedAdminApiKey>(&Self::redis_key(api_key))
+                .await?
+            {
                 // Redis 命中:验证 secret
                 if cached.api_secret == api_secret {
                     // 检查是否过期
@@ -424,7 +461,8 @@ impl AdminService {
                             name: String::new(),
                             api_key: api_key.to_string(),
                             api_secret_encrypted: String::new(), // Redis 中不需要
-                            permissions: serde_json::to_value(&cached.permissions).unwrap_or_default(),
+                            permissions: serde_json::to_value(&cached.permissions)
+                                .unwrap_or_default(),
                             rate_limit: cached.rate_limit,
                             last_used_at: None,
                             expires_at: cached.expires_at,
@@ -442,13 +480,16 @@ impl AdminService {
         }
 
         // 2) Redis miss → 查 DB
-        let result = self.admin_repo.validate_admin_api_key(api_key, api_secret).await?;
+        let result = self
+            .admin_repo
+            .validate_admin_api_key(api_key, api_secret)
+            .await?;
 
         // 3) DB 验证通过 → 写入 Redis
         if let Some((ref key_record, ref admin)) = result {
             if let Some(ref redis) = self.redis {
-                let permissions: Vec<String> = serde_json::from_value(key_record.permissions.clone())
-                    .unwrap_or_default();
+                let permissions: Vec<String> =
+                    serde_json::from_value(key_record.permissions.clone()).unwrap_or_default();
                 let cached = CachedAdminApiKey {
                     admin_id: admin.id,
                     key_id: key_record.id,
@@ -458,7 +499,13 @@ impl AdminService {
                     rate_limit: key_record.rate_limit,
                     expires_at: key_record.expires_at,
                 };
-                let _ = redis.set_json(&Self::redis_key(api_key), &cached, Self::DEFAULT_SESSION_TTL).await;
+                let _ = redis
+                    .set_json(
+                        &Self::redis_key(api_key),
+                        &cached,
+                        Self::DEFAULT_SESSION_TTL,
+                    )
+                    .await;
             }
         }
 
@@ -491,7 +538,10 @@ impl AdminService {
     ) -> Result<Option<(AdminApiKey, Admin)>, RswsError> {
         // 1) 获取 api_secret（先查 Redis 缓存）
         let api_secret = if let Some(ref redis) = self.redis {
-            if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&Self::redis_key(api_key)).await? {
+            if let Some(cached) = redis
+                .get_json::<CachedAdminApiKey>(&Self::redis_key(api_key))
+                .await?
+            {
                 Some(cached.api_secret)
             } else {
                 None
@@ -509,8 +559,8 @@ impl AdminService {
                     Some(r) => {
                         // 写入 Redis 缓存
                         if let Some(ref redis) = self.redis {
-                            let permissions: Vec<String> = serde_json::from_value(r.permissions.clone())
-                                .unwrap_or_default();
+                            let permissions: Vec<String> =
+                                serde_json::from_value(r.permissions.clone()).unwrap_or_default();
                             let cached = CachedAdminApiKey {
                                 admin_id: r.admin_id,
                                 key_id: r.id,
@@ -520,7 +570,13 @@ impl AdminService {
                                 rate_limit: r.rate_limit,
                                 expires_at: r.expires_at,
                             };
-                            let _ = redis.set_json(&Self::redis_key(api_key), &cached, Self::DEFAULT_SESSION_TTL).await;
+                            let _ = redis
+                                .set_json(
+                                    &Self::redis_key(api_key),
+                                    &cached,
+                                    Self::DEFAULT_SESSION_TTL,
+                                )
+                                .await;
                         }
                         r.api_secret_encrypted
                     }
@@ -535,12 +591,17 @@ impl AdminService {
         // 3) 对比签名
         if computed_sign == sign {
             // 签名正确，获取完整的记录
-            let result = self.admin_repo.validate_admin_api_key(api_key, &api_secret).await?;
+            let result = self
+                .admin_repo
+                .validate_admin_api_key(api_key, &api_secret)
+                .await?;
             Ok(result)
         } else {
             tracing::warn!(
                 "Admin signature mismatch for api_key: {}. Expected: {}, Got: {}",
-                api_key, computed_sign, sign
+                api_key,
+                computed_sign,
+                sign
             );
             Ok(None)
         }
@@ -550,13 +611,12 @@ impl AdminService {
 /// 计算签名（符合 Cregis 方案）
 fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> String {
     // 1. 获取所有 key（排除 sign），排序
-    let mut keys: Vec<&String> = params.keys()
-        .filter(|k| (*k).as_str() != "sign")
-        .collect();
+    let mut keys: Vec<&String> = params.keys().filter(|k| (*k).as_str() != "sign").collect();
     keys.sort();
 
     // 2. 按 ASCII 顺序拼接 key + value
-    let param_str: String = keys.iter()
+    let param_str: String = keys
+        .iter()
         .map(|k| format!("{}{}", k, params[*k]))
         .collect();
 

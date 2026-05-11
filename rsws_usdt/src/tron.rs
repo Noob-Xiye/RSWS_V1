@@ -107,14 +107,12 @@ impl TronClient {
             request = request.header("TRON-PRO-API-KEY", api_key);
         }
 
-        let response = request
-            .send()
-            .await?
-            .json::<TronGridResponse>()
-            .await?;
+        let response = request.send().await?.json::<TronGridResponse>().await?;
 
         if !response.success {
-            return Err(UsdtError::ApiError("TronGrid API returned error".to_string()));
+            return Err(UsdtError::ApiError(
+                "TronGrid API returned error".to_string(),
+            ));
         }
 
         // 转换数据
@@ -167,21 +165,13 @@ impl TronClient {
             number: u64,
         }
 
-        let response = request
-            .send()
-            .await?
-            .json::<BlockResponse>()
-            .await?;
+        let response = request.send().await?.json::<BlockResponse>().await?;
 
         Ok(response.block_header.raw_data.number)
     }
 
     /// 计算确认数
-    pub fn calculate_confirmations(
-        &self,
-        tx_block: u64,
-        latest_block: u64,
-    ) -> u32 {
+    pub fn calculate_confirmations(&self, tx_block: u64, latest_block: u64) -> u32 {
         if latest_block >= tx_block {
             (latest_block - tx_block) as u32
         } else {

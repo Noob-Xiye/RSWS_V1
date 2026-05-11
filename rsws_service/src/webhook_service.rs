@@ -1,8 +1,8 @@
 //! Webhook 服务
 
-use std::sync::Arc;
 use rsws_common::error::RswsError;
 use serde_json::Value;
+use std::sync::Arc;
 use tracing::info;
 
 use crate::PayPalService;
@@ -22,7 +22,8 @@ impl WebhookService {
     pub async fn handle_paypal(&self, payload: Value) -> Result<String, RswsError> {
         info!("Handling PayPal webhook: {:?}", payload);
 
-        let event_type = payload.get("event_type")
+        let event_type = payload
+            .get("event_type")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
@@ -54,17 +55,19 @@ impl WebhookService {
     pub async fn handle_usdt(&self, payload: Value) -> Result<String, RswsError> {
         info!("Handling USDT webhook: {:?}", payload);
 
-        let tx_hash = payload.get("tx_hash")
+        let tx_hash = payload
+            .get("tx_hash")
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        let status = payload.get("status")
+        let status = payload
+            .get("status")
             .and_then(|v| v.as_str())
             .unwrap_or("pending");
 
         if tx_hash.is_empty() {
             return Err(RswsError::business(
-                rsws_common::error_code::ErrorCode::USDT_TRANSACTION_NOT_FOUND
+                rsws_common::error_code::ErrorCode::USDT_TRANSACTION_NOT_FOUND,
             ));
         }
 

@@ -7,19 +7,17 @@
 //! - 中间件确保 `is_admin == true` 才能访问
 //! - handler 内部无需再检查权限
 
+use crate::state::get_state;
+use chrono::{Duration, Utc};
+use rsws_common::{error_code::ErrorCode, ResponseExt, RswsError};
+use rsws_db::{order::OrderRepository, resource::ResourceRepository, user::UserRepository};
+use rsws_model::user_models::admin::{AdminLoginResponse, DailyOrderCount, DashboardStats};
+use rsws_service::UpdateLogConfigRequest;
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
-use sqlx::PgPool;
-use rsws_common::{ResponseExt, error_code::ErrorCode, RswsError};
 use serde::Deserialize;
-use chrono::{Duration, Utc};
+use sqlx::PgPool;
 use uuid::Uuid;
-use crate::state::get_state;
-use rsws_service::UpdateLogConfigRequest;
-use rsws_model::user_models::admin::{
-    AdminLoginResponse, DashboardStats, DailyOrderCount,
-};
-use rsws_db::{user::UserRepository, order::OrderRepository, resource::ResourceRepository};
 
 /// 管理员登录请求
 #[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
@@ -42,16 +40,17 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     match body {
         Ok(data) => {
             let state = get_state(depot);
-            let ip = req.headers()
+            let ip = req
+                .headers()
                 .get("X-Forwarded-For")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string());
 
-            match state.admin_service.login(
-                &data.email,
-                &data.password,
-                ip.as_deref(),
-            ).await {
+            match state
+                .admin_service
+                .login(&data.email, &data.password, ip.as_deref())
+                .await
+            {
                 Ok(info) => {
                     let token = Uuid::new_v4().to_string();
                     let expires_at = Utc::now() + Duration::days(30);
@@ -127,19 +126,24 @@ pub async fn create_admin(req: &mut Request, depot: &mut Depot, res: &mut Respon
     match body {
         Ok(data) => {
             let state = get_state(depot);
-            let ip = req.headers()
+            let ip = req
+                .headers()
                 .get("X-Forwarded-For")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string());
 
-            match state.admin_service.create_admin(
-                &data.email,
-                &data.password,
-                &data.username,
-                &data.role,
-                Some(operator_id),
-                ip.as_deref(),
-            ).await {
+            match state
+                .admin_service
+                .create_admin(
+                    &data.email,
+                    &data.password,
+                    &data.username,
+                    &data.role,
+                    Some(operator_id),
+                    ip.as_deref(),
+                )
+                .await
+            {
                 Ok(admin) => {
                     res.status_code(StatusCode::CREATED);
                     res.success(serde_json::json!({
@@ -177,9 +181,17 @@ pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Respons
 
     let state = get_state(depot);
 
-    match state.admin_service.list_admins(page, page_size, role.as_deref()).await {
+    match state
+        .admin_service
+        .list_admins(page, page_size, role.as_deref())
+        .await
+    {
         Ok((admins, total)) => {
-            let total_pages = if page_size > 0 { (total + page_size - 1) / page_size } else { 0 };
+            let total_pages = if page_size > 0 {
+                (total + page_size - 1) / page_size
+            } else {
+                0
+            };
             res.success(serde_json::json!({
                 "items": admins,
                 "total": total,
@@ -206,7 +218,10 @@ pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Respons
 pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid admin ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid admin ID",
+        );
         return;
     }
 
@@ -239,17 +254,25 @@ pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Re
     };
 
     if id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid admin ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid admin ID",
+        );
         return;
     }
 
     let state = get_state(depot);
-    let ip = req.headers()
+    let ip = req
+        .headers()
         .get("X-Forwarded-For")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    match state.admin_service.deactivate_admin(id, operator_id, ip.as_deref()).await {
+    match state
+        .admin_service
+        .deactivate_admin(id, operator_id, ip.as_deref())
+        .await
+    {
         Ok(()) => res.success(serde_json::json!({
             "id": id,
             "message": "Admin deactivated successfully"
@@ -280,16 +303,24 @@ pub async fn activate_admin(req: &mut Request, depot: &mut Depot, res: &mut Resp
 
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid admin ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid admin ID",
+        );
         return;
     }
 
-    let ip_address = req.header::<String>("X-Forwarded-For")
+    let ip_address = req
+        .header::<String>("X-Forwarded-For")
         .or_else(|| req.header::<String>("X-Real-IP"))
         .map(|s| s.to_string());
 
     let state = get_state(depot);
-    match state.admin_service.activate_admin(id, operator_id, ip_address.as_deref()).await {
+    match state
+        .admin_service
+        .activate_admin(id, operator_id, ip_address.as_deref())
+        .await
+    {
         Ok(()) => res.success(serde_json::json!({
             "id": id,
             "message": "Admin activated successfully"
@@ -321,11 +352,15 @@ pub async fn reset_admin_password(req: &mut Request, depot: &mut Depot, res: &mu
 
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid admin ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid admin ID",
+        );
         return;
     }
 
-    let ip_address = req.header::<String>("X-Forwarded-For")
+    let ip_address = req
+        .header::<String>("X-Forwarded-For")
         .or_else(|| req.header::<String>("X-Real-IP"))
         .map(|s| s.to_string());
 
@@ -333,7 +368,11 @@ pub async fn reset_admin_password(req: &mut Request, depot: &mut Depot, res: &mu
     match body {
         Ok(data) => {
             let state = get_state(depot);
-            match state.admin_service.reset_password(id, &data.password, operator_id, ip_address.as_deref()).await {
+            match state
+                .admin_service
+                .reset_password(id, &data.password, operator_id, ip_address.as_deref())
+                .await
+            {
                 Ok(()) => res.success(serde_json::json!({
                     "id": id,
                     "message": "Password reset successfully"
@@ -385,13 +424,17 @@ pub async fn create_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
     match body {
         Ok(data) => {
             let state = get_state(depot);
-            match state.admin_service.create_api_key(
-                admin_id,
-                &data.name,
-                data.permissions,
-                data.rate_limit,
-                data.expires_in_days,
-            ).await {
+            match state
+                .admin_service
+                .create_api_key(
+                    admin_id,
+                    &data.name,
+                    data.permissions,
+                    data.rate_limit,
+                    data.expires_in_days,
+                )
+                .await
+            {
                 Ok(response) => {
                     res.status_code(StatusCode::CREATED);
                     res.success(response);
@@ -450,7 +493,10 @@ pub async fn delete_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
 
     let key_id: i64 = req.param("key_id").unwrap_or(0);
     if key_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid API key ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid API key ID",
+        );
         return;
     }
 
@@ -483,8 +529,7 @@ pub struct ToggleApiKeyStatusBody {
     )
 )]
 pub async fn toggle_api_key_status(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied()
-        .unwrap_or(false);
+    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
 
     if !is_admin {
         res.http_error(StatusCode::FORBIDDEN, "Admin access required");
@@ -501,16 +546,23 @@ pub async fn toggle_api_key_status(req: &mut Request, depot: &mut Depot, res: &m
 
     let key_id: i64 = req.param("key_id").unwrap_or(0);
     if key_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid API key ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid API key ID",
+        );
         return;
     }
 
     let body: Result<ToggleApiKeyStatusBody, _> = req.parse_json().await;
-    
+
     match body {
         Ok(data) => {
             let state = get_state(depot);
-            match state.admin_service.toggle_api_key_status(key_id, admin_id, data.is_active).await {
+            match state
+                .admin_service
+                .toggle_api_key_status(key_id, admin_id, data.is_active)
+                .await
+            {
                 Ok(_) => res.success("API key status updated"),
                 Err(e) => res.error(e),
             }
@@ -552,7 +604,10 @@ pub async fn list_log_configs(_req: &mut Request, depot: &mut Depot, res: &mut R
 pub async fn get_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let key: String = req.param("key").unwrap_or_default();
     if key.is_empty() {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Config key is required");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Config key is required",
+        );
         return;
     }
 
@@ -587,12 +642,16 @@ pub async fn create_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
         Ok(data) => {
             let state = get_state(depot);
             let config_type = data.config_type.as_deref().unwrap_or("string");
-            match state.log_service.set_log_config(
-                &data.config_key,
-                &data.config_value,
-                config_type,
-                data.description.as_deref(),
-            ).await {
+            match state
+                .log_service
+                .set_log_config(
+                    &data.config_key,
+                    &data.config_value,
+                    config_type,
+                    data.description.as_deref(),
+                )
+                .await
+            {
                 Ok(config) => {
                     res.status_code(StatusCode::CREATED);
                     res.success(config);
@@ -630,7 +689,10 @@ pub struct UpdateLogConfigBody {
 pub async fn update_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let key: String = req.param("key").unwrap_or_default();
     if key.is_empty() {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Config key is required");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Config key is required",
+        );
         return;
     }
 
@@ -669,7 +731,10 @@ pub async fn update_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
 pub async fn delete_log_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let key: String = req.param("key").unwrap_or_default();
     if key.is_empty() {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Config key is required");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Config key is required",
+        );
         return;
     }
 
@@ -702,15 +767,23 @@ pub async fn query_system_logs(req: &mut Request, depot: &mut Depot, res: &mut R
     let page_size: i64 = req.query("page_size").unwrap_or(20);
 
     let state = get_state(depot);
-    match state.log_service.query_system_logs(
-        level.as_deref(),
-        None, // module
-        None, // user_id
-        page,
-        page_size,
-    ).await {
+    match state
+        .log_service
+        .query_system_logs(
+            level.as_deref(),
+            None, // module
+            None, // user_id
+            page,
+            page_size,
+        )
+        .await
+    {
         Ok((logs, total)) => {
-            let total_pages = if page_size > 0 { (total + page_size - 1) / page_size } else { 0 };
+            let total_pages = if page_size > 0 {
+                (total + page_size - 1) / page_size
+            } else {
+                0
+            };
             res.success(serde_json::json!({
                 "items": logs,
                 "total": total,
@@ -761,7 +834,10 @@ pub async fn list_usdt_wallets(_req: &mut Request, depot: &mut Depot, res: &mut 
 pub async fn update_usdt_wallet(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let network: String = req.param("network").unwrap_or_else(|| "tron".to_string());
     if network != "tron" && network != "ethereum" {
-        res.http_error(StatusCode::BAD_REQUEST, "Invalid network, use 'tron' or 'ethereum'");
+        res.http_error(
+            StatusCode::BAD_REQUEST,
+            "Invalid network, use 'tron' or 'ethereum'",
+        );
         return;
     }
 
@@ -770,16 +846,24 @@ pub async fn update_usdt_wallet(req: &mut Request, depot: &mut Depot, res: &mut 
     match body {
         Ok(data) => {
             let valid = if network == "tron" {
-                state.blockchain_service.validate_trc20_address(&data.address)
+                state
+                    .blockchain_service
+                    .validate_trc20_address(&data.address)
             } else {
-                state.blockchain_service.validate_erc20_address(&data.address)
+                state
+                    .blockchain_service
+                    .validate_erc20_address(&data.address)
             };
             if !valid {
                 res.http_error(StatusCode::BAD_REQUEST, "Invalid address format");
                 return;
             }
 
-            match state.blockchain_service.upsert_usdt_wallet(&network, &data.address, data.name.as_deref()).await {
+            match state
+                .blockchain_service
+                .upsert_usdt_wallet(&network, &data.address, data.name.as_deref())
+                .await
+            {
                 Ok(wallet) => res.success(wallet),
                 Err(e) => res.error(e),
             }
@@ -822,13 +906,14 @@ pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Re
         }
     };
 
-    let (total_orders, completed_orders, total_revenue, _orders_30d, revenue_30d) = match order_result {
-        Ok(v) => v,
-        Err(e) => {
-            res.error(e);
-            return;
-        }
-    };
+    let (total_orders, completed_orders, total_revenue, _orders_30d, revenue_30d) =
+        match order_result {
+            Ok(v) => v,
+            Err(e) => {
+                res.error(e);
+                return;
+            }
+        };
 
     let (total_resources, active_resources, new_resources_30d) = match resource_result {
         Ok(v) => v,
@@ -846,14 +931,17 @@ pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Re
         WHERE created_at >= NOW() - INTERVAL '30 days'
         GROUP BY DATE(created_at AT TIME ZONE 'UTC')
         ORDER BY date ASC
-        "#
+        "#,
     )
     .fetch_all(&pool)
     .await
     {
         Ok(v) => v,
         Err(e) => {
-            res.error(RswsError::internal(format!("Failed to query orders trend: {}", e)));
+            res.error(RswsError::internal(format!(
+                "Failed to query orders trend: {}",
+                e
+            )));
             return;
         }
     };
@@ -863,8 +951,8 @@ pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Re
         new_users_30d,
         total_orders,
         completed_orders,
-        total_revenue,      // 单位：分，前端除以100转元
-        revenue_30d,         // 单位：分，前端除以100转元
+        total_revenue, // 单位：分，前端除以100转元
+        revenue_30d,   // 单位：分，前端除以100转元
         total_resources,
         active_resources,
         new_resources_30d,
@@ -1010,8 +1098,15 @@ pub async fn list_users(req: &mut Request, depot: &mut Depot, res: &mut Response
     let username: Option<String> = req.query("username");
     let is_active: Option<bool> = req.query::<bool>("is_active");
 
-    let (users, total) = match state.user_service
-        .list_users(page, page_size, email.as_deref(), username.as_deref(), is_active)
+    let (users, total) = match state
+        .user_service
+        .list_users(
+            page,
+            page_size,
+            email.as_deref(),
+            username.as_deref(),
+            is_active,
+        )
         .await
     {
         Ok(result) => result,

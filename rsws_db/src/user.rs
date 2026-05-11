@@ -85,7 +85,7 @@ impl UserRepository {
         nickname: &str,
     ) -> Result<User, RswsError> {
         let user = sqlx::query_as::<_, User>(
-            "UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2 RETURNING *"
+            "UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
         )
         .bind(nickname)
         .bind(user_id)
@@ -119,7 +119,9 @@ impl UserRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| RswsError::internal(format!("Failed to update user active status: {}", e)))?;
+            .map_err(|e| {
+                RswsError::internal(format!("Failed to update user active status: {}", e))
+            })?;
 
         Ok(())
     }
@@ -146,7 +148,7 @@ impl UserRepository {
             }
             (Some(nick), None) => {
                 let user = sqlx::query_as::<_, User>(
-                    "UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2 RETURNING *"
+                    "UPDATE users SET nickname = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
                 )
                 .bind(nick)
                 .bind(user_id)
@@ -166,11 +168,10 @@ impl UserRepository {
                 .map_err(|e| RswsError::internal(format!("Failed to update profile: {}", e)))?;
                 Ok(user)
             }
-            (None, None) => {
-                self.find_user_by_id(user_id)
-                    .await?
-                    .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))
-            }
+            (None, None) => self
+                .find_user_by_id(user_id)
+                .await?
+                .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND)),
         }
     }
 
@@ -248,7 +249,7 @@ impl UserRepository {
             .map_err(|e| RswsError::internal(format!("Failed to count users: {}", e)))?;
 
         let new_users_30d: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '30 days'"
+            "SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '30 days'",
         )
         .fetch_one(&self.pool)
         .await

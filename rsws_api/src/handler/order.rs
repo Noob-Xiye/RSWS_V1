@@ -2,12 +2,12 @@
 //!
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
+use crate::state::get_state;
+use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
-use rsws_common::{ResponseExt, AuthHandler, error_code::ErrorCode, RswsError};
-use serde::Deserialize;
 use salvo_oapi::ToSchema;
-use crate::state::get_state;
+use serde::Deserialize;
 
 /// 订单创建请求
 #[derive(Debug, Deserialize, ToSchema)]
@@ -38,9 +38,17 @@ pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Respons
 
     let state = get_state(depot);
 
-    match state.order_service.list_detail_by_user(user_id, page, limit).await {
+    match state
+        .order_service
+        .list_detail_by_user(user_id, page, limit)
+        .await
+    {
         Ok((orders, total)) => {
-            let total_pages = if limit > 0 { (total + limit as i64 - 1) / limit as i64 } else { 0 };
+            let total_pages = if limit > 0 {
+                (total + limit as i64 - 1) / limit as i64
+            } else {
+                0
+            };
             res.success(serde_json::json!({
                 "items": orders,
                 "total": total,
@@ -71,7 +79,7 @@ pub async fn get_order(req: &mut Request, depot: &mut Depot, res: &mut Response)
     if id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid order ID"
+            "Invalid order ID",
         );
         return;
     }
@@ -115,7 +123,7 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
             if !valid_methods.contains(&data.payment_method.as_str()) {
                 res.error_msg(
                     RswsError::from(ErrorCode::PAYMENT_METHOD_NOT_SUPPORTED),
-                    format!("Unsupported payment method: {}", data.payment_method)
+                    format!("Unsupported payment method: {}", data.payment_method),
                 );
                 return;
             }
@@ -135,31 +143,37 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
                 }
             };
 
-            match state.order_service.create(user_id, data.resource_id, amount, &data.payment_method).await {
+            match state
+                .order_service
+                .create(user_id, data.resource_id, amount, &data.payment_method)
+                .await
+            {
                 Ok(order) => {
                     // 如果是 PayPal 支付，需要创建 PayPal 订单
                     if data.payment_method == "paypal" {
-                        match state.paypal_service.create_order(
-                            amount as f64 / 100.0, // 分转元
-                            "USDT",
-                            &format!("Resource #{}", data.resource_id),
-                            order.id,
-                        ).await {
+                        match state
+                            .paypal_service
+                            .create_order(
+                                amount as f64 / 100.0, // 分转元
+                                "USDT",
+                                &format!("Resource #{}", data.resource_id),
+                                order.id,
+                            )
+                            .await
+                        {
                             Ok(paypal_order) => {
-                                let paypal_order_id = paypal_order["id"].as_str().unwrap_or("").to_string();
+                                let paypal_order_id =
+                                    paypal_order["id"].as_str().unwrap_or("").to_string();
                                 let approve_url = paypal_order["links"]
                                     .as_array()
                                     .and_then(|links| links.iter().find(|l| l["rel"] == "approve"))
                                     .and_then(|l| l["href"].as_str().map(|s| s.to_string()));
 
                                 // 创建支付交易记录
-                                let _ = state.payment_service.create(
-                                    order.id,
-                                    user_id,
-                                    amount,
-                                    "USDT",
-                                    "paypal",
-                                ).await;
+                                let _ = state
+                                    .payment_service
+                                    .create(order.id, user_id, amount, "USDT", "paypal")
+                                    .await;
 
                                 res.status_code(StatusCode::CREATED);
                                 res.success(serde_json::json!({
@@ -204,7 +218,7 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
         Err(e) => {
             res.error_msg(
                 RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
-                format!("Invalid request: {}", e)
+                format!("Invalid request: {}", e),
             );
         }
     }
@@ -232,7 +246,7 @@ pub async fn cancel_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
     if id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid order ID"
+            "Invalid order ID",
         );
         return;
     }
@@ -270,7 +284,7 @@ pub async fn refund_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
     if id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid order ID"
+            "Invalid order ID",
         );
         return;
     }
@@ -313,7 +327,7 @@ pub async fn complete_order(req: &mut Request, depot: &mut Depot, res: &mut Resp
     if id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid order ID"
+            "Invalid order ID",
         );
         return;
     }
@@ -355,7 +369,7 @@ pub async fn check_order_status(req: &mut Request, depot: &mut Depot, res: &mut 
     if id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid order ID"
+            "Invalid order ID",
         );
         return;
     }
@@ -401,14 +415,18 @@ pub async fn check_purchase(req: &mut Request, depot: &mut Depot, res: &mut Resp
     if resource_id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid resource ID"
+            "Invalid resource ID",
         );
         return;
     }
 
     let state = get_state(depot);
 
-    match state.order_service.check_purchased(user_id, resource_id).await {
+    match state
+        .order_service
+        .check_purchased(user_id, resource_id)
+        .await
+    {
         Ok(purchased) => {
             res.success(serde_json::json!({
                 "purchased": purchased,
@@ -443,7 +461,7 @@ pub async fn get_resource_download(req: &mut Request, depot: &mut Depot, res: &m
     if resource_id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid resource ID"
+            "Invalid resource ID",
         );
         return;
     }
@@ -451,11 +469,15 @@ pub async fn get_resource_download(req: &mut Request, depot: &mut Depot, res: &m
     let state = get_state(depot);
 
     // 检查是否已购买
-    match state.order_service.check_purchased(user_id, resource_id).await {
+    match state
+        .order_service
+        .check_purchased(user_id, resource_id)
+        .await
+    {
         Ok(false) => {
             res.error_msg(
                 RswsError::from(ErrorCode::AUTH_PERMISSION_DENIED),
-                "Please purchase this resource first"
+                "Please purchase this resource first",
             );
         }
         Ok(true) => {
@@ -463,7 +485,10 @@ pub async fn get_resource_download(req: &mut Request, depot: &mut Depot, res: &m
             match state.resource_service.get(resource_id).await {
                 Ok(Some(resource)) => {
                     // 递增下载计数
-                    let _ = state.resource_service.increment_download_count(resource_id).await;
+                    let _ = state
+                        .resource_service
+                        .increment_download_count(resource_id)
+                        .await;
 
                     res.success(serde_json::json!({
                         "file_url": resource.file_url,

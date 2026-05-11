@@ -46,7 +46,7 @@ impl PasswordService {
         if password.len() < 8 {
             return Err(RswsError::business_with_message(
                 ErrorCode::AUTH_PASSWORD_TOO_WEAK,
-                "Password must be at least 8 characters"
+                "Password must be at least 8 characters",
             ));
         }
 
@@ -57,7 +57,7 @@ impl PasswordService {
         if !has_upper || !has_lower || !has_digit {
             return Err(RswsError::business_with_message(
                 ErrorCode::AUTH_PASSWORD_TOO_WEAK,
-                "Password must contain uppercase, lowercase and digit"
+                "Password must contain uppercase, lowercase and digit",
             ));
         }
 

@@ -2,18 +2,16 @@
 //!
 //! 持有所有 service 实例，通过 Salvo Depot 注入到 handler
 
-use std::sync::Arc;
+use rsws_common::config::AppConfig;
+use rsws_db::CategoryRepository;
+use rsws_service::{
+    AdminRepository, AdminService, ApiKeyService, BlockchainService, ConfigService,
+    CrossPlatformService, LogService, OrderService, PayPalService, PaymentService, ResourceService,
+    UserService, WebhookService,
+};
 use salvo::prelude::*;
 use sqlx::PgPool;
-use rsws_common::config::AppConfig;
-use rsws_service::{
-    UserService, OrderService, ResourceService,
-    ApiKeyService, PayPalService, BlockchainService,
-    WebhookService, CrossPlatformService, ConfigService,
-    PaymentService, AdminService, AdminRepository,
-    LogService,
-};
-use rsws_db::CategoryRepository;
+use std::sync::Arc;
 
 /// 应用全局状态
 #[derive(Clone)]
@@ -91,7 +89,8 @@ impl AppState {
 
 /// 从 Depot 获取 AppState
 pub fn get_state(depot: &Depot) -> AppState {
-    depot.obtain::<AppState>()
+    depot
+        .obtain::<AppState>()
         .cloned()
         .expect("AppState not found in Depot")
 }

@@ -1,7 +1,7 @@
 //! USDT 监听配置
 
-use serde::{Deserialize, Serialize};
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 /// USDT 监听配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

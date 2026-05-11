@@ -2,12 +2,12 @@
 //!
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
+use crate::state::get_state;
+use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
+use rsws_model::resource::{CreateResourceRequest, UpdateResourceRequest};
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
-use rsws_common::{ResponseExt, AuthHandler, error_code::ErrorCode, RswsError};
-use rsws_model::resource::{CreateResourceRequest, UpdateResourceRequest};
 use serde::Deserialize;
-use crate::state::get_state;
 
 /// 资源列表查询参数
 #[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
@@ -43,14 +43,17 @@ pub async fn list_resources(req: &mut Request, depot: &mut Depot, res: &mut Resp
 
     let state = get_state(depot);
 
-    match state.resource_service.search(
-        query.category_id,
-        query.search.as_deref(),
-        page,
-        page_size,
-    ).await {
+    match state
+        .resource_service
+        .search(query.category_id, query.search.as_deref(), page, page_size)
+        .await
+    {
         Ok((resources, total)) => {
-            let total_pages = if page_size > 0 { (total + page_size - 1) / page_size } else { 0 };
+            let total_pages = if page_size > 0 {
+                (total + page_size - 1) / page_size
+            } else {
+                0
+            };
             res.success(serde_json::json!({
                 "items": resources,
                 "total": total,
@@ -81,7 +84,7 @@ pub async fn get_resource(req: &mut Request, depot: &mut Depot, res: &mut Respon
     if id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid resource ID"
+            "Invalid resource ID",
         );
         return;
     }
@@ -123,7 +126,7 @@ pub async fn create_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
             if data.title.trim().is_empty() {
                 res.error_msg(
                     RswsError::from(ErrorCode::INVALID_PARAMETER),
-                    "Title cannot be empty"
+                    "Title cannot be empty",
                 );
                 return;
             }
@@ -143,7 +146,7 @@ pub async fn create_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
         Err(e) => {
             res.error_msg(
                 RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
-                format!("Invalid request: {}", e)
+                format!("Invalid request: {}", e),
             );
         }
     }
@@ -169,7 +172,7 @@ pub async fn update_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
     if id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid resource ID"
+            "Invalid resource ID",
         );
         return;
     }
@@ -197,7 +200,7 @@ pub async fn update_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
         Err(e) => {
             res.error_msg(
                 RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
-                format!("Invalid request: {}", e)
+                format!("Invalid request: {}", e),
             );
         }
     }
@@ -221,7 +224,7 @@ pub async fn delete_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
     if id <= 0 {
         res.error_msg(
             RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid resource ID"
+            "Invalid resource ID",
         );
         return;
     }

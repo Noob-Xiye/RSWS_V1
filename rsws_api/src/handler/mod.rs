@@ -1,12 +1,12 @@
 //! 处理器
 
-pub mod user;
-pub mod resource;
-pub mod order;
-pub mod payment;
 pub mod admin;
 pub mod admin_paypal;
 pub mod category;
+pub mod order;
+pub mod payment;
+pub mod resource;
+pub mod user;
 
 use salvo::prelude::*;
 use salvo_oapi::endpoint;

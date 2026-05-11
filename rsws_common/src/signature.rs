@@ -103,14 +103,8 @@ impl ClientSignature {
 
         let nonce = uuid::Uuid::new_v4().to_string();
 
-        let signature = SignatureService::generate(
-            &self.secret,
-            method,
-            path,
-            timestamp,
-            &nonce,
-            body,
-        )?;
+        let signature =
+            SignatureService::generate(&self.secret, method, path, timestamp, &nonce, body)?;
 
         Ok((signature, timestamp, nonce))
     }
@@ -131,13 +125,12 @@ mod tests {
         let nonce = "test-nonce-123";
         let body = r#"{"name":"test"}"#;
 
-        let signature = SignatureService::generate(
-            secret, method, path, timestamp, nonce, body
-        ).expect("Generate failed");
+        let signature = SignatureService::generate(secret, method, path, timestamp, nonce, body)
+            .expect("Generate failed");
 
-        let valid = SignatureService::verify(
-            secret, method, path, timestamp, nonce, body, &signature
-        ).expect("Verify failed");
+        let valid =
+            SignatureService::verify(secret, method, path, timestamp, nonce, body, &signature)
+                .expect("Verify failed");
 
         assert!(valid);
     }
@@ -152,13 +145,19 @@ mod tests {
         let nonce = "nonce";
         let body = "";
 
-        let signature = SignatureService::generate(
-            secret, method, path, timestamp, nonce, body
-        ).expect("Generate failed");
+        let signature = SignatureService::generate(secret, method, path, timestamp, nonce, body)
+            .expect("Generate failed");
 
         let valid = SignatureService::verify(
-            wrong_secret, method, path, timestamp, nonce, body, &signature
-        ).expect("Verify failed");
+            wrong_secret,
+            method,
+            path,
+            timestamp,
+            nonce,
+            body,
+            &signature,
+        )
+        .expect("Verify failed");
 
         assert!(!valid);
     }
@@ -182,10 +181,7 @@ mod tests {
 
     #[test]
     fn test_client_signature() {
-        let client = ClientSignature::new(
-            "ak_test123".to_string(),
-            "secret123".to_string()
-        );
+        let client = ClientSignature::new("ak_test123".to_string(), "secret123".to_string());
 
         assert_eq!(client.api_key(), "ak_test123");
 

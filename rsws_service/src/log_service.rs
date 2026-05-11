@@ -3,12 +3,12 @@
 //! 日志记录 + 日志配置管理
 //! Log + Log Config 存 DB，后台可动态管理
 
+use chrono;
 use rsws_common::error::RswsError;
 use rsws_common::snowflake;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::PgPool;
-use chrono;
 
 /// 日志配置
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -204,23 +204,19 @@ impl LogService {
 
     /// 获取日志配置
     pub async fn get_log_config(&self, key: &str) -> Result<Option<LogConfig>, RswsError> {
-        sqlx::query_as::<_, LogConfig>(
-            "SELECT * FROM log_configs WHERE config_key = $1"
-        )
-        .bind(key)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to get log config: {}", e)))
+        sqlx::query_as::<_, LogConfig>("SELECT * FROM log_configs WHERE config_key = $1")
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to get log config: {}", e)))
     }
 
     /// 列出所有日志配置
     pub async fn list_log_configs(&self) -> Result<Vec<LogConfig>, RswsError> {
-        sqlx::query_as::<_, LogConfig>(
-            "SELECT * FROM log_configs ORDER BY id"
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to list log configs: {}", e)))
+        sqlx::query_as::<_, LogConfig>("SELECT * FROM log_configs ORDER BY id")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to list log configs: {}", e)))
     }
 
     /// 设置日志配置（upsert）
@@ -251,7 +247,10 @@ impl LogService {
     }
 
     /// 更新日志配置
-    pub async fn update_log_config(&self, request: &UpdateLogConfigRequest) -> Result<LogConfig, RswsError> {
+    pub async fn update_log_config(
+        &self,
+        request: &UpdateLogConfigRequest,
+    ) -> Result<LogConfig, RswsError> {
         let config_type = request.config_type.as_deref().unwrap_or("string");
         sqlx::query_as::<_, LogConfig>(
             r#"UPDATE log_configs SET

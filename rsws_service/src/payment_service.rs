@@ -25,7 +25,8 @@ impl PaymentService {
         currency: &str,
         payment_method: &str,
     ) -> Result<i64, RswsError> {
-        let transaction = self.payment_repo
+        let transaction = self
+            .payment_repo
             .create(order_id, user_id, amount, currency, payment_method)
             .await?;
 
@@ -41,23 +42,34 @@ impl PaymentService {
         status: &str,
         provider_tx_id: Option<&str>,
     ) -> Result<(), RswsError> {
-        self.payment_repo.update_status(transaction_id, status, provider_tx_id).await
+        self.payment_repo
+            .update_status(transaction_id, status, provider_tx_id)
+            .await
     }
 
     /// 根据 PayPal order ID 查找交易
-    /// 
+    ///
     /// provider_transaction_id 存储 PayPal order ID
-    pub async fn get_by_paypal_order(&self, paypal_order_id: &str) -> Result<Option<rsws_model::payment::PaymentTransaction>, RswsError> {
+    pub async fn get_by_paypal_order(
+        &self,
+        paypal_order_id: &str,
+    ) -> Result<Option<rsws_model::payment::PaymentTransaction>, RswsError> {
         self.payment_repo.get_by_provider_tx(paypal_order_id).await
     }
 
     /// 根据订单 ID 查找交易
-    pub async fn get_by_order(&self, order_id: i64) -> Result<Vec<rsws_model::payment::PaymentTransaction>, RswsError> {
+    pub async fn get_by_order(
+        &self,
+        order_id: i64,
+    ) -> Result<Vec<rsws_model::payment::PaymentTransaction>, RswsError> {
         self.payment_repo.get_by_order_id(order_id).await
     }
 
     /// 获取交易信息
-    pub async fn get_transaction(&self, transaction_id: i64) -> Result<Option<rsws_model::payment::PaymentTransaction>, RswsError> {
+    pub async fn get_transaction(
+        &self,
+        transaction_id: i64,
+    ) -> Result<Option<rsws_model::payment::PaymentTransaction>, RswsError> {
         self.payment_repo.get_by_id(transaction_id).await
     }
 
@@ -68,6 +80,8 @@ impl PaymentService {
         page: i64,
         page_size: i64,
     ) -> Result<(Vec<rsws_model::payment::PaymentTransaction>, i64), RswsError> {
-        self.payment_repo.get_user_transactions(user_id, page, page_size).await
+        self.payment_repo
+            .get_user_transactions(user_id, page, page_size)
+            .await
     }
 }

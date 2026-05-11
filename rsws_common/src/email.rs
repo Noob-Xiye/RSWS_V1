@@ -32,10 +32,12 @@ impl EmailService {
         let creds = Credentials::new(smtp_username.to_string(), smtp_password.to_string());
 
         let smtp_transport = SmtpTransport::relay(smtp_server)
-            .map_err(|e| RswsError::business_with_message(
-                ErrorCode::CONFIG_INVALID_VALUE,
-                format!("SMTP relay error: {}", e)
-            ))?
+            .map_err(|e| {
+                RswsError::business_with_message(
+                    ErrorCode::CONFIG_INVALID_VALUE,
+                    format!("SMTP relay error: {}", e),
+                )
+            })?
             .credentials(creds)
             .build();
 

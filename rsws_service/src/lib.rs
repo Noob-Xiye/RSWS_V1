@@ -2,6 +2,7 @@
 //!
 //! 提供各业务模块的服务逻辑
 
+pub mod admin_service;
 pub mod api_key_service;
 pub mod auth_service;
 pub mod blockchain_service;
@@ -17,15 +18,15 @@ pub mod resource_service;
 pub mod user_payment_service;
 pub mod user_service;
 pub mod webhook_service;
-pub mod admin_service;
 
 // 导出主要服务
+pub use admin_service::AdminService;
 pub use api_key_service::ApiKeyService;
 pub use auth_service::AuthService;
 pub use blockchain_service::BlockchainService;
 pub use commission_service::CommissionService;
 pub use config_service::ConfigService;
-pub use config_service::{PayPalDbConfig, BlockchainDbConfig, EmailDbConfig, UsdtListenDbConfig};
+pub use config_service::{BlockchainDbConfig, EmailDbConfig, PayPalDbConfig, UsdtListenDbConfig};
 pub use cross_platform_service::CrossPlatformService;
 pub use log_service::LogService;
 pub use log_service::{LogConfig, UpdateLogConfigRequest};
@@ -34,21 +35,21 @@ pub use payment_service::PaymentService;
 pub use paypal_service::PayPalService;
 pub use request_service::RequestService;
 pub use resource_service::ResourceService;
+pub use rsws_db::admin::AdminRepository;
 pub use user_payment_service::UserPaymentService;
 pub use user_service::UserService;
 pub use webhook_service::WebhookService;
-pub use admin_service::AdminService;
-pub use rsws_db::admin::AdminRepository;
 
-use std::sync::Arc;
 use rsws_db::{
-    ApiKeyRepository, UserRepository, OrderRepository,
-    ResourceRepository, WalletRepository, RedisService,
-    PaymentRepository,
+    ApiKeyRepository, OrderRepository, PaymentRepository, RedisService, ResourceRepository,
+    UserRepository, WalletRepository,
 };
+use std::sync::Arc;
 
 /// 创建 PayPal 服务（配置从数据库读取）
-pub fn create_paypal_service(config: Option<crate::config_service::PayPalDbConfig>) -> PayPalService {
+pub fn create_paypal_service(
+    config: Option<crate::config_service::PayPalDbConfig>,
+) -> PayPalService {
     PayPalService::new(config)
 }
 
@@ -73,12 +74,9 @@ pub fn create_api_key_service(pool: sqlx::PgPool) -> ApiKeyService {
 }
 
 /// 创建用户服务
-pub fn create_user_service(
-    pool: sqlx::PgPool,
-    redis: Option<RedisService>,
-) -> UserService {
+pub fn create_user_service(pool: sqlx::PgPool, redis: Option<RedisService>) -> UserService {
     let user_repo = UserRepository::new(pool);
-    
+
     if let Some(redis) = redis {
         UserService::with_redis(user_repo, redis)
     } else {

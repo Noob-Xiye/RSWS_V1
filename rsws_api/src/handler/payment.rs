@@ -2,10 +2,10 @@
 //!
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
+use crate::state::get_state;
+use rsws_common::{AuthHandler, ResponseExt};
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
-use rsws_common::{ResponseExt, AuthHandler};
-use crate::state::get_state;
 
 /// PayPal Webhook — 接收并处理 PayPal 事件通知
 ///
@@ -50,21 +50,44 @@ pub async fn paypal_webhook(req: &mut Request, depot: &mut Depot, res: &mut Resp
     let state = get_state(depot);
 
     // 构造签名验证参数
-    let _webhook_id = state.config_service.get("paypal.webhook_id").await
+    let _webhook_id = state
+        .config_service
+        .get("paypal.webhook_id")
+        .await
         .ok()
         .flatten()
         .unwrap_or_default();
     let event_json = event.to_string();
     let headers_for_verify: Vec<(String, String)> = vec![
-        ("PAYPAL-TRANSMISSION-ID".to_string(), transmission_id.unwrap_or_default()),
-        ("PAYPAL-TRANSMISSION-TIME".to_string(), transmission_time.unwrap_or_default()),
-        ("PAYPAL-TRANSMISSION-SIG".to_string(), transmission_sig.unwrap_or_default()),
-        ("PAYPAL-CERT-URL".to_string(), req.headers().get("paypal-cert-url").and_then(|v| v.to_str().ok()).unwrap_or("").to_string()),
+        (
+            "PAYPAL-TRANSMISSION-ID".to_string(),
+            transmission_id.unwrap_or_default(),
+        ),
+        (
+            "PAYPAL-TRANSMISSION-TIME".to_string(),
+            transmission_time.unwrap_or_default(),
+        ),
+        (
+            "PAYPAL-TRANSMISSION-SIG".to_string(),
+            transmission_sig.unwrap_or_default(),
+        ),
+        (
+            "PAYPAL-CERT-URL".to_string(),
+            req.headers()
+                .get("paypal-cert-url")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string(),
+        ),
         ("CONTENT-TYPE".to_string(), "application/json".to_string()),
     ];
 
     // 验证 PayPal Webhook 签名（dev 模式下失败不影响处理）
-    match state.paypal_service.verify_webhook(&headers_for_verify, event_json.as_bytes()).await {
+    match state
+        .paypal_service
+        .verify_webhook(&headers_for_verify, event_json.as_bytes())
+        .await
+    {
         Ok(true) => {}
         Ok(false) => {
             tracing::warn!("PayPal webhook signature verification failed");
@@ -79,15 +102,27 @@ pub async fn paypal_webhook(req: &mut Request, depot: &mut Depot, res: &mut Resp
     let event_type = event["event_type"].as_str().unwrap_or("UNKNOWN");
     let resource = &event["resource"];
 
-    tracing::info!("PayPal webhook: {} | id={}", event_type, event["id"].as_str().unwrap_or("?"));
+    tracing::info!(
+        "PayPal webhook: {} | id={}",
+        event_type,
+        event["id"].as_str().unwrap_or("?")
+    );
 
     match event_type {
         // 用户批准了 PayPal 订单 / 支付已完成
         "CHECKOUT.ORDER.APPROVED" | "PAYMENT.CAPTURE.COMPLETED" => {
             let paypal_order_id = resource["id"].as_str().unwrap_or("");
-            tracing::info!("PayPal order {} completed. Status: {}", paypal_order_id, resource["status"].as_str().unwrap_or(""));
+            tracing::info!(
+                "PayPal order {} completed. Status: {}",
+                paypal_order_id,
+                resource["status"].as_str().unwrap_or("")
+            );
 
-            if let Ok(Some(tx)) = state.payment_service.get_by_paypal_order(paypal_order_id).await {
+            if let Ok(Some(tx)) = state
+                .payment_service
+                .get_by_paypal_order(paypal_order_id)
+                .await
+            {
                 let order_id = tx.order_id;
                 let tx_id = tx.id;
 
@@ -96,10 +131,18 @@ pub async fn paypal_webhook(req: &mut Request, depot: &mut Depot, res: &mut Resp
                     res.http_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to update order");
                     return;
                 }
-                if let Err(e) = state.payment_service.update_status(tx_id, "completed", Some(paypal_order_id)).await {
+                if let Err(e) = state
+                    .payment_service
+                    .update_status(tx_id, "completed", Some(paypal_order_id))
+                    .await
+                {
                     tracing::error!("Failed to update transaction {}: {}", tx_id, e);
                 }
-                tracing::info!("Order {} paid via PayPal. TX: {}", order_id, paypal_order_id);
+                tracing::info!(
+                    "Order {} paid via PayPal. TX: {}",
+                    order_id,
+                    paypal_order_id
+                );
             } else {
                 tracing::warn!("PayPal order {} not found in our records", paypal_order_id);
             }
@@ -109,13 +152,29 @@ pub async fn paypal_webhook(req: &mut Request, depot: &mut Depot, res: &mut Resp
         // 支付被拒绝/退款
         "PAYMENT.CAPTURE.DENIED" | "PAYMENT.CAPTURE.REFUNDED" => {
             let paypal_order_id = resource["id"].as_str().unwrap_or("");
-            tracing::warn!("PayPal {} {}: {}", event_type, paypal_order_id, resource["status"].as_str().unwrap_or(""));
+            tracing::warn!(
+                "PayPal {} {}: {}",
+                event_type,
+                paypal_order_id,
+                resource["status"].as_str().unwrap_or("")
+            );
 
-            if let Ok(Some(tx)) = state.payment_service.get_by_paypal_order(paypal_order_id).await {
+            if let Ok(Some(tx)) = state
+                .payment_service
+                .get_by_paypal_order(paypal_order_id)
+                .await
+            {
                 let order_id = tx.order_id;
                 let _ = state.order_service.cancel(order_id, 0).await;
-                let status = if event_type == "PAYMENT.CAPTURE.REFUNDED" { "refunded" } else { "failed" };
-                let _ = state.payment_service.update_status(tx.id, status, None).await;
+                let status = if event_type == "PAYMENT.CAPTURE.REFUNDED" {
+                    "refunded"
+                } else {
+                    "failed"
+                };
+                let _ = state
+                    .payment_service
+                    .update_status(tx.id, status, None)
+                    .await;
             }
             res.success(serde_json::json!({ "status": "processed" }));
         }
@@ -149,8 +208,14 @@ pub async fn usdt_webhook(req: &mut Request, depot: &mut Depot, res: &mut Respon
 
     match payload {
         Ok(data) => {
-            tracing::info!("USDT webhook: {} {} from {} to {} amount {}",
-                data.network, data.tx_hash, data.from_address, data.to_address, data.amount);
+            tracing::info!(
+                "USDT webhook: {} {} from {} to {} amount {}",
+                data.network,
+                data.tx_hash,
+                data.from_address,
+                data.to_address,
+                data.amount
+            );
 
             let state = get_state(depot);
 
@@ -166,14 +231,21 @@ pub async fn usdt_webhook(req: &mut Request, depot: &mut Depot, res: &mut Respon
             };
 
             if data.to_address.to_lowercase() != expected_address.to_lowercase() {
-                tracing::warn!("USDT webhook: to_address mismatch. Expected: {}, Got: {}",
-                    expected_address, data.to_address);
+                tracing::warn!(
+                    "USDT webhook: to_address mismatch. Expected: {}, Got: {}",
+                    expected_address,
+                    data.to_address
+                );
                 res.success(serde_json::json!({ "status": "ignored" }));
                 return;
             }
 
-            tracing::info!("USDT deposit confirmed: {} {} amount {}",
-                data.network, data.tx_hash, data.amount);
+            tracing::info!(
+                "USDT deposit confirmed: {} {} amount {}",
+                data.network,
+                data.tx_hash,
+                data.amount
+            );
 
             // 真实确认由 processor.rs 链上监听完成，这里只记录
             res.success(serde_json::json!({ "status": "received", "tx_hash": data.tx_hash }));
@@ -210,16 +282,24 @@ pub async fn get_usdt_address(req: &mut Request, depot: &mut Depot, res: &mut Re
         Ok(configs) => configs,
         Err(e) => {
             tracing::error!("Failed to load blockchain configs: {}", e);
-            res.http_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to load blockchain config");
+            res.http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load blockchain config",
+            );
             return;
         }
     };
 
-    let bc_config = blockchain_configs.iter().find(|c| c.network == network && c.is_active);
+    let bc_config = blockchain_configs
+        .iter()
+        .find(|c| c.network == network && c.is_active);
     let contract = match bc_config {
         Some(c) => c.usdt_contract.clone(),
         None => {
-            res.http_error(StatusCode::BAD_REQUEST, "Unsupported or inactive network, use 'tron' or 'ethereum'");
+            res.http_error(
+                StatusCode::BAD_REQUEST,
+                "Unsupported or inactive network, use 'tron' or 'ethereum'",
+            );
             return;
         }
     };
@@ -233,7 +313,11 @@ pub async fn get_usdt_address(req: &mut Request, depot: &mut Depot, res: &mut Re
         }
     };
 
-    tracing::info!("User {} requesting USDT address for network: {}", user_id, network);
+    tracing::info!(
+        "User {} requesting USDT address for network: {}",
+        user_id,
+        network
+    );
 
     res.success(serde_json::json!({
         "network": network,

@@ -30,7 +30,8 @@ impl AuthService {
         body: &str,
     ) -> Result<i64, RswsError> {
         // 获取 API Key 记录
-        let api_key_record = self.api_key_repo
+        let api_key_record = self
+            .api_key_repo
             .get_by_api_key(api_key)
             .await?
             .ok_or_else(|| RswsError::business(ErrorCode::AUTH_INVALID_API_KEY))?;
@@ -63,7 +64,9 @@ impl AuthService {
         }
 
         // 更新最后使用时间
-        self.api_key_repo.update_last_used(api_key_record.id).await?;
+        self.api_key_repo
+            .update_last_used(api_key_record.id)
+            .await?;
 
         Ok(api_key_record.user_id)
     }

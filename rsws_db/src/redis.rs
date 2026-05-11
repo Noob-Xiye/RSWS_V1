@@ -16,12 +16,10 @@ impl RedisService {
     /// 创建 Redis 服务
     pub fn new(url: &str) -> Result<Self, RswsError> {
         let cfg = RedisConfig::from_url(url);
-        let pool = cfg
-            .create_pool(Some(Runtime::Tokio1))
-            .map_err(|e| {
-                error!("Failed to create Redis pool: {}", e);
-                RswsError::internal("Failed to create Redis pool")
-            })?;
+        let pool = cfg.create_pool(Some(Runtime::Tokio1)).map_err(|e| {
+            error!("Failed to create Redis pool: {}", e);
+            RswsError::internal("Failed to create Redis pool")
+        })?;
 
         Ok(Self { pool })
     }
@@ -42,10 +40,12 @@ impl RedisService {
     /// 设置键值（带过期时间，秒）
     pub async fn set_ex(&self, key: &str, value: &str, ttl_secs: u64) -> Result<(), RswsError> {
         let mut conn = self.get_connection().await?;
-        conn.set_ex::<_, _, ()>(key, value, ttl_secs).await.map_err(|e| {
-            error!("Failed to set Redis key: {}", e);
-            RswsError::internal("Failed to set Redis key")
-        })?;
+        conn.set_ex::<_, _, ()>(key, value, ttl_secs)
+            .await
+            .map_err(|e| {
+                error!("Failed to set Redis key: {}", e);
+                RswsError::internal("Failed to set Redis key")
+            })?;
         debug!("Redis SET {} (TTL: {}s)", key, ttl_secs);
         Ok(())
     }
@@ -112,7 +112,7 @@ impl RedisService {
     }
 
     /// 原子递增
-    /// 
+    ///
     /// # Arguments
     /// * `key` - Redis key
     /// * `delta` - 增量值
@@ -126,7 +126,7 @@ impl RedisService {
     }
 
     /// 设置键过期时间（秒）
-    /// 
+    ///
     /// # Returns
     /// * `true` - 设置成功
     /// * `false` - key 不存在
@@ -249,7 +249,10 @@ impl RedisService {
     }
 
     /// 获取缓存的用户信息
-    pub async fn get_cached_user<T: DeserializeOwned>(&self, user_id: i64) -> Result<Option<T>, RswsError> {
+    pub async fn get_cached_user<T: DeserializeOwned>(
+        &self,
+        user_id: i64,
+    ) -> Result<Option<T>, RswsError> {
         let key = Self::user_cache_key(user_id);
         self.get_json(&key).await
     }
@@ -274,7 +277,10 @@ mod tests {
             code_type: "login",
         };
         assert_eq!(cache.key(), "verify:login:test@example.com");
-        assert_eq!(cache.attempts_key(), "verify:login:test@example.com:attempts");
+        assert_eq!(
+            cache.attempts_key(),
+            "verify:login:test@example.com:attempts"
+        );
     }
 
     #[test]

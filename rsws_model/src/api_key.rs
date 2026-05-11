@@ -1,8 +1,8 @@
 //! API Key 模型
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use salvo_oapi::ToSchema;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// API Key

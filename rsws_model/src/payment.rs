@@ -1,8 +1,8 @@
 //! 支付模型
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use salvo_oapi::ToSchema;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 // ==================== 订单 ====================
@@ -19,7 +19,6 @@ pub enum OrderStatus {
     Cancelled,
     Refunded,
 }
-
 
 /// 订单
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -72,7 +71,6 @@ pub enum TransactionStatus {
     Cancelled,
     Refunded,
 }
-
 
 /// 支付交易
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

@@ -2,12 +2,14 @@
 //!
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
-use salvo::prelude::*;
-use serde::Deserialize;
-use salvo_oapi::endpoint;
-use rsws_common::{ResponseExt, AuthHandler, error_code::ErrorCode, RswsError};
-use rsws_model::user_models::user::{RegisterRequest, LoginRequest, ChangePasswordRequest, UpdateProfileRequest};
 use crate::state::get_state;
+use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
+use rsws_model::user_models::user::{
+    ChangePasswordRequest, LoginRequest, RegisterRequest, UpdateProfileRequest,
+};
+use salvo::prelude::*;
+use salvo_oapi::endpoint;
+use serde::Deserialize;
 
 /// 获取用户信息（按 ID）
 #[endpoint(
@@ -182,7 +184,7 @@ pub async fn update_profile(req: &mut Request, depot: &mut Depot, res: &mut Resp
             } else {
                 res.error_msg(
                     RswsError::from(ErrorCode::INVALID_PARAMETER),
-                    "No fields to update"
+                    "No fields to update",
                 );
             }
         }
@@ -213,7 +215,11 @@ pub async fn change_password(req: &mut Request, depot: &mut Depot, res: &mut Res
         Ok(data) => {
             let state = get_state(depot);
 
-            match state.user_service.change_password(user_id, &data.old_password, &data.new_password).await {
+            match state
+                .user_service
+                .change_password(user_id, &data.old_password, &data.new_password)
+                .await
+            {
                 Ok(()) => {
                     res.success(serde_json::json!({
                         "message": "Password changed successfully"
@@ -251,7 +257,11 @@ pub async fn send_code(req: &mut Request, _depot: &mut Depot, res: &mut Response
         Ok(data) => {
             let state = get_state(_depot);
 
-            match state.user_service.send_verification_code(&data.email, &data.scene).await {
+            match state
+                .user_service
+                .send_verification_code(&data.email, &data.scene)
+                .await
+            {
                 Ok(_ttl) => {
                     res.success(serde_json::json!({
                         "success": true,

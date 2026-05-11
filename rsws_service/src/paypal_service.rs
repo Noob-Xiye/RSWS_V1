@@ -2,10 +2,10 @@
 //!
 //! 配置从 paypal_configs 数据库表读取，不再依赖 config.toml
 
-use rsws_common::error::RswsError;
-use rsws_common::snowflake;
 use crate::config_service::PayPalDbConfig;
 use reqwest::Client;
+use rsws_common::error::RswsError;
+use rsws_common::snowflake;
 use serde_json::Value;
 use tracing::{info, warn};
 
@@ -30,7 +30,9 @@ impl PayPalService {
 
     /// 是否已配置
     pub fn is_configured(&self) -> bool {
-        self.config.as_ref().is_some_and(|c| !c.client_id.is_empty())
+        self.config
+            .as_ref()
+            .is_some_and(|c| !c.client_id.is_empty())
     }
 
     /// 获取 base URL（sandbox 或 live）
@@ -43,16 +45,17 @@ impl PayPalService {
 
     /// 获取 Access Token
     pub async fn get_access_token(&self) -> Result<String, RswsError> {
-        let config = self.config.as_ref()
+        let config = self
+            .config
+            .as_ref()
             .ok_or_else(|| RswsError::internal("PayPal not configured"))?;
 
         let auth_url = format!("{}/v1/oauth2/token", self.api_base_url());
 
-        let params = [
-            ("grant_type", "client_credentials"),
-        ];
+        let params = [("grant_type", "client_credentials")];
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&auth_url)
             .form(&params)
             .basic_auth(&config.client_id, Some(&config.client_secret))
@@ -67,7 +70,9 @@ impl PayPalService {
             return Err(RswsError::internal("Failed to authenticate with PayPal"));
         }
 
-        let json: Value = resp.json().await
+        let json: Value = resp
+            .json()
+            .await
             .map_err(|e| RswsError::internal(format!("Failed to parse token response: {}", e)))?;
 
         json["access_token"]
@@ -122,7 +127,8 @@ impl PayPalService {
             }
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&order_url)
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
@@ -138,7 +144,9 @@ impl PayPalService {
             return Err(RswsError::internal("Failed to create PayPal order"));
         }
 
-        let json: Value = resp.json().await
+        let json: Value = resp
+            .json()
+            .await
             .map_err(|e| RswsError::internal(format!("Failed to parse PayPal response: {}", e)))?;
 
         info!("PayPal order created: {:?}", json["id"]);
@@ -168,9 +176,14 @@ impl PayPalService {
 
         let _ = config; // 使用 config 确认已配置
         let token = self.get_access_token().await?;
-        let capture_url = format!("{}/v2/checkout/orders/{}/capture", self.api_base_url(), paypal_order_id);
+        let capture_url = format!(
+            "{}/v2/checkout/orders/{}/capture",
+            self.api_base_url(),
+            paypal_order_id
+        );
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&capture_url)
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
@@ -185,7 +198,9 @@ impl PayPalService {
             return Err(RswsError::internal("Failed to capture PayPal payment"));
         }
 
-        let json: Value = resp.json().await
+        let json: Value = resp
+            .json()
+            .await
             .map_err(|e| RswsError::internal(format!("Failed to parse PayPal response: {}", e)))?;
 
         info!("PayPal order captured: {:?}", json["id"]);
@@ -215,7 +230,8 @@ impl PayPalService {
         }
 
         let get_header = |key: &str| -> String {
-            headers.iter()
+            headers
+                .iter()
                 .find(|(k, _)| k.eq_ignore_ascii_case(key))
                 .map(|(_, v)| v.clone())
                 .unwrap_or_default()
@@ -235,7 +251,10 @@ impl PayPalService {
             .map_err(|e| RswsError::internal(format!("Failed to parse webhook body: {}", e)))?;
         let event_type = event_json["event_type"].as_str().unwrap_or("UNKNOWN");
 
-        let verify_url = format!("{}/v1/notifications/verify-webhook-signature", self.api_base_url());
+        let verify_url = format!(
+            "{}/v1/notifications/verify-webhook-signature",
+            self.api_base_url()
+        );
 
         let verify_body = serde_json::json!({
             "auth_algo": "SHA256withRSA",
@@ -255,7 +274,8 @@ impl PayPalService {
             }
         };
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&verify_url)
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
@@ -264,16 +284,23 @@ impl PayPalService {
             .await
             .map_err(|e| RswsError::internal(format!("PayPal verify request failed: {}", e)))?;
 
-        let resp_json: Value = resp.json().await
+        let resp_json: Value = resp
+            .json()
+            .await
             .unwrap_or_else(|_| serde_json::json!({ "verification_status": "FAILED" }));
 
-        let status = resp_json["verification_status"].as_str().unwrap_or("FAILED");
+        let status = resp_json["verification_status"]
+            .as_str()
+            .unwrap_or("FAILED");
 
         if status == "SUCCESS" {
             info!("PayPal webhook signature verified: event={}", event_type);
             Ok(true)
         } else {
-            warn!("PayPal webhook verification FAILED: {} | resp={}", event_type, resp_json);
+            warn!(
+                "PayPal webhook verification FAILED: {} | resp={}",
+                event_type, resp_json
+            );
             Ok(false)
         }
     }

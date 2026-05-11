@@ -34,7 +34,10 @@ impl WalletRepository {
     }
 
     /// 根据网络获取平台收款钱包（返回第一个激活的）
-    pub async fn get_platform_wallet(&self, network: &str) -> Result<Option<UsdtWallet>, RswsError> {
+    pub async fn get_platform_wallet(
+        &self,
+        network: &str,
+    ) -> Result<Option<UsdtWallet>, RswsError> {
         let wallet = sqlx::query_as::<_, UsdtWallet>(
             r#"
             SELECT id, address, network, name, is_active, total_received, created_at, updated_at 
@@ -82,7 +85,12 @@ impl WalletRepository {
     }
 
     /// 创建或更新钱包
-    pub async fn upsert(&self, network: &str, address: &str, name: Option<&str>) -> Result<UsdtWallet, RswsError> {
+    pub async fn upsert(
+        &self,
+        network: &str,
+        address: &str,
+        name: Option<&str>,
+    ) -> Result<UsdtWallet, RswsError> {
         let wallet = sqlx::query_as::<_, UsdtWallet>(
             r#"
             INSERT INTO usdt_wallets (address, network, name, is_active, created_at, updated_at)

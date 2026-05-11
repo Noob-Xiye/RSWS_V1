@@ -1,8 +1,8 @@
 //! 用户模型
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use salvo_oapi::ToSchema;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// 用户
@@ -11,8 +11,8 @@ pub struct User {
     pub id: i64,
     pub email: String,
     pub password_hash: String,
-    pub username: String,        // 登录用用户名（唯一）
-    pub nickname: String,        // 显示名称（可修改）
+    pub username: String, // 登录用用户名（唯一）
+    pub nickname: String, // 显示名称（可修改）
     pub avatar_url: Option<String>,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
@@ -49,8 +49,8 @@ pub struct UpdateProfileRequest {
 /// 注册请求
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterRequest {
-    pub username: String,        // 登录用用户名
-    pub nickname: String,        // 显示名称
+    pub username: String, // 登录用用户名
+    pub nickname: String, // 显示名称
     pub email: String,
     pub password: String,
 }
@@ -118,8 +118,8 @@ pub struct LoginResponse {
 pub struct UserInfo {
     pub id: i64,
     pub email: String,
-    pub username: String,        // 登录用用户名
-    pub nickname: String,        // 显示名称
+    pub username: String, // 登录用用户名
+    pub nickname: String, // 显示名称
     pub avatar_url: Option<String>,
     pub is_active: bool,
 }

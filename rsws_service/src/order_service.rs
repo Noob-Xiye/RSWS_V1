@@ -31,7 +31,8 @@ impl OrderService {
             return Err(RswsError::business(ErrorCode::PAYMENT_AMOUNT_INVALID));
         }
 
-        let order = self.order_repo
+        let order = self
+            .order_repo
             .create(user_id, resource_id, amount, payment_method, 30)
             .await?;
 
@@ -62,7 +63,9 @@ impl OrderService {
         page: i32,
         limit: i32,
     ) -> Result<(Vec<OrderDetail>, i64), RswsError> {
-        self.order_repo.list_detail_by_user(user_id, page, limit).await
+        self.order_repo
+            .list_detail_by_user(user_id, page, limit)
+            .await
     }
 
     /// 更新订单状态
@@ -78,7 +81,10 @@ impl OrderService {
 
     /// 取消订单
     pub async fn cancel(&self, order_id: i64, user_id: i64) -> Result<(), RswsError> {
-        let order = self.order_repo.get_by_id(order_id).await?
+        let order = self
+            .order_repo
+            .get_by_id(order_id)
+            .await?
             .ok_or_else(|| RswsError::business(ErrorCode::ORDER_NOT_FOUND))?;
 
         // 验证订单所有权
@@ -111,6 +117,8 @@ impl OrderService {
 
     /// 检查用户是否已购买某资源（通过已完成订单）
     pub async fn check_purchased(&self, user_id: i64, resource_id: i64) -> Result<bool, RswsError> {
-        self.order_repo.check_user_purchased(user_id, resource_id).await
+        self.order_repo
+            .check_user_purchased(user_id, resource_id)
+            .await
     }
 }

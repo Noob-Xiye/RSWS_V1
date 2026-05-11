@@ -4,12 +4,12 @@
 //! - 所有 handler 已通过 `require_admin` 中间件保护
 //! - handler 内部无需再检查权限
 
+use crate::state::get_state;
+use rsws_common::{ResponseExt, RswsError};
+use rsws_db::PayPalConfigRepository;
+use rsws_model::payment::UpdatePayPalConfigRequest;
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
-use rsws_common::{ResponseExt, RswsError};
-use rsws_model::payment::UpdatePayPalConfigRequest;
-use rsws_db::PayPalConfigRepository;
-use crate::state::get_state;
 
 /// 获取所有 PayPal 配置
 #[endpoint(
@@ -85,7 +85,10 @@ pub async fn update_paypal_config(req: &mut Request, depot: &mut Depot, res: &mu
     let body: UpdatePayPalConfigRequest = match req.parse_json().await {
         Ok(body) => body,
         Err(e) => {
-            res.error(RswsError::bad_request(format!("Invalid request body: {}", e)));
+            res.error(RswsError::bad_request(format!(
+                "Invalid request body: {}",
+                e
+            )));
             return;
         }
     };

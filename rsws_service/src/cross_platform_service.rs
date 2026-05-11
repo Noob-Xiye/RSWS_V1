@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// 平台配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,8 +75,9 @@ impl CrossPlatformService {
         local_id: &str,
         data: Value,
     ) -> Result<SyncRecord, RswsError> {
-        let config = self.configs.get(platform_name)
-            .ok_or_else(|| RswsError::bad_request(format!("Platform not found: {}", platform_name)))?;
+        let config = self.configs.get(platform_name).ok_or_else(|| {
+            RswsError::bad_request(format!("Platform not found: {}", platform_name))
+        })?;
 
         if !config.is_active {
             return Err(RswsError::bad_request("Platform is not active"));
@@ -88,7 +89,11 @@ impl CrossPlatformService {
         );
 
         // 构造同步 URL: {api_endpoint}/{operation_type}
-        let url = format!("{}/{}", config.api_endpoint.trim_end_matches('/'), operation_type);
+        let url = format!(
+            "{}/{}",
+            config.api_endpoint.trim_end_matches('/'),
+            operation_type
+        );
 
         // 构造请求体
         let mut body = serde_json::json!({
@@ -99,7 +104,9 @@ impl CrossPlatformService {
         });
 
         // 签名：HMAC-SHA256(api_secret, body_json) — 如果配置了 api_secret
-        let mut request = self.client.post(&url)
+        let mut request = self
+            .client
+            .post(&url)
             .header("Content-Type", "application/json");
 
         if let Some(ref api_key) = config.api_key {
@@ -107,8 +114,9 @@ impl CrossPlatformService {
         }
 
         if let Some(ref api_secret) = config.api_secret {
-            let body_str = serde_json::to_string(&body)
-                .map_err(|e| RswsError::internal(format!("Failed to serialize sync body: {}", e)))?;
+            let body_str = serde_json::to_string(&body).map_err(|e| {
+                RswsError::internal(format!("Failed to serialize sync body: {}", e))
+            })?;
             let signature = hmac_sha256(api_secret.as_bytes(), body_str.as_bytes());
             request = request.header("X-Signature", signature.clone());
             body["signature"] = Value::String(signature);
@@ -119,7 +127,12 @@ impl CrossPlatformService {
         for attempt in 0..3 {
             if attempt > 0 {
                 let delay = Duration::from_secs(1 << attempt); // 2s, 4s
-                info!("Retry attempt {} for {} sync, waiting {:?}", attempt + 1, platform_name, delay);
+                info!(
+                    "Retry attempt {} for {} sync, waiting {:?}",
+                    attempt + 1,
+                    platform_name,
+                    delay
+                );
                 tokio::time::sleep(delay).await;
             }
 
@@ -133,9 +146,12 @@ impl CrossPlatformService {
                 Ok(resp) => {
                     let status = resp.status();
                     if status.is_success() {
-                        let resp_data: Value = resp.json().await
+                        let resp_data: Value = resp
+                            .json()
+                            .await
                             .unwrap_or_else(|_| serde_json::json!({"status": "ok"}));
-                        let remote_id = resp_data.get("id")
+                        let remote_id = resp_data
+                            .get("id")
                             .or_else(|| resp_data.get("remote_id"))
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());
@@ -178,7 +194,10 @@ impl CrossPlatformService {
         }
 
         let error_message = last_error.unwrap_or_else(|| "Unknown sync error".to_string());
-        error!("Sync ultimately failed: platform={}, local_id={}, error={}", platform_name, local_id, error_message);
+        error!(
+            "Sync ultimately failed: platform={}, local_id={}, error={}",
+            platform_name, local_id, error_message
+        );
 
         Ok(SyncRecord {
             id: rsws_common::snowflake::next_id(),
@@ -205,13 +224,15 @@ impl Default for CrossPlatformService {
 fn hmac_sha256(key: &[u8], message: &[u8]) -> String {
     use hmac::Mac;
     use std::fmt::Write;
-    let mut hmac = hmac::Hmac::<sha2::Sha256>::new_from_slice(key)
-        .expect("HMAC can take key of any size");
+    let mut hmac =
+        hmac::Hmac::<sha2::Sha256>::new_from_slice(key).expect("HMAC can take key of any size");
     hmac.update(message);
     let result = hmac.finalize();
     let code_bytes = result.into_bytes();
-    code_bytes.iter().fold(String::with_capacity(64), |mut s: String, b: &u8| {
-        write!(s, "{:02x}", b).unwrap();
-        s
-    })
+    code_bytes
+        .iter()
+        .fold(String::with_capacity(64), |mut s: String, b: &u8| {
+            write!(s, "{:02x}", b).unwrap();
+            s
+        })
 }

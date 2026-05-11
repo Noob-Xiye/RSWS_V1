@@ -1,17 +1,17 @@
 //! USDT 交易监听服务
 
 use crate::{
-    config::{UsdtConfig, WalletAddress, ListenerStatus},
+    config::{ListenerStatus, UsdtConfig, WalletAddress},
+    ethereum::EthereumClient,
     processor::{TransactionProcessor, UsdtTransaction},
     tron::TronClient,
-    ethereum::EthereumClient,
     UsdtError,
 };
 use chrono::Utc;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
-use tracing::{info, error};
+use tracing::{error, info};
 
 /// USDT 监听服务
 pub struct UsdtListener {
@@ -100,10 +100,8 @@ impl UsdtListener {
                 match client.get_transactions(&wallet.address, 20).await {
                     Ok(transactions) => {
                         for raw_tx in transactions {
-                            let confirmations = client.calculate_confirmations(
-                                raw_tx.block_number,
-                                latest_block,
-                            );
+                            let confirmations =
+                                client.calculate_confirmations(raw_tx.block_number, latest_block);
 
                             if !client.is_confirmed(confirmations) {
                                 continue;
@@ -125,13 +123,18 @@ impl UsdtListener {
                             };
 
                             match processor.process_transaction(tx).await {
-                                Ok(result) => info!("Tron transaction processed: matched={}", result),
+                                Ok(result) => {
+                                    info!("Tron transaction processed: matched={}", result)
+                                }
                                 Err(e) => error!("Failed to process Tron transaction: {}", e),
                             }
                         }
                     }
                     Err(e) => {
-                        error!("Failed to get Tron transactions for {}: {}", wallet.address, e);
+                        error!(
+                            "Failed to get Tron transactions for {}: {}",
+                            wallet.address, e
+                        );
                     }
                 }
             }
@@ -188,13 +191,18 @@ impl UsdtListener {
                             };
 
                             match processor.process_transaction(tx).await {
-                                Ok(result) => info!("Ethereum transaction processed: matched={}", result),
+                                Ok(result) => {
+                                    info!("Ethereum transaction processed: matched={}", result)
+                                }
                                 Err(e) => error!("Failed to process Ethereum transaction: {}", e),
                             }
                         }
                     }
                     Err(e) => {
-                        error!("Failed to get Ethereum transactions for {}: {}", wallet.address, e);
+                        error!(
+                            "Failed to get Ethereum transactions for {}: {}",
+                            wallet.address, e
+                        );
                     }
                 }
             }
@@ -215,13 +223,15 @@ impl UsdtListener {
 
         Ok(rows
             .into_iter()
-            .map(|(address, network, name, is_active, total_received)| WalletAddress {
-                address,
-                network,
-                name,
-                is_active,
-                total_received,
-            })
+            .map(
+                |(address, network, name, is_active, total_received)| WalletAddress {
+                    address,
+                    network,
+                    name,
+                    is_active,
+                    total_received,
+                },
+            )
             .collect())
     }
 

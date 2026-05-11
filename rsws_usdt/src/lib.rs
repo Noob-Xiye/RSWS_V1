@@ -28,11 +28,11 @@
 //! ```
 
 pub mod config;
+pub mod ethereum;
 pub mod listener;
 pub mod matcher;
 pub mod processor;
 pub mod tron;
-pub mod ethereum;
 
 pub use config::UsdtConfig;
 pub use listener::UsdtListener;

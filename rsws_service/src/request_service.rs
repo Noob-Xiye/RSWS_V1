@@ -18,9 +18,7 @@ impl RequestService {
 
         info!("Creating request with ID: {}", request_id);
 
-        Ok(RequestResponse {
-            id: request_id,
-        })
+        Ok(RequestResponse { id: request_id })
     }
 }
 

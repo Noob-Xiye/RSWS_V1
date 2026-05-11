@@ -4,13 +4,13 @@
 //! 禁用 key → 删 Redis 缓存 → 强制下线。
 //! 改密码 → 清用户所有 Redis API Key 缓存。
 
+use md5;
+use rsws_common::error::RswsError;
+use rsws_db::{ApiKeyRepository, RedisService};
+use rsws_model::api_key::{ApiKey, ApiKeyResponse, CreateApiKeyRequest};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use md5;
-use rsws_db::{ApiKeyRepository, RedisService};
-use rsws_model::api_key::{ApiKey, CreateApiKeyRequest, ApiKeyResponse};
-use rsws_common::error::RswsError;
-use serde::{Serialize, Deserialize};
 
 /// Redis 中缓存的 API Key 会话信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,12 +32,18 @@ pub struct ApiKeyService {
 impl ApiKeyService {
     /// 创建 API Key 服务实例（无 Redis）
     pub fn new(repository: Arc<ApiKeyRepository>) -> Self {
-        Self { repository, redis: None }
+        Self {
+            repository,
+            redis: None,
+        }
     }
 
     /// 创建 API Key 服务实例（带 Redis 缓存）
     pub fn with_redis(repository: Arc<ApiKeyRepository>, redis: RedisService) -> Self {
-        Self { repository, redis: Some(redis) }
+        Self {
+            repository,
+            redis: Some(redis),
+        }
     }
 
     /// Redis key 格式
@@ -52,7 +58,8 @@ impl ApiKeyService {
     async fn session_ttl(&self) -> u64 {
         if let Some(ref redis) = self.redis {
             // 尝试从 system_configs 读，读不到用默认值
-            redis.get("config:api_key.session_expire_days")
+            redis
+                .get("config:api_key.session_expire_days")
                 .await
                 .ok()
                 .flatten()
@@ -75,7 +82,10 @@ impl ApiKeyService {
     ) -> Result<Option<ApiKey>, RswsError> {
         // 1) 先查 Redis
         if let Some(ref redis) = self.redis {
-            if let Some(cached) = redis.get_json::<CachedApiKey>(&Self::redis_key(api_key)).await? {
+            if let Some(cached) = redis
+                .get_json::<CachedApiKey>(&Self::redis_key(api_key))
+                .await?
+            {
                 // Redis 命中：验证 secret
                 if cached.api_secret == api_secret {
                     // 检查是否过期
@@ -113,8 +123,8 @@ impl ApiKeyService {
         // 3) DB 验证通过 → 写入 Redis
         if let Some(ref key_record) = result {
             if let Some(ref redis) = self.redis {
-                let permissions: Vec<String> = serde_json::from_value(key_record.permissions.clone())
-                    .unwrap_or_default();
+                let permissions: Vec<String> =
+                    serde_json::from_value(key_record.permissions.clone()).unwrap_or_default();
                 let cached = CachedApiKey {
                     user_id: key_record.user_id,
                     api_key_id: key_record.id,
@@ -124,7 +134,9 @@ impl ApiKeyService {
                     expires_at: key_record.expires_at,
                 };
                 let ttl = self.session_ttl().await;
-                let _ = redis.set_json(&Self::redis_key(api_key), &cached, ttl).await;
+                let _ = redis
+                    .set_json(&Self::redis_key(api_key), &cached, ttl)
+                    .await;
             }
         }
 
@@ -137,14 +149,12 @@ impl ApiKeyService {
         user_id: i64,
         request: CreateApiKeyRequest,
     ) -> Result<ApiKeyResponse, RswsError> {
-        let (api_key, api_secret) = self.repository
-            .create(user_id, &request)
-            .await?;
+        let (api_key, api_secret) = self.repository.create(user_id, &request).await?;
 
         // 创建后写入 Redis 缓存
         if let Some(ref redis) = self.redis {
-            let permissions: Vec<String> = serde_json::from_value(api_key.permissions.clone())
-                .unwrap_or_default();
+            let permissions: Vec<String> =
+                serde_json::from_value(api_key.permissions.clone()).unwrap_or_default();
             let cached = CachedApiKey {
                 user_id: api_key.user_id,
                 api_key_id: api_key.id,
@@ -154,7 +164,9 @@ impl ApiKeyService {
                 expires_at: api_key.expires_at,
             };
             let ttl = self.session_ttl().await;
-            let _ = redis.set_json(&Self::redis_key(&api_key.api_key), &cached, ttl).await;
+            let _ = redis
+                .set_json(&Self::redis_key(&api_key.api_key), &cached, ttl)
+                .await;
         }
 
         Ok(ApiKeyResponse {
@@ -180,7 +192,8 @@ impl ApiKeyService {
     pub async fn delete(&self, api_key_id: i64, user_id: i64) -> Result<bool, RswsError> {
         // 删前先取 key 名称，用于清 Redis
         let keys = self.repository.get_user_api_keys(user_id).await?;
-        let key_value = keys.iter()
+        let key_value = keys
+            .iter()
             .find(|k| k.id == api_key_id)
             .map(|k| k.api_key.clone());
 
@@ -246,7 +259,10 @@ impl ApiKeyService {
     ) -> Result<Option<ApiKey>, RswsError> {
         // 1) 获取 api_secret（先查 Redis 缓存）
         let api_secret = if let Some(ref redis) = self.redis {
-            if let Some(cached) = redis.get_json::<CachedApiKey>(&Self::redis_key(api_key)).await? {
+            if let Some(cached) = redis
+                .get_json::<CachedApiKey>(&Self::redis_key(api_key))
+                .await?
+            {
                 Some(cached.api_secret)
             } else {
                 None
@@ -264,8 +280,8 @@ impl ApiKeyService {
                     Some(r) => {
                         // 写入 Redis 缓存
                         if let Some(ref redis) = self.redis {
-                            let permissions: Vec<String> = serde_json::from_value(r.permissions.clone())
-                                .unwrap_or_default();
+                            let permissions: Vec<String> =
+                                serde_json::from_value(r.permissions.clone()).unwrap_or_default();
                             let cached = CachedApiKey {
                                 user_id: r.user_id,
                                 api_key_id: r.id,
@@ -275,7 +291,9 @@ impl ApiKeyService {
                                 expires_at: r.expires_at,
                             };
                             let ttl = self.session_ttl().await;
-                            let _ = redis.set_json(&Self::redis_key(api_key), &cached, ttl).await;
+                            let _ = redis
+                                .set_json(&Self::redis_key(api_key), &cached, ttl)
+                                .await;
                         }
                         r.api_secret
                     }
@@ -295,7 +313,9 @@ impl ApiKeyService {
         } else {
             tracing::warn!(
                 "Signature mismatch for api_key: {}. Expected: {}, Got: {}",
-                api_key, computed_sign, sign
+                api_key,
+                computed_sign,
+                sign
             );
             Ok(None)
         }
@@ -311,13 +331,12 @@ impl ApiKeyService {
 /// 4. MD5 计算并转小写 hex
 fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> String {
     // 1. 获取所有 key（排除 sign），排序
-    let mut keys: Vec<&String> = params.keys()
-        .filter(|k| (*k).as_str() != "sign")
-        .collect();
+    let mut keys: Vec<&String> = params.keys().filter(|k| (*k).as_str() != "sign").collect();
     keys.sort();
 
     // 2. 按 ASCII 顺序拼接 key + value
-    let param_str: String = keys.iter()
+    let param_str: String = keys
+        .iter()
         .map(|k| format!("{}{}", k, params[*k]))
         .collect();
 
@@ -397,7 +416,10 @@ mod tests {
         let sig1 = compute_signature(&params1, "secret");
         let sig2 = compute_signature(&params2, "secret");
 
-        assert_ne!(sig1, sig2, "Different inputs should produce different signatures");
+        assert_ne!(
+            sig1, sig2,
+            "Different inputs should produce different signatures"
+        );
     }
 
     #[test]
@@ -408,7 +430,10 @@ mod tests {
         let sig1 = compute_signature(&params, "secret1");
         let sig2 = compute_signature(&params, "secret2");
 
-        assert_ne!(sig1, sig2, "Different secrets should produce different signatures");
+        assert_ne!(
+            sig1, sig2,
+            "Different secrets should produce different signatures"
+        );
     }
 
     #[test]
@@ -431,10 +456,7 @@ mod tests {
         // 拼接: api_secret + "api_key" + "test" + "nonce" + "nonce123" + "timestamp" + "1234567890"
         let expected_concat = format!(
             "{}{}{}{}{}{}{}",
-            api_secret,
-            "api_key", "test",
-            "nonce", "nonce123",
-            "timestamp", "1234567890"
+            api_secret, "api_key", "test", "nonce", "nonce123", "timestamp", "1234567890"
         );
 
         // 手动计算 MD5 (使用 Rust md5 crate)

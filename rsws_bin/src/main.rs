@@ -6,16 +6,16 @@
 //! 3. 从 DB 读取动态配置（PayPal/区块链/Email/USDT监听等）
 //! 4. 构建服务并启动
 
-use salvo::prelude::*;
-use std::sync::Arc;
-use salvo::Server;
 use rsws_api::router;
 use rsws_api::state::AppState;
 use rsws_common::config::load_config;
 use rsws_common::error::RswsError;
-use sqlx::postgres::PgPoolOptions;
-use tracing::{info, error, warn};
 use rsws_db::RedisPool;
+use salvo::prelude::*;
+use salvo::Server;
+use sqlx::postgres::PgPoolOptions;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 /// 初始化结构化日志
@@ -24,8 +24,7 @@ use tracing_subscriber::EnvFilter;
 /// - `RUST_LOG`: 日志级别过滤 (e.g., "info,rsws=debug")
 /// - `LOG_FORMAT`: 输出格式，"json" (默认) 或 "pretty" (开发)
 fn init_logging() {
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     let format = std::env::var("LOG_FORMAT").unwrap_or_else(|_| "json".to_string());
 
@@ -66,7 +65,10 @@ async fn main() -> Result<(), RswsError> {
         RswsError::internal("Failed to load config")
     })?;
 
-    info!("Config loaded: {}:{}", config.server.host, config.server.port);
+    info!(
+        "Config loaded: {}:{}",
+        config.server.host, config.server.port
+    );
 
     // ========== 2. 初始化数据库和 Redis 连接 ==========
     let pool = PgPoolOptions::new()
@@ -114,25 +116,37 @@ async fn main() -> Result<(), RswsError> {
     };
 
     // 读取区块链配置
-    let blockchain_configs = config_service.get_blockchain_configs().await
+    let blockchain_configs = config_service
+        .get_blockchain_configs()
+        .await
         .map_err(|e| {
             warn!("Failed to load blockchain configs from DB: {}", e);
             e
         })
         .unwrap_or_default();
-    info!("Blockchain configs loaded: {} networks", blockchain_configs.len());
+    info!(
+        "Blockchain configs loaded: {} networks",
+        blockchain_configs.len()
+    );
 
     // 读取 USDT 监听配置
-    let usdt_listen_configs = config_service.get_usdt_listen_configs().await
+    let usdt_listen_configs = config_service
+        .get_usdt_listen_configs()
+        .await
         .map_err(|e| {
             warn!("Failed to load USDT listen configs from DB: {}", e);
             e
         })
         .unwrap_or_default();
-    info!("USDT listen configs loaded: {} networks", usdt_listen_configs.len());
+    info!(
+        "USDT listen configs loaded: {} networks",
+        usdt_listen_configs.len()
+    );
 
     // 读取 Email 配置
-    let email_db_config = config_service.get_email_config().await
+    let email_db_config = config_service
+        .get_email_config()
+        .await
         .map_err(|e| warn!("Failed to load email config from DB: {}", e))
         .ok()
         .flatten(); // Result<Option<EmailDbConfig>> → Option<EmailDbConfig>
@@ -154,10 +168,17 @@ async fn main() -> Result<(), RswsError> {
             match rsws_common::email::EmailService::new(&email_config) {
                 Ok(email_service) => {
                     info!("Email service initialized");
-                    rsws_service::create_user_service_with_email(pool.clone(), Some(redis_pool.clone()), email_service)
+                    rsws_service::create_user_service_with_email(
+                        pool.clone(),
+                        Some(redis_pool.clone()),
+                        email_service,
+                    )
                 }
                 Err(e) => {
-                    warn!("Failed to initialize email service: {}, continuing without email", e);
+                    warn!(
+                        "Failed to initialize email service: {}, continuing without email",
+                        e
+                    );
                     rsws_service::create_user_service(pool.clone(), Some(redis_pool.clone()))
                 }
             }
@@ -210,7 +231,8 @@ async fn main() -> Result<(), RswsError> {
     );
 
     // ========== 5. 启动 USDT 监听服务（配置来自数据库） ==========
-    let tron_listener_config = usdt_listen_configs.iter()
+    let tron_listener_config = usdt_listen_configs
+        .iter()
         .find(|c| c.network == "tron" && c.is_active)
         .map(|c| rsws_usdt::UsdtConfig {
             network: c.network.clone(),
@@ -222,7 +244,8 @@ async fn main() -> Result<(), RswsError> {
             is_active: c.is_active,
         });
 
-    let eth_listener_config = usdt_listen_configs.iter()
+    let eth_listener_config = usdt_listen_configs
+        .iter()
         .find(|c| c.network == "ethereum" && c.is_active)
         .map(|c| rsws_usdt::UsdtConfig {
             network: c.network.clone(),
@@ -235,11 +258,8 @@ async fn main() -> Result<(), RswsError> {
         });
 
     if tron_listener_config.is_some() || eth_listener_config.is_some() {
-        let listener = rsws_usdt::UsdtListener::new(
-            pool.clone(),
-            tron_listener_config,
-            eth_listener_config,
-        );
+        let listener =
+            rsws_usdt::UsdtListener::new(pool.clone(), tron_listener_config, eth_listener_config);
         listener.start().await;
         info!("USDT listener started (configs from database)");
     } else {

@@ -2,13 +2,13 @@
 //!
 //! 所有配置均从数据库读取（blockchain_configs + usdt_listen_configs 表）
 
+use crate::config_service::BlockchainDbConfig;
+use reqwest::Client;
 use rsws_common::error::RswsError;
 use rsws_db::WalletRepository;
-use crate::config_service::BlockchainDbConfig;
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::{info, warn};
-use reqwest::Client;
 
 /// 区块链服务
 pub struct BlockchainService {
@@ -93,12 +93,17 @@ impl BlockchainService {
                 }
                 match resp.json::<Value>().await {
                     Ok(json) => {
-                        let confirmed = json.get("data")
+                        let confirmed = json
+                            .get("data")
                             .and_then(|d| d.get(0))
                             .and_then(|tx| tx.get("confirmed"))
                             .and_then(|c| c.as_bool())
                             .unwrap_or(false);
-                        let confirmations = if confirmed { config.min_confirmations } else { 0 };
+                        let confirmations = if confirmed {
+                            config.min_confirmations
+                        } else {
+                            0
+                        };
                         Ok(serde_json::json!({
                             "hash": tx_hash,
                             "network": "tron",
@@ -117,7 +122,10 @@ impl BlockchainService {
             }
             Err(e) => {
                 warn!("TronGrid request failed: {}", e);
-                Err(RswsError::internal(format!("TronGrid request failed: {}", e)))
+                Err(RswsError::internal(format!(
+                    "TronGrid request failed: {}",
+                    e
+                )))
             }
         }
     }
@@ -135,7 +143,8 @@ impl BlockchainService {
         let url = format!(
             "{}/api?module=transaction&action=gettxreceiptstatus&txhash={}&apikey={}",
             config.api_url.trim_end_matches('/'),
-            tx_hash, api_key
+            tx_hash,
+            api_key
         );
 
         match self.client.get(&url).send().await {
@@ -151,12 +160,17 @@ impl BlockchainService {
                 }
                 match resp.json::<Value>().await {
                     Ok(json) => {
-                        let status = json.get("result")
+                        let status = json
+                            .get("result")
                             .and_then(|r| r.get("status"))
                             .and_then(|s| s.as_str())
                             .unwrap_or("0");
                         let is_success = status == "1";
-                        let confirmations = if is_success { config.min_confirmations } else { 0 };
+                        let confirmations = if is_success {
+                            config.min_confirmations
+                        } else {
+                            0
+                        };
                         Ok(serde_json::json!({
                             "hash": tx_hash,
                             "network": "ethereum",
@@ -175,7 +189,10 @@ impl BlockchainService {
             }
             Err(e) => {
                 warn!("Etherscan request failed: {}", e);
-                Err(RswsError::internal(format!("Etherscan request failed: {}", e)))
+                Err(RswsError::internal(format!(
+                    "Etherscan request failed: {}",
+                    e
+                )))
             }
         }
     }
@@ -196,7 +213,12 @@ impl BlockchainService {
     }
 
     /// 更新或创建 USDT 钱包
-    pub async fn upsert_usdt_wallet(&self, network: &str, address: &str, name: Option<&str>) -> Result<rsws_db::wallet::UsdtWallet, RswsError> {
+    pub async fn upsert_usdt_wallet(
+        &self,
+        network: &str,
+        address: &str,
+        name: Option<&str>,
+    ) -> Result<rsws_db::wallet::UsdtWallet, RswsError> {
         self.wallet_repo.upsert(network, address, name).await
     }
 }

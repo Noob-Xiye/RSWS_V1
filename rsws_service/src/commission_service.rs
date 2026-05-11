@@ -16,7 +16,10 @@ impl CommissionService {
     /// 计算佣金金额。amount 是以分为单位的订单金额，rate 是万分比。
     pub fn calculate(&self, order_id: i64, amount: i64, rate: i64) -> i64 {
         let commission = amount * rate / 10000;
-        info!("Commission calc: order={} amount={} rate={} => {}", order_id, amount, rate, commission);
+        info!(
+            "Commission calc: order={} amount={} rate={} => {}",
+            order_id, amount, rate, commission
+        );
         commission
     }
 
@@ -32,10 +35,10 @@ impl CommissionService {
             WHERE o.id = $1
             "#,
         )
-            .bind(order_id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Query commission data: {}", e)))?;
+        .bind(order_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Query commission data: {}", e)))?;
 
         let (order_amount, commission_rate, referrer_id) = match row {
             Some(r) => r,
@@ -54,7 +57,10 @@ impl CommissionService {
         };
 
         if commission_rate <= 0 {
-            info!("Order {} commission_rate={}, skipping", order_id, commission_rate);
+            info!(
+                "Order {} commission_rate={}, skipping",
+                order_id, commission_rate
+            );
             return Ok(());
         }
 
@@ -81,8 +87,10 @@ impl CommissionService {
             .await
             .map_err(|e| RswsError::internal(format!("Insert commission: {}", e)))?;
 
-        info!("Commission settled: order={} referrer={} amount={} rate={}",
-              order_id, referrer_id, commission_amount, commission_rate);
+        info!(
+            "Commission settled: order={} referrer={} amount={} rate={}",
+            order_id, referrer_id, commission_amount, commission_rate
+        );
         Ok(())
     }
 

@@ -2,10 +2,10 @@
 //!
 //! 所有 API 返回统一的响应结构
 
-use serde::{Deserialize, Serialize};
-use salvo_oapi::ToSchema;
-use salvo::prelude::*;
 use super::error_code::ErrorCode;
+use salvo::prelude::*;
+use salvo_oapi::ToSchema;
+use serde::{Deserialize, Serialize};
 
 /// 统一 API 响应格式
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -186,10 +186,9 @@ impl<T: Serialize + Send> ApiResponse<T> {
     /// 转换为 Salvo Response
     pub fn into_response(self) -> Response {
         use salvo::prelude::Json;
-        
-        let status = salvo::http::StatusCode::from_u16(
-            ErrorCode::from(self.code).http_status()
-        ).unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
+
+        let status = salvo::http::StatusCode::from_u16(ErrorCode::from(self.code).http_status())
+            .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
 
         let mut res = Response::new();
         res.status_code(status);

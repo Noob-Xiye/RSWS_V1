@@ -58,7 +58,7 @@ pub fn load_config() -> Result<AppConfig, ConfigError> {
         .add_source(
             Environment::with_prefix("RSWS")
                 .prefix_separator("_")
-                .separator("_")
+                .separator("_"),
         )
         .build()?;
 

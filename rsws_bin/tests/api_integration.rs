@@ -21,13 +21,15 @@ mod tests {
     #[test]
     fn test_route_structure_integrity() {
         // 公开端点（无需认证）
-        let public_routes = [("GET", "/health"),
+        let public_routes = [
+            ("GET", "/health"),
             ("POST", "/api/v1/admin/login"),
             ("GET", "/api/v1/payment/usdt/<network>"),
             ("GET", "/api/v1/payment/paypal/success"),
             ("GET", "/api/v1/payment/paypal/cancel"),
             ("POST", "/api/v1/webhook/paypal"),
-            ("POST", "/api/v1/webhook/usdt")];
+            ("POST", "/api/v1/webhook/usdt"),
+        ];
 
         // 需要认证的端点
         let protected_routes = vec![
@@ -45,11 +47,18 @@ mod tests {
         ];
 
         // 确保路由列表不为空
-        assert!(!public_routes.is_empty(), "Public routes should not be empty");
-        assert!(!protected_routes.is_empty(), "Protected routes should not be empty");
+        assert!(
+            !public_routes.is_empty(),
+            "Public routes should not be empty"
+        );
+        assert!(
+            !protected_routes.is_empty(),
+            "Protected routes should not be empty"
+        );
 
         // 确保没有重复路由
-        let all_routes: Vec<_> = public_routes.iter()
+        let all_routes: Vec<_> = public_routes
+            .iter()
             .chain(protected_routes.iter())
             .collect();
         let mut seen = HashMap::new();
@@ -70,7 +79,11 @@ mod tests {
         // 验证 AppConfig 需要的字段存在
         // 这确保配置结构变更时测试会提醒更新
         let required_config_sections = ["server", "database", "redis", "encryption"];
-        assert_eq!(required_config_sections.len(), 4, "Config should have 4 sections");
+        assert_eq!(
+            required_config_sections.len(),
+            4,
+            "Config should have 4 sections"
+        );
 
         // 验证服务器配置字段
         let server_fields = ["host", "port", "cors_origins"];
@@ -89,9 +102,18 @@ mod tests {
 
         assert!(allowed_methods.contains(&"GET"), "GET should be allowed");
         assert!(allowed_methods.contains(&"POST"), "POST should be allowed");
-        assert!(allowed_methods.contains(&"OPTIONS"), "OPTIONS (preflight) should be allowed");
-        assert!(allowed_headers.contains(&"X-Api-Key"), "X-Api-Key header should be allowed");
-        assert!(allowed_headers.contains(&"X-Signature"), "X-Signature header should be allowed");
+        assert!(
+            allowed_methods.contains(&"OPTIONS"),
+            "OPTIONS (preflight) should be allowed"
+        );
+        assert!(
+            allowed_headers.contains(&"X-Api-Key"),
+            "X-Api-Key header should be allowed"
+        );
+        assert!(
+            allowed_headers.contains(&"X-Signature"),
+            "X-Signature header should be allowed"
+        );
     }
 
     /// 验证订单状态流转的合理性
@@ -100,11 +122,23 @@ mod tests {
         let valid_statuses = ["pending", "paid", "completed", "cancelled", "refunded"];
 
         // 有效状态转换: pending → paid → completed
-        assert!(valid_statuses.contains(&"pending"), "pending is a valid status");
+        assert!(
+            valid_statuses.contains(&"pending"),
+            "pending is a valid status"
+        );
         assert!(valid_statuses.contains(&"paid"), "paid is a valid status");
-        assert!(valid_statuses.contains(&"completed"), "completed is a valid status");
-        assert!(valid_statuses.contains(&"cancelled"), "cancelled is a valid status");
-        assert!(valid_statuses.contains(&"refunded"), "refunded is a valid status");
+        assert!(
+            valid_statuses.contains(&"completed"),
+            "completed is a valid status"
+        );
+        assert!(
+            valid_statuses.contains(&"cancelled"),
+            "cancelled is a valid status"
+        );
+        assert!(
+            valid_statuses.contains(&"refunded"),
+            "refunded is a valid status"
+        );
 
         // 无效转换: cancelled → paid (不应发生)
         // 这个测试确保状态模型的一致性
@@ -127,9 +161,15 @@ mod tests {
             let code_str = code.to_string();
             assert_eq!(code_str.len(), 5, "Error code {} should be 5 digits", code);
             assert!(
-                code_str.starts_with('1') || code_str.starts_with('2') || code_str.starts_with('3')
-                    || code_str.starts_with('4') || code_str.starts_with('5') || code_str.starts_with('6')
-                    || code_str.starts_with('7') || code_str.starts_with('8') || code_str.starts_with('9'),
+                code_str.starts_with('1')
+                    || code_str.starts_with('2')
+                    || code_str.starts_with('3')
+                    || code_str.starts_with('4')
+                    || code_str.starts_with('5')
+                    || code_str.starts_with('6')
+                    || code_str.starts_with('7')
+                    || code_str.starts_with('8')
+                    || code_str.starts_with('9'),
                 "Error code {} should start with system digit 1-9",
                 code
             );
@@ -145,9 +185,17 @@ mod tests {
         let migration_files: Vec<_> = std::fs::read_dir(migration_dir)
             .expect("Should read migrations dir")
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|ext| ext == "sql").unwrap_or(false))
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext == "sql")
+                    .unwrap_or(false)
+            })
             .collect();
 
-        assert!(!migration_files.is_empty(), "At least one migration file should exist");
+        assert!(
+            !migration_files.is_empty(),
+            "At least one migration file should exist"
+        );
     }
 }

@@ -2,10 +2,10 @@
 //!
 //! 为 Salvo Response 提供统一的成功/错误响应方法，减少 handler 中的样板代码
 
-use salvo::prelude::*;
-use serde::Serialize;
 use crate::error::RswsError;
 use crate::response::ApiResponse;
+use salvo::prelude::*;
+use serde::Serialize;
 
 /// Response 扩展 Trait
 pub trait ResponseExt {
@@ -54,7 +54,10 @@ impl ResponseExt for Response {
         let status = salvo::http::StatusCode::from_u16(code.http_status())
             .unwrap_or(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
         self.status_code(status);
-        self.render(Json(ApiResponse::<()>::error_with_message(code, err.to_string())));
+        self.render(Json(ApiResponse::<()>::error_with_message(
+            code,
+            err.to_string(),
+        )));
     }
 
     fn error_msg(&mut self, err: RswsError, msg: impl Into<String>) {

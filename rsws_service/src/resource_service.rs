@@ -3,7 +3,7 @@
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_db::ResourceRepository;
-use rsws_model::resource::{Resource, CreateResourceRequest, UpdateResourceRequest};
+use rsws_model::resource::{CreateResourceRequest, Resource, UpdateResourceRequest};
 use std::sync::Arc;
 use tracing::info;
 
@@ -30,7 +30,9 @@ impl ResourceService {
         page: i64,
         page_size: i64,
     ) -> Result<(Vec<Resource>, i64), RswsError> {
-        self.resource_repo.get_list(category_id, page, page_size).await
+        self.resource_repo
+            .get_list(category_id, page, page_size)
+            .await
     }
 
     /// 搜索资源列表
@@ -41,25 +43,30 @@ impl ResourceService {
         page: i64,
         page_size: i64,
     ) -> Result<(Vec<Resource>, i64), RswsError> {
-        self.resource_repo.get_list_with_search(category_id, search, page, page_size).await
+        self.resource_repo
+            .get_list_with_search(category_id, search, page, page_size)
+            .await
     }
 
     /// 递增资源下载计数
     pub async fn increment_download_count(&self, resource_id: i64) -> Result<(), RswsError> {
-        self.resource_repo.increment_download_count(resource_id).await
+        self.resource_repo
+            .increment_download_count(resource_id)
+            .await
     }
 
     /// 创建资源
-    pub async fn create(&self, req: CreateResourceRequest, user_id: i64) -> Result<Resource, RswsError> {
+    pub async fn create(
+        &self,
+        req: CreateResourceRequest,
+        user_id: i64,
+    ) -> Result<Resource, RswsError> {
         // 验证价格
         if req.price < 0 {
             return Err(RswsError::business(ErrorCode::INVALID_PARAMETER));
         }
 
-        let resource = self.resource_repo.create(
-            user_id,
-            &req,
-        ).await?;
+        let resource = self.resource_repo.create(user_id, &req).await?;
 
         info!("Resource created: {} by user {}", resource.id, user_id);
 
@@ -67,19 +74,24 @@ impl ResourceService {
     }
 
     /// 更新资源
-    pub async fn update(&self, resource_id: i64, req: UpdateResourceRequest, user_id: i64) -> Result<Resource, RswsError> {
+    pub async fn update(
+        &self,
+        resource_id: i64,
+        req: UpdateResourceRequest,
+        user_id: i64,
+    ) -> Result<Resource, RswsError> {
         // 检查资源是否存在且属于该用户
-        let existing = self.resource_repo.get_by_id(resource_id).await?
+        let existing = self
+            .resource_repo
+            .get_by_id(resource_id)
+            .await?
             .ok_or_else(|| RswsError::business(ErrorCode::RESOURCE_NOT_FOUND))?;
 
         if existing.user_id != user_id {
             return Err(RswsError::business(ErrorCode::AUTH_PERMISSION_DENIED));
         }
 
-        let updated = self.resource_repo.update(
-            resource_id,
-            &req,
-        ).await?;
+        let updated = self.resource_repo.update(resource_id, &req).await?;
 
         info!("Resource updated: {} by user {}", resource_id, user_id);
 
@@ -89,7 +101,10 @@ impl ResourceService {
     /// 删除资源
     pub async fn delete(&self, resource_id: i64, user_id: i64) -> Result<(), RswsError> {
         // 检查资源是否存在且属于该用户
-        let existing = self.resource_repo.get_by_id(resource_id).await?
+        let existing = self
+            .resource_repo
+            .get_by_id(resource_id)
+            .await?
             .ok_or_else(|| RswsError::business(ErrorCode::RESOURCE_NOT_FOUND))?;
 
         if existing.user_id != user_id {

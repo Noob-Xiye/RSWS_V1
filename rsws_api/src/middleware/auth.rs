@@ -9,11 +9,11 @@
 //!
 //! Admin 权限检查中间件
 
-use salvo::prelude::*;
 use crate::state::get_state;
-use std::collections::HashMap;
 use md5;
 use rsws_common::error::RswsError;
+use salvo::prelude::*;
+use std::collections::HashMap;
 
 /// 获取真实客户端 IP（考虑可信代理）
 ///
@@ -28,38 +28,39 @@ fn get_real_client_ip(req: &Request, trusted_proxies: &[String]) -> String {
         salvo::conn::SocketAddr::IPv6(v6) => v6.ip().to_string(),
         _ => "unknown".to_string(),
     };
-    
+
     // 如果没有可信代理配置，不信任 X-Forwarded-For
     if trusted_proxies.is_empty() {
         return remote_ip;
     }
-    
+
     // 检查连接 IP 是否在可信代理列表中
     if !trusted_proxies.contains(&remote_ip) {
         return remote_ip;
     }
-    
+
     // 连接来自可信代理，解析 X-Forwarded-For
-    if let Some(xff) = req.headers()
+    if let Some(xff) = req
+        .headers()
         .get("X-Forwarded-For")
         .and_then(|v| v.to_str().ok())
     {
         // X-Forwarded-For 格式: client, proxy1, proxy2, ...
         // 找到最右边一个不在可信代理列表中的 IP
         let ips: Vec<&str> = xff.split(',').map(|s| s.trim()).collect();
-        
+
         for ip in ips.iter().rev() {
             if !trusted_proxies.contains(&ip.to_string()) {
                 return ip.to_string();
             }
         }
-        
+
         // 所有 IP 都在可信代理列表中，返回最左边的（原始客户端）
         if let Some(first_ip) = ips.first() {
             return first_ip.to_string();
         }
     }
-    
+
     // 无法解析 X-Forwarded-For，使用连接 IP
     remote_ip
 }
@@ -108,10 +109,12 @@ pub async fn api_key_auth(
         // 检查时间戳防重放
         if let Err(e) = check_timestamp(&timestamp) {
             res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(rsws_common::response::ApiResponse::<()>::error_with_message(
-                e.error_code(),
-                e.to_string()
-            )));
+            res.render(Json(
+                rsws_common::response::ApiResponse::<()>::error_with_message(
+                    e.error_code(),
+                    e.to_string(),
+                ),
+            ));
             return;
         }
 
@@ -120,7 +123,7 @@ pub async fn api_key_auth(
         params.insert("api_key".to_string(), api_key.clone());
         params.insert("timestamp".to_string(), timestamp.clone());
         params.insert("nonce".to_string(), nonce.clone());
-        
+
         // 从查询参数和表单数据收集其他参数
         if let Some(query) = req.query::<HashMap<String, String>>("") {
             for (k, v) in query {
@@ -131,9 +134,13 @@ pub async fn api_key_auth(
         }
 
         let state = get_state(depot);
-        
+
         // 先尝试普通用户
-        match state.api_key_service.validate_signature(&api_key, &params, &sign).await {
+        match state
+            .api_key_service
+            .validate_signature(&api_key, &params, &sign)
+            .await
+        {
             Ok(Some(api_key_record)) => {
                 depot.insert("user_id", api_key_record.user_id);
                 depot.insert("api_key_id", api_key_record.id);
@@ -154,18 +161,24 @@ pub async fn api_key_auth(
             Err(e) => {
                 tracing::error!("Signature validation error: {}", e);
                 res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-                res.render(Json(rsws_common::response::ApiResponse::<()>::internal_error(
-                    "Authentication service error"
-                )));
+                res.render(Json(
+                    rsws_common::response::ApiResponse::<()>::internal_error(
+                        "Authentication service error",
+                    ),
+                ));
                 return;
             }
         }
 
         // 尝试管理员签名认证
-        match state.admin_service.validate_admin_api_key_signature(&api_key, &params, &sign).await {
+        match state
+            .admin_service
+            .validate_admin_api_key_signature(&api_key, &params, &sign)
+            .await
+        {
             Ok(Some((key_record, admin))) => {
-                let permissions: Vec<String> = serde_json::from_value(admin.permissions.clone())
-                    .unwrap_or_default();
+                let permissions: Vec<String> =
+                    serde_json::from_value(admin.permissions.clone()).unwrap_or_default();
 
                 depot.insert("user_id", admin.id);
                 depot.insert("api_key_id", key_record.id);
@@ -188,9 +201,11 @@ pub async fn api_key_auth(
             Err(e) => {
                 tracing::error!("Admin signature validation error: {}", e);
                 res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-                res.render(Json(rsws_common::response::ApiResponse::<()>::internal_error(
-                    "Authentication service error"
-                )));
+                res.render(Json(
+                    rsws_common::response::ApiResponse::<()>::internal_error(
+                        "Authentication service error",
+                    ),
+                ));
                 return;
             }
         }
@@ -236,18 +251,24 @@ pub async fn api_key_auth(
                 Err(e) => {
                     tracing::error!("API key validation error: {}", e);
                     res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-                    res.render(Json(rsws_common::response::ApiResponse::<()>::internal_error(
-                        "Authentication service error"
-                    )));
+                    res.render(Json(
+                        rsws_common::response::ApiResponse::<()>::internal_error(
+                            "Authentication service error",
+                        ),
+                    ));
                     return;
                 }
             }
 
             // 2) 尝试管理员 API Key
-            match state.admin_service.validate_admin_api_key(&key, &secret).await {
+            match state
+                .admin_service
+                .validate_admin_api_key(&key, &secret)
+                .await
+            {
                 Ok(Some((key_record, admin))) => {
-                    let permissions: Vec<String> = serde_json::from_value(admin.permissions.clone())
-                        .unwrap_or_default();
+                    let permissions: Vec<String> =
+                        serde_json::from_value(admin.permissions.clone()).unwrap_or_default();
 
                     depot.insert("user_id", admin.id);
                     depot.insert("api_key_id", key_record.id);
@@ -266,26 +287,32 @@ pub async fn api_key_auth(
                 }
                 Ok(None) => {
                     res.status_code(StatusCode::UNAUTHORIZED);
-                    res.render(Json(rsws_common::response::ApiResponse::<()>::error_with_message(
-                        rsws_common::error_code::ErrorCode::AUTH_API_KEY_NOT_FOUND,
-                        "Invalid API credentials"
-                    )));
+                    res.render(Json(
+                        rsws_common::response::ApiResponse::<()>::error_with_message(
+                            rsws_common::error_code::ErrorCode::AUTH_API_KEY_NOT_FOUND,
+                            "Invalid API credentials",
+                        ),
+                    ));
                 }
                 Err(e) => {
                     tracing::error!("Admin API key validation error: {}", e);
                     res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-                    res.render(Json(rsws_common::response::ApiResponse::<()>::internal_error(
-                        "Authentication service error"
-                    )));
+                    res.render(Json(
+                        rsws_common::response::ApiResponse::<()>::internal_error(
+                            "Authentication service error",
+                        ),
+                    ));
                 }
             }
         }
         _ => {
             res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(rsws_common::response::ApiResponse::<()>::error_with_message(
-                rsws_common::error_code::ErrorCode::AUTH_MISSING_CREDENTIALS,
-                "Missing API credentials. Please provide X-API-Key and X-API-Secret headers."
-            )));
+            res.render(Json(
+                rsws_common::response::ApiResponse::<()>::error_with_message(
+                    rsws_common::error_code::ErrorCode::AUTH_MISSING_CREDENTIALS,
+                    "Missing API credentials. Please provide X-API-Key and X-API-Secret headers.",
+                ),
+            ));
         }
     }
 }
@@ -302,7 +329,7 @@ pub async fn rate_limit(
 ) {
     let state = get_state(depot);
     let trusted_proxies = &state.config.server.trusted_proxies;
-    
+
     // 获取客户端标识（优先用 API Key，未认证则用真实 IP）
     let client_id = depot
         .get::<i64>("api_key_id")
@@ -335,20 +362,34 @@ pub async fn rate_limit(
                 let _ = redis.expire(&key, 120).await;
             }
 
-            res.add_header("X-RateLimit-Limit", limit.to_string(), true).ok();
-            res.add_header("X-RateLimit-Remaining", (limit.saturating_sub(count)).max(0).to_string(), true).ok();
+            res.add_header("X-RateLimit-Limit", limit.to_string(), true)
+                .ok();
+            res.add_header(
+                "X-RateLimit-Remaining",
+                (limit.saturating_sub(count)).max(0).to_string(),
+                true,
+            )
+            .ok();
 
             if count > limit as i64 {
                 tracing::warn!(
                     "Rate limit exceeded for {}: {}/{} in window {}",
-                    client_id, count, limit, window
+                    client_id,
+                    count,
+                    limit,
+                    window
                 );
                 res.status_code(StatusCode::TOO_MANY_REQUESTS);
                 res.add_header("Retry-After", "60", true).ok();
-                res.render(Json(rsws_common::response::ApiResponse::<()>::error_with_message(
-                    rsws_common::error_code::ErrorCode::RATE_LIMIT_EXCEEDED,
-                    format!("Rate limit exceeded. Maximum {} requests per minute.", limit)
-                )));
+                res.render(Json(
+                    rsws_common::response::ApiResponse::<()>::error_with_message(
+                        rsws_common::error_code::ErrorCode::RATE_LIMIT_EXCEEDED,
+                        format!(
+                            "Rate limit exceeded. Maximum {} requests per minute.",
+                            limit
+                        ),
+                    ),
+                ));
                 return;
             }
         }
@@ -370,46 +411,47 @@ fn check_timestamp(timestamp_str: &str) -> Result<(), RswsError> {
     let timestamp = timestamp_str
         .parse::<i64>()
         .map_err(|_| RswsError::unauthorized("Invalid timestamp format"))?;
-    
+
     let now = chrono::Utc::now().timestamp_millis();
     let tolerance = 300_000i64; // 5 分钟
-    
+
     if (now - timestamp).abs() > tolerance {
         tracing::warn!(
             "Timestamp out of range: {} (now: {}, tolerance: {}ms)",
-            timestamp, now, tolerance
+            timestamp,
+            now,
+            tolerance
         );
         return Err(RswsError::unauthorized("Timestamp out of range"));
     }
-    
+
     Ok(())
 }
 
 /// 计算签名（符合 Cregis 方案）
-/// 
+///
 /// 算法：
 /// 1. 排除 sign 字段，按 key ASCII 升序排序
 /// 2. 拼接参数字符串（key + value）
 /// 3. 拼接 api_secret 到字符串末尾
 /// 4. MD5 计算并转小写 hex
-/// 
+///
 /// 注意：Cregis 方案将 api_secret 拼在参数前面，但关键是保持前后端一致
 #[allow(dead_code)]
 fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> String {
     // 1. 获取所有 key（排除 sign），排序
-    let mut keys: Vec<&String> = params.keys()
-        .filter(|k| (*k).as_str() != "sign")
-        .collect();
+    let mut keys: Vec<&String> = params.keys().filter(|k| (*k).as_str() != "sign").collect();
     keys.sort();
-    
+
     // 2. 按 ASCII 顺序拼接 key + value
-    let param_str: String = keys.iter()
+    let param_str: String = keys
+        .iter()
         .map(|k| format!("{}{}", k, params[*k]))
         .collect();
-    
+
     // 3. 拼接 api_secret（拼在前面，与 Cregis 方案一致）
     let sign_str = format!("{}{}", api_secret, param_str);
-    
+
     // 4. MD5 + 小写 hex
     format!("{:x}", md5::compute(sign_str.as_bytes()))
 }
@@ -424,19 +466,21 @@ pub async fn require_admin(
     ctrl: &mut FlowCtrl,
 ) {
     let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    
+
     if !is_admin {
         tracing::warn!(
             "Non-admin attempted to access admin endpoint: {}",
             req.uri().path()
         );
         res.status_code(StatusCode::FORBIDDEN);
-        res.render(Json(rsws_common::response::ApiResponse::<()>::error_with_message(
-            rsws_common::error_code::ErrorCode::FORBIDDEN,
-            "Admin access required"
-        )));
+        res.render(Json(
+            rsws_common::response::ApiResponse::<()>::error_with_message(
+                rsws_common::error_code::ErrorCode::FORBIDDEN,
+                "Admin access required",
+            ),
+        ));
         return;
     }
-    
+
     ctrl.call_next(req, depot, res).await;
 }

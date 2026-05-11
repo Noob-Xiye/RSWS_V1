@@ -15,7 +15,10 @@ impl UserPaymentService {
     }
 
     /// 获取用户支付配置
-    pub async fn get_user_configs(&self, user_id: i64) -> Result<Vec<rsws_model::payment::UserPaymentConfig>, RswsError> {
+    pub async fn get_user_configs(
+        &self,
+        user_id: i64,
+    ) -> Result<Vec<rsws_model::payment::UserPaymentConfig>, RswsError> {
         let configs = sqlx::query_as::<_, rsws_model::payment::UserPaymentConfig>(
             "SELECT id, user_id, payment_method, account_address, account_name, is_active, created_at, updated_at FROM user_payment_configs WHERE user_id = $1 AND is_active = true",
         )

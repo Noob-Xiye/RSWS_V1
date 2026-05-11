@@ -4,27 +4,27 @@
 
 use sqlx::PgPool;
 
+pub mod admin;
 pub mod api_key;
-pub mod user;
+pub mod category;
 pub mod order;
 pub mod payment;
-pub mod resource;
 pub mod redis;
+pub mod resource;
+pub mod user;
 pub mod wallet;
-pub mod admin;
-pub mod category;
 
-pub use user::UserRepository;
-pub use order::OrderRepository;
-pub use payment::PaymentRepository;
-pub use payment::PayPalConfigRepository;
-pub use resource::ResourceRepository;
-pub use api_key::ApiKeyRepository;
-pub use redis::RedisService;
-pub use wallet::WalletRepository;
 pub use admin::AdminRepository;
-pub use category::CategoryRepository;
+pub use api_key::ApiKeyRepository;
 pub use category::Category;
+pub use category::CategoryRepository;
+pub use order::OrderRepository;
+pub use payment::PayPalConfigRepository;
+pub use payment::PaymentRepository;
+pub use redis::RedisService;
+pub use resource::ResourceRepository;
+pub use user::UserRepository;
+pub use wallet::WalletRepository;
 
 /// Redis connection pool alias
 pub type RedisPool = RedisService;

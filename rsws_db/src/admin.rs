@@ -1,11 +1,11 @@
 //! 管理员仓储层
 
+use chrono::Utc;
 use rsws_common::error::RswsError;
-use rsws_common::snowflake;
 use rsws_common::password::PasswordService;
+use rsws_common::snowflake;
 use rsws_model::user_models::admin::*;
 use sqlx::PgPool;
-use chrono::Utc;
 
 /// 管理员仓储
 pub struct AdminRepository {
@@ -19,13 +19,11 @@ impl AdminRepository {
 
     /// 检查邮箱是否已存在
     pub async fn email_exists(&self, email: &str) -> Result<bool, RswsError> {
-        let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM admins WHERE email = $1"
-        )
-        .bind(email)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to check admin email: {}", e)))?;
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM admins WHERE email = $1")
+            .bind(email)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to check admin email: {}", e)))?;
 
         Ok(count.0 > 0)
     }
@@ -136,7 +134,9 @@ impl AdminRepository {
 
         if let Some(permissions) = &request.permissions {
             separated.push("permissions = ");
-            separated.push_bind(serde_json::to_value(permissions).unwrap_or(serde_json::Value::Array(vec![])));
+            separated.push_bind(
+                serde_json::to_value(permissions).unwrap_or(serde_json::Value::Array(vec![])),
+            );
         }
 
         separated.push("updated_at = ");
@@ -162,7 +162,9 @@ impl AdminRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| RswsError::internal(format!("Failed to update admin login info: {}", e)))?;
+            .map_err(|e| {
+                RswsError::internal(format!("Failed to update admin login info: {}", e))
+            })?;
 
         Ok(())
     }
@@ -281,13 +283,14 @@ impl AdminRepository {
         }
 
         // 查关联的 admin
-        let admin = sqlx::query_as::<_, Admin>(
-            "SELECT * FROM admins WHERE id = $1 AND is_active = true"
-        )
-        .bind(key_record.admin_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to get admin by API key: {}", e)))?;
+        let admin =
+            sqlx::query_as::<_, Admin>("SELECT * FROM admins WHERE id = $1 AND is_active = true")
+                .bind(key_record.admin_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| {
+                    RswsError::internal(format!("Failed to get admin by API key: {}", e))
+                })?;
 
         match admin {
             Some(a) => Ok(Some((key_record, a))),
@@ -301,7 +304,9 @@ impl AdminRepository {
             .bind(key_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| RswsError::internal(format!("Failed to update admin API key last used: {}", e)))?;
+            .map_err(|e| {
+                RswsError::internal(format!("Failed to update admin API key last used: {}", e))
+            })?;
         Ok(())
     }
 
@@ -314,15 +319,21 @@ impl AdminRepository {
         rate_limit: Option<i32>,
         expires_in_days: Option<i32>,
     ) -> Result<(AdminApiKey, String), RswsError> {
+        use base64::{engine::general_purpose, Engine as _};
         use rand::{Rng, SeedableRng};
-        use base64::{Engine as _, engine::general_purpose};
 
         let mut rng = rand::rngs::StdRng::from_os_rng();
         let key_bytes: [u8; 32] = rng.random();
-        let api_key = format!("adm_ak_{}", general_purpose::URL_SAFE_NO_PAD.encode(key_bytes));
+        let api_key = format!(
+            "adm_ak_{}",
+            general_purpose::URL_SAFE_NO_PAD.encode(key_bytes)
+        );
 
         let secret_bytes: [u8; 64] = rng.random();
-        let api_secret = format!("adm_sk_{}", general_purpose::URL_SAFE_NO_PAD.encode(secret_bytes));
+        let api_secret = format!(
+            "adm_sk_{}",
+            general_purpose::URL_SAFE_NO_PAD.encode(secret_bytes)
+        );
 
         // 用 Argon2 加密 secret 存储
         let api_secret_encrypted = PasswordService::hash(&api_secret)?;
@@ -356,7 +367,7 @@ impl AdminRepository {
     /// 获取管理员的所有 API Key
     pub async fn get_admin_api_keys(&self, admin_id: i64) -> Result<Vec<AdminApiKey>, RswsError> {
         sqlx::query_as::<_, AdminApiKey>(
-            "SELECT * FROM admin_api_keys WHERE admin_id = $1 ORDER BY created_at DESC"
+            "SELECT * FROM admin_api_keys WHERE admin_id = $1 ORDER BY created_at DESC",
         )
         .bind(admin_id)
         .fetch_all(&self.pool)
@@ -365,9 +376,12 @@ impl AdminRepository {
     }
 
     /// 根据 api_key 值获取管理员 API Key 记录
-    pub async fn get_admin_api_key_by_key(&self, api_key: &str) -> Result<Option<AdminApiKey>, RswsError> {
+    pub async fn get_admin_api_key_by_key(
+        &self,
+        api_key: &str,
+    ) -> Result<Option<AdminApiKey>, RswsError> {
         sqlx::query_as::<_, AdminApiKey>(
-            "SELECT * FROM admin_api_keys WHERE api_key = $1 AND is_active = true"
+            "SELECT * FROM admin_api_keys WHERE api_key = $1 AND is_active = true",
         )
         .bind(api_key)
         .fetch_optional(&self.pool)
@@ -376,7 +390,11 @@ impl AdminRepository {
     }
 
     /// 删除管理员 API Key
-    pub async fn delete_admin_api_key(&self, key_id: i64, admin_id: i64) -> Result<bool, RswsError> {
+    pub async fn delete_admin_api_key(
+        &self,
+        key_id: i64,
+        admin_id: i64,
+    ) -> Result<bool, RswsError> {
         let result = sqlx::query("DELETE FROM admin_api_keys WHERE id = $1 AND admin_id = $2")
             .bind(key_id)
             .bind(admin_id)
@@ -409,11 +427,13 @@ impl AdminRepository {
 
     /// 禁用管理员所有 API Key（停用管理员 / 改密码时使用）
     pub async fn deactivate_admin_api_keys(&self, admin_id: i64) -> Result<u64, RswsError> {
-        let result = sqlx::query("UPDATE admin_api_keys SET is_active = false WHERE admin_id = $1 AND is_active = true")
-            .bind(admin_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Failed to deactivate admin API keys: {}", e)))?;
+        let result = sqlx::query(
+            "UPDATE admin_api_keys SET is_active = false WHERE admin_id = $1 AND is_active = true",
+        )
+        .bind(admin_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to deactivate admin API keys: {}", e)))?;
         Ok(result.rows_affected())
     }
 }

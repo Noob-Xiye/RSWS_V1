@@ -148,7 +148,7 @@ pub struct DashboardStats {
 /// 单日订单统计
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DailyOrderCount {
-    pub date: String,  // YYYY-MM-DD
+    pub date: String, // YYYY-MM-DD
     pub count: i64,
 }
 

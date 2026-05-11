@@ -1,10 +1,10 @@
 //! Category handler
 
-use salvo::prelude::*;
-use salvo_oapi::endpoint;
 use crate::state::get_state;
 use rsws_common::{ResponseExt, RswsError};
 use rsws_db::category::CategoryRepository;
+use salvo::prelude::*;
+use salvo_oapi::endpoint;
 
 /// Get category list
 #[endpoint(

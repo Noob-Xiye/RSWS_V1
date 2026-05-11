@@ -25,18 +25,16 @@ impl EncryptionService {
 
     /// 从 Base64 编码的密钥创建加密服务
     pub fn from_base64(key_b64: &str) -> Result<Self, RswsError> {
-        let key_bytes = general_purpose::STANDARD
-            .decode(key_b64)
-            .map_err(|e| RswsError::business_with_message(
+        let key_bytes = general_purpose::STANDARD.decode(key_b64).map_err(|e| {
+            RswsError::business_with_message(
                 ErrorCode::CONFIG_DECRYPTION_FAILED,
-                format!("Invalid key base64: {}", e)
-            ))?;
+                format!("Invalid key base64: {}", e),
+            )
+        })?;
 
         let key: [u8; 32] = key_bytes
             .try_into()
-            .map_err(|_| RswsError::business(
-                ErrorCode::CONFIG_INVALID_VALUE
-            ))?;
+            .map_err(|_| RswsError::business(ErrorCode::CONFIG_INVALID_VALUE))?;
 
         Ok(Self::new(&key))
     }
@@ -50,10 +48,12 @@ impl EncryptionService {
         let ciphertext = self
             .cipher
             .encrypt(nonce, plaintext.as_bytes())
-            .map_err(|e| RswsError::business_with_message(
-                ErrorCode::CONFIG_ENCRYPTION_FAILED,
-                format!("Encryption failed: {}", e)
-            ))?;
+            .map_err(|e| {
+                RswsError::business_with_message(
+                    ErrorCode::CONFIG_ENCRYPTION_FAILED,
+                    format!("Encryption failed: {}", e),
+                )
+            })?;
 
         // 格式: nonce (12 bytes) + ciphertext
         let mut result = nonce_bytes.to_vec();
@@ -66,27 +66,26 @@ impl EncryptionService {
     pub fn decrypt(&self, encrypted_data: &str) -> Result<String, RswsError> {
         let data = general_purpose::STANDARD
             .decode(encrypted_data)
-            .map_err(|e| RswsError::business_with_message(
-                ErrorCode::CONFIG_DECRYPTION_FAILED,
-                format!("Base64 decode failed: {}", e)
-            ))?;
+            .map_err(|e| {
+                RswsError::business_with_message(
+                    ErrorCode::CONFIG_DECRYPTION_FAILED,
+                    format!("Base64 decode failed: {}", e),
+                )
+            })?;
 
         if data.len() < 12 {
-            return Err(RswsError::business(
-                ErrorCode::CONFIG_DECRYPTION_FAILED
-            ));
+            return Err(RswsError::business(ErrorCode::CONFIG_DECRYPTION_FAILED));
         }
 
         let (nonce_bytes, ciphertext) = data.split_at(12);
         let nonce = Nonce::from_slice(nonce_bytes);
 
-        let plaintext = self
-            .cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|e| RswsError::business_with_message(
+        let plaintext = self.cipher.decrypt(nonce, ciphertext).map_err(|e| {
+            RswsError::business_with_message(
                 ErrorCode::CONFIG_DECRYPTION_FAILED,
-                format!("Decryption failed: {}", e)
-            ))?;
+                format!("Decryption failed: {}", e),
+            )
+        })?;
 
         String::from_utf8(plaintext)
             .map_err(|e| RswsError::internal(format!("UTF-8 decode failed: {}", e)))

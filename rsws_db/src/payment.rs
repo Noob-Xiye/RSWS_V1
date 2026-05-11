@@ -62,7 +62,10 @@ impl PaymentRepository {
     }
 
     /// 根据订单 ID 获取交易
-    pub async fn get_by_order_id(&self, order_id: i64) -> Result<Vec<PaymentTransaction>, RswsError> {
+    pub async fn get_by_order_id(
+        &self,
+        order_id: i64,
+    ) -> Result<Vec<PaymentTransaction>, RswsError> {
         let transactions = sqlx::query_as::<_, PaymentTransaction>(
             "SELECT id, order_id, user_id, amount, currency, payment_method, provider_transaction_id, status, created_at, updated_at, completed_at FROM payment_transactions WHERE order_id = $1 ORDER BY created_at DESC",
         )
@@ -162,13 +165,12 @@ impl PaymentRepository {
         .map_err(|e| RswsError::internal(format!("Failed to get user transactions: {}", e)))?;
 
         // 获取总数
-        let total: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM payment_transactions WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to count transactions: {}", e)))?;
+        let total: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM payment_transactions WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to count transactions: {}", e)))?;
 
         Ok((transactions, total.0))
     }
@@ -226,9 +228,15 @@ impl PayPalConfigRepository {
     }
 
     /// 更新 PayPal 配置
-    pub async fn update(&self, id: i32, req: &rsws_model::payment::UpdatePayPalConfigRequest) -> Result<PayPalConfig, RswsError> {
+    pub async fn update(
+        &self,
+        id: i32,
+        req: &rsws_model::payment::UpdatePayPalConfigRequest,
+    ) -> Result<PayPalConfig, RswsError> {
         // 先获取现有配置
-        let existing = self.get_by_id(id).await?
+        let existing = self
+            .get_by_id(id)
+            .await?
             .ok_or_else(|| RswsError::not_found("PayPal config not found"))?;
 
         let updated = sqlx::query_as::<_, PayPalConfig>(
@@ -277,14 +285,14 @@ impl PayPalConfigRepository {
 
     /// 设置激活状态
     pub async fn set_active(&self, id: i32, is_active: bool) -> Result<(), RswsError> {
-        sqlx::query(
-            "UPDATE paypal_configs SET is_active = $1, updated_at = NOW() WHERE id = $2",
-        )
-        .bind(is_active)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to set paypal config active: {}", e)))?;
+        sqlx::query("UPDATE paypal_configs SET is_active = $1, updated_at = NOW() WHERE id = $2")
+            .bind(is_active)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                RswsError::internal(format!("Failed to set paypal config active: {}", e))
+            })?;
 
         Ok(())
     }
@@ -294,7 +302,6 @@ impl PayPalConfigRepository {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_payment_repository_new() {

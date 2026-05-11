@@ -1,9 +1,9 @@
 //! Resource repository
 
 use rsws_common::error::RswsError;
+use rsws_common::snowflake::next_id;
 use rsws_model::resource::{CreateResourceRequest, Resource, UpdateResourceRequest};
 use sqlx::PgPool;
-use rsws_common::snowflake::next_id;
 
 /// 资源仓储
 pub struct ResourceRepository {
@@ -68,12 +68,13 @@ impl ResourceRepository {
             .await
             .map_err(|e| RswsError::internal(format!("Failed to get resources: {}", e)))?;
 
-            let total: (i64,) = sqlx::query_as(
-                "SELECT COUNT(*) FROM resources WHERE is_active = true",
-            )
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Failed to count resources: {}", e)))?;
+            let total: (i64,) =
+                sqlx::query_as("SELECT COUNT(*) FROM resources WHERE is_active = true")
+                    .fetch_one(&self.pool)
+                    .await
+                    .map_err(|e| {
+                        RswsError::internal(format!("Failed to count resources: {}", e))
+                    })?;
 
             (resources, total.0)
         };
@@ -100,13 +101,11 @@ impl ResourceRepository {
         .await
         .map_err(|e| RswsError::internal(format!("Failed to get user resources: {}", e)))?;
 
-        let total: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM resources WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to count user resources: {}", e)))?;
+        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM resources WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to count user resources: {}", e)))?;
 
         Ok((resources, total.0))
     }
@@ -154,7 +153,9 @@ impl ResourceRepository {
         req: &UpdateResourceRequest,
     ) -> Result<Resource, RswsError> {
         // 先获取当前资源
-        let mut resource = self.get_by_id(id).await?
+        let mut resource = self
+            .get_by_id(id)
+            .await?
             .ok_or_else(|| RswsError::internal("Resource not found".to_string()))?;
 
         // 合并更新字段
@@ -192,7 +193,8 @@ impl ResourceRepository {
             resource.precautions = Some(precautions.clone());
         }
         if let Some(display_images) = &req.display_images {
-            resource.display_images = Some(serde_json::to_value(display_images).unwrap_or(serde_json::Value::Null));
+            resource.display_images =
+                Some(serde_json::to_value(display_images).unwrap_or(serde_json::Value::Null));
         }
 
         // 更新数据库
@@ -220,10 +222,7 @@ impl ResourceRepository {
     }
 
     /// 删除资源（软删除，设置 is_active = false）
-    pub async fn delete(
-        &self,
-        id: i64,
-    ) -> Result<(), RswsError> {
+    pub async fn delete(&self, id: i64) -> Result<(), RswsError> {
         sqlx::query("UPDATE resources SET is_active = false, updated_at = NOW() WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -339,15 +338,16 @@ impl ResourceRepository {
             .await
             .map_err(|e| RswsError::internal(format!("Failed to count resources: {}", e)))?;
 
-        let active: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM resources WHERE is_active = true"
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to count active resources: {}", e)))?;
+        let active: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM resources WHERE is_active = true")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    RswsError::internal(format!("Failed to count active resources: {}", e))
+                })?;
 
         let new_30d: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM resources WHERE created_at >= NOW() - INTERVAL '30 days'"
+            "SELECT COUNT(*) FROM resources WHERE created_at >= NOW() - INTERVAL '30 days'",
         )
         .fetch_one(&self.pool)
         .await
@@ -361,7 +361,6 @@ impl ResourceRepository {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_resource_repository_new() {

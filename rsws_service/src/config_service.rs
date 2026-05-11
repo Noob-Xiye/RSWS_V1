@@ -71,24 +71,48 @@ pub struct UsdtListenDbConfig {
 /// PayPal 配置查询结果行（13 列）
 #[allow(clippy::type_complexity)]
 type PayPalConfigRow = (
-    i32, String, String, bool, Option<String>, Option<String>,
-    String, String, String, String,
-    rust_decimal::Decimal, rust_decimal::Decimal, rust_decimal::Decimal,
+    i32,
+    String,
+    String,
+    bool,
+    Option<String>,
+    Option<String>,
+    String,
+    String,
+    String,
+    String,
+    rust_decimal::Decimal,
+    rust_decimal::Decimal,
+    rust_decimal::Decimal,
 );
 
 /// 区块链配置查询结果行（10 列）
 #[allow(clippy::type_complexity)]
 type BlockchainConfigRow = (
-    String, String, String, Option<String>,
-    String, i32,
-    rust_decimal::Decimal, rust_decimal::Decimal, rust_decimal::Decimal, bool,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    i32,
+    rust_decimal::Decimal,
+    rust_decimal::Decimal,
+    rust_decimal::Decimal,
+    bool,
 );
 
 /// Email 配置查询结果行（9 列）
 #[allow(clippy::type_complexity)]
 type EmailConfigRow = (
-    String, Option<String>, Option<i32>, Option<String>, Option<String>,
-    bool, String, Option<String>, Option<String>,
+    String,
+    Option<String>,
+    Option<i32>,
+    Option<String>,
+    Option<String>,
+    bool,
+    String,
+    Option<String>,
+    Option<String>,
 );
 
 /// USDT 监听配置查询结果行（7 列）
@@ -121,13 +145,12 @@ impl ConfigService {
 
     /// 获取配置值
     pub async fn get(&self, key: &str) -> Result<Option<String>, RswsError> {
-        let result: Option<(String,)> = sqlx::query_as(
-            "SELECT config_value FROM system_configs WHERE config_key = $1",
-        )
-        .bind(key)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to get config: {}", e)))?;
+        let result: Option<(String,)> =
+            sqlx::query_as("SELECT config_value FROM system_configs WHERE config_key = $1")
+                .bind(key)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to get config: {}", e)))?;
 
         Ok(result.map(|r| r.0))
     }
@@ -172,9 +195,8 @@ impl ConfigService {
 
     /// 从 paypal_configs 表获取活跃的 PayPal 配置
     pub async fn get_paypal_config(&self) -> Result<Option<PayPalDbConfig>, RswsError> {
-        let row: Option<PayPalConfigRow> =
-            sqlx::query_as(
-                r#"
+        let row: Option<PayPalConfigRow> = sqlx::query_as(
+            r#"
                 SELECT id, client_id, client_secret_encrypted, sandbox,
                        webhook_id, webhook_secret_encrypted,
                        base_url, return_url, cancel_url, brand_name,
@@ -184,13 +206,14 @@ impl ConfigService {
                 ORDER BY id DESC
                 LIMIT 1
                 "#,
-            )
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Failed to get PayPal config: {}", e)))?;
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get PayPal config: {}", e)))?;
 
-        Ok(row.map(|(_, client_id, client_secret, sandbox, webhook_id, webhook_secret, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate)| {
-            PayPalDbConfig {
+        Ok(row.map(
+            |(
+                _,
                 client_id,
                 client_secret,
                 sandbox,
@@ -203,17 +226,31 @@ impl ConfigService {
                 min_amount,
                 max_amount,
                 fee_rate,
-            }
-        }))
+            )| {
+                PayPalDbConfig {
+                    client_id,
+                    client_secret,
+                    sandbox,
+                    webhook_id,
+                    webhook_secret,
+                    base_url,
+                    return_url,
+                    cancel_url,
+                    brand_name,
+                    min_amount,
+                    max_amount,
+                    fee_rate,
+                }
+            },
+        ))
     }
 
     // ==================== 区块链配置 ====================
 
     /// 从 blockchain_configs 表获取所有活跃的区块链配置
     pub async fn get_blockchain_configs(&self) -> Result<Vec<BlockchainDbConfig>, RswsError> {
-        let rows: Vec<BlockchainConfigRow> =
-            sqlx::query_as(
-                r#"
+        let rows: Vec<BlockchainConfigRow> = sqlx::query_as(
+            r#"
                 SELECT network, network_name, api_url, api_key_encrypted,
                        usdt_contract, min_confirmations,
                        min_amount, max_amount, fee_rate, is_active
@@ -221,39 +258,61 @@ impl ConfigService {
                 WHERE is_active = true
                 ORDER BY network
                 "#,
-            )
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Failed to get blockchain configs: {}", e)))?;
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get blockchain configs: {}", e)))?;
 
-        Ok(rows.into_iter().map(|(network, network_name, api_url, api_key, usdt_contract, min_confirmations, min_amount, max_amount, fee_rate, is_active)| {
-            BlockchainDbConfig {
-                network,
-                network_name,
-                api_url,
-                api_key,
-                usdt_contract,
-                min_confirmations,
-                min_amount,
-                max_amount,
-                fee_rate,
-                is_active,
-            }
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    network,
+                    network_name,
+                    api_url,
+                    api_key,
+                    usdt_contract,
+                    min_confirmations,
+                    min_amount,
+                    max_amount,
+                    fee_rate,
+                    is_active,
+                )| {
+                    BlockchainDbConfig {
+                        network,
+                        network_name,
+                        api_url,
+                        api_key,
+                        usdt_contract,
+                        min_confirmations,
+                        min_amount,
+                        max_amount,
+                        fee_rate,
+                        is_active,
+                    }
+                },
+            )
+            .collect())
     }
 
     /// 获取指定网络的区块链配置
-    pub async fn get_blockchain_config(&self, network: &str) -> Result<Option<BlockchainDbConfig>, RswsError> {
-        Ok(self.get_blockchain_configs().await?.into_iter().find(|c| c.network == network))
+    pub async fn get_blockchain_config(
+        &self,
+        network: &str,
+    ) -> Result<Option<BlockchainDbConfig>, RswsError> {
+        Ok(self
+            .get_blockchain_configs()
+            .await?
+            .into_iter()
+            .find(|c| c.network == network))
     }
 
     // ==================== Email 配置 ====================
 
     /// 从 email_configs 表获取活跃的邮件配置
     pub async fn get_email_config(&self) -> Result<Option<EmailDbConfig>, RswsError> {
-        let row: Option<EmailConfigRow> =
-            sqlx::query_as(
-                r#"
+        let row: Option<EmailConfigRow> = sqlx::query_as(
+            r#"
                 SELECT provider, host, port, username, password_encrypted,
                        use_tls, from_email, from_name, reply_to
                 FROM email_configs
@@ -261,25 +320,33 @@ impl ConfigService {
                 ORDER BY id DESC
                 LIMIT 1
                 "#,
-            )
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Failed to get email config: {}", e)))?;
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get email config: {}", e)))?;
 
         match row {
-            Some((provider, host, port, username, password, use_tls, from_email, from_name, reply_to)) => {
-                Ok(Some(EmailDbConfig {
-                    provider,
-                    host: host.unwrap_or_default(),
-                    port: port.unwrap_or(465),
-                    username: username.unwrap_or_default(),
-                    password: password.unwrap_or_default(),
-                    use_tls,
-                    from_email,
-                    from_name,
-                    reply_to,
-                }))
-            }
+            Some((
+                provider,
+                host,
+                port,
+                username,
+                password,
+                use_tls,
+                from_email,
+                from_name,
+                reply_to,
+            )) => Ok(Some(EmailDbConfig {
+                provider,
+                host: host.unwrap_or_default(),
+                port: port.unwrap_or(465),
+                username: username.unwrap_or_default(),
+                password: password.unwrap_or_default(),
+                use_tls,
+                from_email,
+                from_name,
+                reply_to,
+            })),
             None => {
                 warn!("No active email config found in database");
                 Ok(None)
@@ -291,9 +358,8 @@ impl ConfigService {
 
     /// 从 usdt_listen_configs 表获取所有活跃的监听配置
     pub async fn get_usdt_listen_configs(&self) -> Result<Vec<UsdtListenDbConfig>, RswsError> {
-        let rows: Vec<UsdtListenConfigRow> =
-            sqlx::query_as(
-                r#"
+        let rows: Vec<UsdtListenConfigRow> = sqlx::query_as(
+            r#"
                 SELECT network, api_url, api_key_encrypted,
                        usdt_contract, poll_interval_seconds,
                        min_confirmations, is_active
@@ -301,27 +367,47 @@ impl ConfigService {
                 WHERE is_active = true
                 ORDER BY network
                 "#,
-            )
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Failed to get USDT listen configs: {}", e)))?;
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to get USDT listen configs: {}", e)))?;
 
-        Ok(rows.into_iter().map(|(network, api_url, api_key, usdt_contract, poll_interval_seconds, min_confirmations, is_active)| {
-            UsdtListenDbConfig {
-                network,
-                api_url,
-                api_key,
-                usdt_contract,
-                poll_interval_seconds: poll_interval_seconds as u64,
-                min_confirmations,
-                is_active,
-            }
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    network,
+                    api_url,
+                    api_key,
+                    usdt_contract,
+                    poll_interval_seconds,
+                    min_confirmations,
+                    is_active,
+                )| {
+                    UsdtListenDbConfig {
+                        network,
+                        api_url,
+                        api_key,
+                        usdt_contract,
+                        poll_interval_seconds: poll_interval_seconds as u64,
+                        min_confirmations,
+                        is_active,
+                    }
+                },
+            )
+            .collect())
     }
 
     /// 获取指定网络的 USDT 监听配置
-    pub async fn get_usdt_listen_config(&self, network: &str) -> Result<Option<UsdtListenDbConfig>, RswsError> {
-        Ok(self.get_usdt_listen_configs().await?.into_iter().find(|c| c.network == network))
+    pub async fn get_usdt_listen_config(
+        &self,
+        network: &str,
+    ) -> Result<Option<UsdtListenDbConfig>, RswsError> {
+        Ok(self
+            .get_usdt_listen_configs()
+            .await?
+            .into_iter()
+            .find(|c| c.network == network))
     }
 
     // ==================== 加密配置 ====================
@@ -347,7 +433,10 @@ impl ConfigService {
     // ==================== 批量获取配置 ====================
 
     /// 获取所有 system_configs（按命名空间前缀过滤）
-    pub async fn get_configs_by_prefix(&self, prefix: &str) -> Result<Vec<(String, String, String)>, RswsError> {
+    pub async fn get_configs_by_prefix(
+        &self,
+        prefix: &str,
+    ) -> Result<Vec<(String, String, String)>, RswsError> {
         let rows: Vec<(String, String, String)> = sqlx::query_as(
             r#"
             SELECT config_key, config_value, config_type

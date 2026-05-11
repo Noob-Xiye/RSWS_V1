@@ -104,7 +104,8 @@ impl EthereumClient {
             self.api_url, self.usdt_contract, address, limit, api_key
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .send()
             .await?
@@ -160,7 +161,8 @@ impl EthereumClient {
             result: String,
         }
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .send()
             .await?

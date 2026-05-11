@@ -94,13 +94,11 @@ impl OrderRepository {
         .map_err(|e| RswsError::internal(format!("Failed to get orders: {}", e)))?;
 
         // 获取总数
-        let total: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM orders WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
+        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM orders WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
 
         Ok((orders, total.0))
     }
@@ -126,7 +124,8 @@ impl OrderRepository {
         page: i32,
         limit: i32,
     ) -> Result<(Vec<Order>, i64), RswsError> {
-        self.get_user_orders(user_id, page as i64, limit as i64).await
+        self.get_user_orders(user_id, page as i64, limit as i64)
+            .await
     }
 
     /// 获取用户订单列表（包含资源标题）
@@ -158,19 +157,21 @@ impl OrderRepository {
         .map_err(|e| RswsError::internal(format!("Failed to get orders with details: {}", e)))?;
 
         // 获取总数
-        let total: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM orders WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
+        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM orders WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
 
         Ok((orders, total.0))
     }
 
     /// 检查用户是否已购买资源
-    pub async fn check_user_purchased(&self, user_id: i64, resource_id: i64) -> Result<bool, RswsError> {
+    pub async fn check_user_purchased(
+        &self,
+        user_id: i64,
+        resource_id: i64,
+    ) -> Result<bool, RswsError> {
         let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM orders WHERE user_id = $1 AND resource_id = $2 AND status IN ('paid', 'completed')",
         )
@@ -202,22 +203,23 @@ impl OrderRepository {
             .await
             .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
 
-        let completed_orders: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM orders WHERE status IN ('paid', 'completed')"
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to count completed orders: {}", e)))?;
+        let completed_orders: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM orders WHERE status IN ('paid', 'completed')")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    RswsError::internal(format!("Failed to count completed orders: {}", e))
+                })?;
 
         let total_revenue: (i64,) = sqlx::query_as(
-            "SELECT COALESCE(SUM(amount), 0) FROM orders WHERE status IN ('paid', 'completed')"
+            "SELECT COALESCE(SUM(amount), 0) FROM orders WHERE status IN ('paid', 'completed')",
         )
         .fetch_one(&self.pool)
         .await
         .map_err(|e| RswsError::internal(format!("Failed to sum revenue: {}", e)))?;
 
         let orders_30d: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM orders WHERE created_at >= NOW() - INTERVAL '30 days'"
+            "SELECT COUNT(*) FROM orders WHERE created_at >= NOW() - INTERVAL '30 days'",
         )
         .fetch_one(&self.pool)
         .await
@@ -230,7 +232,13 @@ impl OrderRepository {
         .await
         .map_err(|e| RswsError::internal(format!("Failed to sum recent revenue: {}", e)))?;
 
-        Ok((total_orders.0, completed_orders.0, total_revenue.0, orders_30d.0, revenue_30d.0))
+        Ok((
+            total_orders.0,
+            completed_orders.0,
+            total_revenue.0,
+            orders_30d.0,
+            revenue_30d.0,
+        ))
     }
 }
 
@@ -238,7 +246,6 @@ impl OrderRepository {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_order_repository_new() {

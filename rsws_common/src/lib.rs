@@ -10,22 +10,22 @@
 //! - ID 生成
 //! - 工具函数
 
-pub mod error_code;
-pub mod error;
-pub mod response;
-pub mod response_ext;  // Response 扩展 trait
-pub mod auth_handler;   // 认证辅助 trait
+pub mod auth_handler; // 认证辅助 trait
 pub mod config;
 pub mod email;
 pub mod encryption;
+pub mod error;
+pub mod error_code;
 pub mod password;
+pub mod response;
+pub mod response_ext; // Response 扩展 trait
 pub mod signature;
 pub mod snowflake;
 pub mod utils;
 
 // 重新导出核心类型
-pub use error_code::ErrorCode;
-pub use error::{RswsError, RswsResult, DbError, ServiceError, ApiError};
-pub use response::{ApiResponse, PaginatedData, PaginatedResponse, ListData, ListResponse};
-pub use response_ext::ResponseExt;
 pub use auth_handler::AuthHandler;
+pub use error::{ApiError, DbError, RswsError, RswsResult, ServiceError};
+pub use error_code::ErrorCode;
+pub use response::{ApiResponse, ListData, ListResponse, PaginatedData, PaginatedResponse};
+pub use response_ext::ResponseExt;

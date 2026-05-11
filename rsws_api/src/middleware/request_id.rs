@@ -1,21 +1,21 @@
 //! Request ID 中间件
 //!
 //! 为每个请求生成唯一的 request_id，用于日志追踪和分布式追踪。
-//! 
+//!
 //! 行为:
 //! 1. 如果请求头中已有 `X-Request-ID`，沿用该值
 //! 2. 否则生成新的 UUID v4
 //! 3. 将 request_id 注入到响应头和 tracing span 中
 
 use salvo::prelude::*;
-use uuid::Uuid;
 use tracing::Span;
+use uuid::Uuid;
 
 /// Request ID 请求头名称
 pub const REQUEST_ID_HEADER: &str = "X-Request-ID";
 
 /// Request ID 中间件
-/// 
+///
 /// 用法:
 /// ```rust
 /// let router = Router::new()

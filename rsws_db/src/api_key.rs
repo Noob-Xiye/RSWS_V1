@@ -1,10 +1,10 @@
 //! API Key 仓储层
 
+use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
 use rand::Rng;
-use base64::{Engine as _, engine::general_purpose};
-use rsws_model::api_key::{ApiKey, CreateApiKeyRequest};
 use rsws_common::error::RswsError;
+use rsws_model::api_key::{ApiKey, CreateApiKeyRequest};
 use sqlx::PgPool;
 
 /// API Key 仓储
@@ -25,11 +25,17 @@ impl ApiKeyRepository {
 
         // 生成 32 字节的随机数据作为 API Key
         let api_key_bytes: [u8; 32] = rng.random();
-        let api_key = format!("ak_{}", general_purpose::URL_SAFE_NO_PAD.encode(api_key_bytes));
+        let api_key = format!(
+            "ak_{}",
+            general_purpose::URL_SAFE_NO_PAD.encode(api_key_bytes)
+        );
 
         // 生成 64 字节的随机数据作为 API Secret
         let secret_bytes: [u8; 64] = rng.random();
-        let api_secret = format!("sk_{}", general_purpose::URL_SAFE_NO_PAD.encode(secret_bytes));
+        let api_secret = format!(
+            "sk_{}",
+            general_purpose::URL_SAFE_NO_PAD.encode(secret_bytes)
+        );
 
         (api_key, api_secret)
     }
@@ -43,9 +49,9 @@ impl ApiKeyRepository {
         let (api_key, api_secret) = Self::generate_credentials();
 
         // 计算过期时间
-        let expires_at = request.expires_in_days.map(|days| {
-            Utc::now() + chrono::Duration::days(days as i64)
-        });
+        let expires_at = request
+            .expires_in_days
+            .map(|days| Utc::now() + chrono::Duration::days(days as i64));
 
         let permissions_json = serde_json::to_value(&request.permissions)
             .map_err(|e| RswsError::internal(format!("Failed to serialize permissions: {}", e)))?;
@@ -85,7 +91,11 @@ impl ApiKeyRepository {
     }
 
     /// 验证 API Key 和 Secret
-    pub async fn validate(&self, api_key: &str, api_secret: &str) -> Result<Option<ApiKey>, RswsError> {
+    pub async fn validate(
+        &self,
+        api_key: &str,
+        api_secret: &str,
+    ) -> Result<Option<ApiKey>, RswsError> {
         let api_key_record = sqlx::query_as::<_, ApiKey>(
             r#"
             SELECT id, user_id, api_key, api_secret, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at
@@ -141,11 +151,12 @@ impl ApiKeyRepository {
 
     /// 禁用指定 API Key
     pub async fn deactivate_by_id(&self, key_id: i64) -> Result<bool, RswsError> {
-        let result = sqlx::query("UPDATE api_keys SET is_active = false, updated_at = NOW() WHERE id = $1")
-            .bind(key_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Failed to deactivate API key: {}", e)))?;
+        let result =
+            sqlx::query("UPDATE api_keys SET is_active = false, updated_at = NOW() WHERE id = $1")
+                .bind(key_id)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| RswsError::internal(format!("Failed to deactivate API key: {}", e)))?;
         Ok(result.rows_affected() > 0)
     }
 

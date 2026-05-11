@@ -1,7 +1,7 @@
 //! 订单金额匹配器
 
-use rust_decimal::Decimal;
 use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
 
 /// 匹配策略
 #[derive(Debug, Clone, Copy)]
@@ -236,11 +236,7 @@ mod tests {
             expires_at: None,
         }];
 
-        let result = matcher.match_order(
-            Decimal::from(10),
-            "T123",
-            &orders,
-        );
+        let result = matcher.match_order(Decimal::from(10), "T123", &orders);
 
         assert!(result.matched);
         assert_eq!(result.order_id, Some(1));
