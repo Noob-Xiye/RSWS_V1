@@ -327,3 +327,120 @@ fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> Stri
     // 4. MD5 + 小写 hex
     format!("{:x}", md5::compute(sign_str.as_bytes()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_signature_basic() {
+        let mut params = HashMap::new();
+        params.insert("api_key".to_string(), "test_api_key".to_string());
+        params.insert("timestamp".to_string(), "1715400000000".to_string());
+        params.insert("nonce".to_string(), "abc123".to_string());
+        params.insert("sign".to_string(), "should_be_ignored".to_string()); // 应被忽略
+
+        let api_secret = "test_secret";
+        let signature = compute_signature(&params, api_secret);
+
+        // 验证签名不为空
+        assert!(!signature.is_empty());
+        // 验证是有效的 MD5 hex 字符串（32个字符）
+        assert_eq!(signature.len(), 32);
+        assert!(signature.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_signature_excludes_sign_param() {
+        let mut params_with_sign = HashMap::new();
+        params_with_sign.insert("api_key".to_string(), "test".to_string());
+        params_with_sign.insert("sign".to_string(), "value1".to_string());
+
+        let mut params_without_sign = HashMap::new();
+        params_without_sign.insert("api_key".to_string(), "test".to_string());
+
+        let api_secret = "secret";
+        let sig_with_sign = compute_signature(&params_with_sign, api_secret);
+        let sig_without_sign = compute_signature(&params_without_sign, api_secret);
+
+        // 两种情况的签名应该相同（因为 sign 被排除）
+        assert_eq!(sig_with_sign, sig_without_sign);
+    }
+
+    #[test]
+    fn test_signature_key_ordering() {
+        // 按不同顺序插入参数，结果应该相同
+        let mut params1 = HashMap::new();
+        params1.insert("api_key".to_string(), "key".to_string());
+        params1.insert("timestamp".to_string(), "123".to_string());
+
+        let mut params2 = HashMap::new();
+        params2.insert("timestamp".to_string(), "123".to_string());
+        params2.insert("api_key".to_string(), "key".to_string());
+
+        let api_secret = "secret";
+        let sig1 = compute_signature(&params1, api_secret);
+        let sig2 = compute_signature(&params2, api_secret);
+
+        // 签名应该相同（因为会排序）
+        assert_eq!(sig1, sig2);
+    }
+
+    #[test]
+    fn test_signature_different_inputs_different_output() {
+        let mut params1 = HashMap::new();
+        params1.insert("api_key".to_string(), "key1".to_string());
+
+        let mut params2 = HashMap::new();
+        params2.insert("api_key".to_string(), "key2".to_string());
+
+        let sig1 = compute_signature(&params1, "secret");
+        let sig2 = compute_signature(&params2, "secret");
+
+        assert_ne!(sig1, sig2, "Different inputs should produce different signatures");
+    }
+
+    #[test]
+    fn test_signature_different_secrets_different_output() {
+        let mut params = HashMap::new();
+        params.insert("api_key".to_string(), "key".to_string());
+
+        let sig1 = compute_signature(&params, "secret1");
+        let sig2 = compute_signature(&params, "secret2");
+
+        assert_ne!(sig1, sig2, "Different secrets should produce different signatures");
+    }
+
+    #[test]
+    fn test_signature_matches_frontend_algorithm() {
+        // 模拟前端 TypeScript 的行为:
+        // const keys = Object.keys(params).sort()
+        // const paramStr = keys.map(k => k + params[k]).join('')
+        // const signStr = apiSecret + paramStr
+        // CryptoJS.MD5(signStr).toString()
+
+        // 参数: api_key=test, timestamp=1234567890, nonce=nonce123
+        let mut params = HashMap::new();
+        params.insert("api_key".to_string(), "test".to_string());
+        params.insert("timestamp".to_string(), "1234567890".to_string());
+        params.insert("nonce".to_string(), "nonce123".to_string());
+
+        let api_secret = "my_secret_key";
+
+        // ASCII 排序后: api_key, nonce, timestamp
+        // 拼接: api_secret + "api_key" + "test" + "nonce" + "nonce123" + "timestamp" + "1234567890"
+        let expected_concat = format!(
+            "{}{}{}{}{}{}{}",
+            api_secret,
+            "api_key", "test",
+            "nonce", "nonce123",
+            "timestamp", "1234567890"
+        );
+
+        // 手动计算 MD5 (使用 Rust md5 crate)
+        let expected_md5 = format!("{:x}", md5::compute(expected_concat.as_bytes()));
+        let actual_sig = compute_signature(&params, api_secret);
+
+        assert_eq!(actual_sig, expected_md5);
+    }
+}
