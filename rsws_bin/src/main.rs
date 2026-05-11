@@ -272,7 +272,7 @@ async fn main() -> Result<(), RswsError> {
     let addr = format!("{}:{}", config.server.host, config.server.port);
     info!("Server listening on http://{}", addr);
 
-    let acceptor = TcpListener::new(&addr).bind().await;
+    let acceptor = TcpListener::new(addr).bind().await;
     Server::new(acceptor).serve(router).await;
 
     Ok(())
