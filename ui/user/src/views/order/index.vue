@@ -177,7 +177,7 @@ async function fetchOrders() {
   loading.value = true
   try {
     const res = await listOrders({ page: page.value, limit: pageSize })
-    if (res.success && res.data) { orders.value = res.data.items; total.value = res.data.total }
+    if (res.code === 0 && res.data) { orders.value = res.data.items; total.value = res.data.total }
   } catch { orders.value = [] }
   finally { loading.value = false }
 }
@@ -188,7 +188,7 @@ async function handlePay(order: Order) {
   const network = order.payment_method === 'usdt_trc20' ? 'tron' : 'ethereum'
   try {
     const res = await getUsdtAddress(network)
-    if (res.success && res.data) { usdtAddress.value = res.data.address; usdtDialogVisible.value = true; startPolling() }
+    if (res.code === 0 && res.data) { usdtAddress.value = res.data.address; usdtDialogVisible.value = true; startPolling() }
     else ElMessage.error('获取收款地址失败')
   } catch { ElMessage.error('获取收款地址失败') }
 }
@@ -197,8 +197,8 @@ async function handleCancel(order: Order) {
   try {
     await ElMessageBox.confirm('确定要取消该订单吗？', '提示', { type: 'warning' })
     const res = await cancelOrder(order.id)
-    if (res.success) { ElMessage.success('订单已取消'); fetchOrders() }
-    else ElMessage.error(res.message || '取消失败')
+    if (res.code === 0) { ElMessage.success('订单已取消'); fetchOrders() }
+    else ElMessage.error(res.msg || '取消失败')
   } catch {}
 }
 
@@ -211,7 +211,7 @@ function startPolling() {
     if (!currentOrder.value) return
     try {
       const res = await checkOrderStatus(currentOrder.value.id)
-      if (res.success && res.data && (res.data.status === 'completed' || res.data.status === 'paid')) {
+      if (res.code === 0 && res.data && (res.data.status === 'completed' || res.data.status === 'paid')) {
         stopPolling(); usdtDialogVisible.value = false; ElMessage.success('支付成功！'); fetchOrders()
       }
     } catch {}
@@ -227,7 +227,7 @@ async function refreshOrderStatus() {
   if (!currentOrder.value) return
   try {
     const res = await checkOrderStatus(currentOrder.value.id)
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       if (res.data.status === 'completed' || res.data.status === 'paid') {
         stopPolling(); usdtDialogVisible.value = false; ElMessage.success('支付成功！'); fetchOrders()
       } else { ElMessage.info(`当前状态: ${getStatusText(res.data.status)}`) }

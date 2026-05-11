@@ -59,31 +59,26 @@ export interface SignParams {
   apiKey: string
   /** 请求路径 */
   path: string
-  /** 请求体参数（可选） */
-  body?: Record<string, unknown>
 }
 
 /**
  * 生成签名请求参数
  * 
- * @param options 包含 userId, apiKey, path, body
+ * 只签名 query params（user_id, timestamp, nonce + 其他业务查询参数）
+ * 不签名 body —— 后端 auth 中间件只从 query params 验签
+ * 
+ * @param options 包含 userId, apiKey, path
  * @returns 签名参数对象 { user_id, timestamp, nonce, sign }
  */
 export function generateSignParams(options: SignParams): Record<string, string> {
   const timestamp = getTimestamp()
   const nonce = generateNonce()
   
-  // 构建参数字典（包含 user_id, timestamp, nonce）
+  // 构建参数字典（只有 query params，不包含 body）
   const params: Record<string, string> = {
     user_id: options.userId,
     timestamp: timestamp.toString(),
     nonce: nonce,
-  }
-  
-  // 如果有 body，添加 body 参数
-  if (options.body && Object.keys(options.body).length > 0) {
-    const bodyStr = JSON.stringify(options.body)
-    params.body = bodyStr
   }
   
   // 计算签名（使用 apiKey 作为签名密钥）

@@ -177,8 +177,8 @@ async function handleSaveProfile() {
   savingProfile.value = true
   try {
     const res = await updateProfile({ nickname: profileForm.nickname, avatar_url: profileForm.avatar_url || undefined })
-    if (res.success) { ElMessage.success('保存成功'); await userStore.fetchUserInfo() }
-    else ElMessage.error(res.message || '保存失败')
+    if (res.code === 0) { ElMessage.success('保存成功'); await userStore.fetchUserInfo() }
+    else ElMessage.error(res.msg || '保存失败')
   } catch { ElMessage.error('保存失败') }
   finally { savingProfile.value = false }
 }
@@ -189,8 +189,8 @@ async function handleChangePassword() {
   savingPassword.value = true
   try {
     const res = await changePassword({ old_password: passwordForm.old_password, new_password: passwordForm.new_password })
-    if (res.success) { ElMessage.success('密码修改成功'); passwordForm.old_password = ''; passwordForm.new_password = ''; passwordForm.confirm_password = '' }
-    else ElMessage.error(res.message || '修改失败')
+    if (res.code === 0) { ElMessage.success('密码修改成功'); passwordForm.old_password = ''; passwordForm.new_password = ''; passwordForm.confirm_password = '' }
+    else ElMessage.error(res.msg || '修改失败')
   } catch { ElMessage.error('修改失败') }
   finally { savingPassword.value = false }
 }
@@ -199,7 +199,7 @@ async function fetchRecentOrders() {
   loadingOrders.value = true
   try {
     const res = await listOrders({ page: 1, limit: 5 })
-    if (res.success && res.data) recentOrders.value = res.data.items
+    if (res.code === 0 && res.data) recentOrders.value = res.data.items
   } catch { recentOrders.value = [] }
   finally { loadingOrders.value = false }
 }

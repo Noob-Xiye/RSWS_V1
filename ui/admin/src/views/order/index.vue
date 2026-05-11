@@ -162,7 +162,7 @@ async function fetchOrders() {
     if (searchForm.order_no) params.order_no = searchForm.order_no
     if (searchForm.status) params.status = searchForm.status
     const res = await listOrders(params)
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       orders.value = res.data.items
       total.value = res.data.total
     }

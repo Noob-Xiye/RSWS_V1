@@ -21,14 +21,18 @@ export interface LoginRequest {
   login_type: 'password' | 'code'
 }
 
+/**
+ * 后端 LoginResponse (user_service 返回的结构)
+ * 
+ * 注意：后端不返回 success 字段，成功与否由 ApiResponse.code === 0 判断
+ */
 export interface LoginResponse {
-  success: boolean
-  message?: string
   user_info?: Partial<User>
   session_data?: {
     api_key: string
     expires_at?: string
   }
+  message?: string
 }
 
 export interface RegisterRequest {
@@ -38,14 +42,16 @@ export interface RegisterRequest {
   verification_code?: string
 }
 
+/**
+ * 后端 RegisterResponse
+ */
 export interface RegisterResponse {
-  success: boolean
-  message?: string
   user_info?: Partial<User>
   session_data?: {
     api_key: string
     expires_at?: string
   }
+  message?: string
 }
 
 export interface UpdateProfileRequest {
@@ -67,6 +73,7 @@ export interface SendCodeRequest {
 
 /**
  * 用户登录
+ * 返回 ApiResponse<LoginResponse>，由 code === 0 判断成功
  */
 export async function login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
   return request.post('/user/login', data)
@@ -74,6 +81,7 @@ export async function login(data: LoginRequest): Promise<ApiResponse<LoginRespon
 
 /**
  * 用户注册
+ * 返回 ApiResponse<RegisterResponse>，由 code === 0 判断成功
  */
 export async function register(data: RegisterRequest): Promise<ApiResponse<RegisterResponse>> {
   return request.post('/user/register', data)
@@ -96,7 +104,7 @@ export async function updateProfile(data: UpdateProfileRequest): Promise<ApiResp
 /**
  * 修改密码
  */
-export async function changePassword(data: ChangePasswordRequest): Promise<ApiResponse<{ success: boolean; message: string }>> {
+export async function changePassword(data: ChangePasswordRequest): Promise<ApiResponse<{ message: string }>> {
   return request.post('/user/change-password', data)
 }
 

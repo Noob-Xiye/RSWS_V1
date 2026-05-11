@@ -153,7 +153,7 @@ async function fetchResources() {
     if (selectedCategory.value) params.category_id = selectedCategory.value
 
     const res = await listResources(params)
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       resources.value = res.data.items
       total.value = res.data.total
     }

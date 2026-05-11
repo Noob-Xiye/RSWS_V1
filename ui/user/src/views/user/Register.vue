@@ -145,11 +145,11 @@ async function handleRegister() {
   loading.value = true
   try {
     const result = await userStore.register(form.email, form.password, form.username)
-    if (result.success) {
+    if (result.code === 0) {
       ElMessage.success('注册成功')
       router.push('/')
     } else {
-      ElMessage.error(result.message || '注册失败')
+      ElMessage.error(result.msg || '注册失败')
     }
   } finally {
     loading.value = false

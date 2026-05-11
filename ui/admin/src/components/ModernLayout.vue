@@ -22,9 +22,9 @@
           <el-dropdown trigger="click">
             <div class="user-info">
               <el-avatar :size="32" class="user-avatar">
-                {{ authStore.username?.charAt(0)?.toUpperCase() || 'A' }}
+                {{ authStore.adminName?.charAt(0)?.toUpperCase() || 'A' }}
               </el-avatar>
-              <span class="user-name">{{ authStore.username || 'Admin' }}</span>
+              <span class="user-name">{{ authStore.adminName || 'Admin' }}</span>
             </div>
             <template #dropdown>
               <el-dropdown-menu>

@@ -81,11 +81,11 @@ async function handleLogin() {
   loading.value = true
   try {
     const result = await authStore.login(form.email, form.password)
-    if (result.success) {
+    if (result.code === 0) {
       ElMessage.success('登录成功')
       router.push('/dashboard')
     } else {
-      ElMessage.error(result.message || '登录失败')
+      ElMessage.error(result.msg || '登录失败')
     }
   } finally {
     loading.value = false

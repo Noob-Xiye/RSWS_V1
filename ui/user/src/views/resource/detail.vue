@@ -200,7 +200,7 @@ async function fetchResource() {
   loading.value = true
   try {
     const res = await getResource(id)
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       resource.value = res.data
       await checkPurchasedStatus(id)
     } else {
@@ -218,7 +218,7 @@ async function checkPurchasedStatus(resourceId: number) {
   if (!userStore.isLoggedIn) { isPurchased.value = false; return }
   try {
     const res = await checkPurchase(resourceId)
-    if (res.success && res.data) isPurchased.value = res.data.purchased || false
+    if (res.code === 0 && res.data) isPurchased.value = res.data.purchased || false
   } catch { isPurchased.value = false }
 }
 
@@ -231,7 +231,7 @@ async function handlePurchase() {
   purchasing.value = true
   try {
     const res = await createOrder({ resource_id: resource.value.id, payment_method: paymentMethod.value })
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       currentOrderId.value = res.data.id
       currentOrderNo.value = `ORD-${res.data.id}`
       if (paymentMethod.value === 'paypal') {
@@ -241,10 +241,10 @@ async function handlePurchase() {
       } else {
         const network = paymentMethod.value === 'usdt_trc20' ? 'tron' : 'ethereum'
         const addrRes = await getUsdtAddress(network)
-        if (addrRes.success && addrRes.data) { usdtAddress.value = addrRes.data.address; usdtDialogVisible.value = true; startPolling() }
+        if (addrRes.code === 0 && addrRes.data) { usdtAddress.value = addrRes.data.address; usdtDialogVisible.value = true; startPolling() }
         else { ElMessage.error('获取收款地址失败') }
       }
-    } else { ElMessage.error(res.message || '创建订单失败') }
+    } else { ElMessage.error(res.msg || '创建订单失败') }
   } catch (err: any) { ElMessage.error(err?.message || '购买失败') }
   finally { purchasing.value = false }
 }
@@ -256,7 +256,7 @@ async function handleDownload() {
   downloading.value = true
   try {
     const res = await getDownloadInfo(resource.value.id)
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       const link = document.createElement('a'); link.href = res.data.file_url; link.download = res.data.file_name || 'resource'
       document.body.appendChild(link); link.click(); document.body.removeChild(link)
     } else if (resource.value.file_url) { window.open(resource.value.file_url, '_blank') }
@@ -274,7 +274,7 @@ function startPolling() {
     if (!currentOrderId.value) return
     try {
       const res = await checkOrderStatus(currentOrderId.value)
-      if (res.success && res.data && (res.data.status === 'completed' || res.data.status === 'paid')) {
+      if (res.code === 0 && res.data && (res.data.status === 'completed' || res.data.status === 'paid')) {
         stopPolling(); usdtDialogVisible.value = false; ElMessage.success('支付成功！'); isPurchased.value = true
       }
     } catch {}

@@ -22,11 +22,11 @@ request.interceptors.request.use(async (config) => {
   if (apiKey && adminId) {
     // 生成签名参数 (Cregis 方案)
     // 注意：只传 admin_id（后端存为 user_id），不传 api_key
+    // 注意：不传 body，后端只读 query params 签名
     const signParams = generateSignParams({
       adminId,
       apiKey,
       path: config.url || '/',
-      body: config.data,
     })
     
     // 将签名参数添加到查询参数
@@ -67,12 +67,27 @@ request.interceptors.response.use(
 
 export default request
 
-// 通用响应类型
+/**
+ * 后端统一响应格式
+ * 
+ * 后端返回: { code: number, msg: string, data?: T, request_id?: string }
+ * - code === 0: 成功
+ * - code !== 0: 失败
+ */
 export interface ApiResponse<T = unknown> {
-  success: boolean
+  /** 错误码 (0 = 成功) */
+  code: number
+  /** 消息 */
+  msg: string
+  /** 响应数据 */
   data?: T
-  message?: string
-  code?: number
+  /** 请求 ID */
+  request_id?: string
+}
+
+/** 判断响应是否成功 */
+export function isSuccess<T>(res: ApiResponse<T>): res is ApiResponse<T> & { data: T } {
+  return res.code === 0
 }
 
 // 分页响应

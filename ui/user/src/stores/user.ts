@@ -1,8 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { register as apiRegister, getUserInfo, login as apiLogin } from '@/api/user'
-import { setApiKey, getApiKey, removeApiKey } from '@/utils/storage'
-import type { User } from '@/api/user'
+import { register as apiRegister, getUserInfo, login as apiLogin, type LoginResponse, type RegisterResponse } from '@/api/user'
+import { setApiKey, getApiKey, removeApiKey, setUserId, getUserId, removeUserId } from '@/utils/storage'
 
 export interface UserInfo {
   id: number
@@ -19,6 +18,7 @@ export interface UserInfo {
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(null)
   const apiKey = ref<string | null>(getApiKey())
+  const userId = ref<string | null>(getUserId())
 
   const isLoggedIn = computed(() => !!apiKey.value)
   const username = computed(() => userInfo.value?.nickname || userInfo.value?.username || '未登录')
@@ -32,52 +32,59 @@ export const useUserStore = defineStore('user', () => {
         verification_code: loginType === 'code' ? passwordOrCode : undefined,
         login_type: loginType,
       })
-      if (res.success && res.data?.success && res.data.session_data?.api_key) {
-        apiKey.value = res.data.session_data.api_key
-        setApiKey(res.data.session_data.api_key)
-        if (res.data.user_info) {
+      // 后端 ApiResponse 格式: { code: 0, msg: "success", data: LoginResponse }
+      const loginData = res.data
+      if (res.code === 0 && loginData) {
+        if (loginData.session_data?.api_key && loginData.user_info?.id) {
+          apiKey.value = loginData.session_data.api_key
+          setApiKey(loginData.session_data.api_key)
+          userId.value = String(loginData.user_info.id)
+          setUserId(String(loginData.user_info.id))
+        }
+        if (loginData.user_info) {
           userInfo.value = {
-            id: res.data.user_info.id ?? 0,
-            email: res.data.user_info.email ?? '',
-            username: res.data.user_info.username ?? '',
-            nickname: res.data.user_info.nickname,
-            avatar_url: res.data.user_info.avatar_url,
-            is_active: res.data.user_info.is_active ?? false,
+            id: loginData.user_info.id ?? 0,
+            email: loginData.user_info.email ?? '',
+            username: loginData.user_info.username ?? '',
+            nickname: loginData.user_info.nickname,
+            avatar_url: loginData.user_info.avatar_url,
+            is_active: loginData.user_info.is_active ?? false,
             created_at: '',
             updated_at: '',
           }
         }
-        return { success: true }
+        return { code: 0, msg: '登录成功' }
       }
-      return { success: false, message: res.data?.message || res.message || '登录失败' }
+      return { code: -1, msg: res.msg || '登录失败' }
     } catch (err: any) {
-      return { success: false, message: err?.message || '登录失败' }
+      return { code: -1, msg: err?.msg || err?.message || '登录失败' }
     }
   }
 
   async function register(email: string, password: string, username: string) {
     try {
       const res = await apiRegister({ email, password, username })
-      if (res.success && res.data?.success && res.data.user_info) {
-        if (res.data.session_data?.api_key) {
-          apiKey.value = res.data.session_data.api_key
-          setApiKey(res.data.session_data.api_key)
+      // 后端 ApiResponse 格式: { code: 0, msg: "success", data: RegisterResponse }
+      const regData = res.data
+      if (res.code === 0 && regData) {
+        // 注册不返回 session_data，前端只存 userInfo
+        if (regData.user_info) {
+          userInfo.value = {
+            id: regData.user_info.id ?? 0,
+            email: regData.user_info.email ?? '',
+            username: regData.user_info.username ?? '',
+            nickname: regData.user_info.nickname,
+            avatar_url: regData.user_info.avatar_url,
+            is_active: regData.user_info.is_active ?? false,
+            created_at: '',
+            updated_at: '',
+          }
         }
-        userInfo.value = {
-          id: res.data.user_info.id ?? 0,
-          email: res.data.user_info.email ?? '',
-          username: res.data.user_info.username ?? '',
-          nickname: res.data.user_info.nickname,
-          avatar_url: res.data.user_info.avatar_url,
-          is_active: res.data.user_info.is_active ?? false,
-          created_at: '',
-          updated_at: '',
-        }
-        return { success: true }
+        return { code: 0, msg: '注册成功' }
       }
-      return { success: false, message: res.data?.message || res.message || '注册失败' }
+      return { code: -1, msg: res.msg || '注册失败' }
     } catch (err: any) {
-      return { success: false, message: err?.message || '注册失败' }
+      return { code: -1, msg: err?.msg || err?.message || '注册失败' }
     }
   }
 
@@ -85,7 +92,7 @@ export const useUserStore = defineStore('user', () => {
     if (!apiKey.value) return
     try {
       const res = await getUserInfo()
-      if (res.success && res.data) {
+      if (res.code === 0 && res.data) {
         userInfo.value = {
           id: res.data.id ?? 0,
           email: res.data.email ?? '',
@@ -105,7 +112,9 @@ export const useUserStore = defineStore('user', () => {
   function logout() {
     userInfo.value = null
     apiKey.value = null
+    userId.value = null
     removeApiKey()
+    removeUserId()
   }
 
   // 初始化时尝试拉取用户信息
@@ -114,6 +123,7 @@ export const useUserStore = defineStore('user', () => {
   return {
     userInfo,
     apiKey,
+    userId,
     isLoggedIn,
     username,
     balance,

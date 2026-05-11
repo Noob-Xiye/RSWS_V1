@@ -112,7 +112,7 @@ async function fetchLogs() {
       params.end_date = dateRange.value[1]
     }
     const res = await querySystemLogs(params)
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       logs.value = res.data.items
       total.value = res.data.total
     }

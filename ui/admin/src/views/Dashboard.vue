@@ -118,7 +118,7 @@ function formatRevenue(cents: number): string {
 onMounted(async () => {
   try {
     const res = await getDashboardStats()
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       stats.value = res.data
     }
   } catch {

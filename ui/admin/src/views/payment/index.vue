@@ -108,7 +108,7 @@ function formatDate(dateStr: string) {
 async function fetchUsdtWallets() {
   try {
     const res = await listUsdtWallets()
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       // 按 network 填充表单
       for (const wallet of res.data) {
         if (wallet.network === 'TRC20') usdtForm.trc20 = wallet.address
@@ -146,7 +146,7 @@ function handleSavePaypal() {
 async function fetchApiKeys() {
   try {
     const res = await listApiKeys()
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       apiKeys.value = res.data
     }
   } catch {

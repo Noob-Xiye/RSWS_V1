@@ -126,7 +126,7 @@ async function fetchUsers() {
       page_size: pageSize.value,
       ...searchForm
     })
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       users.value = res.data.items
       total.value = res.data.total
     }

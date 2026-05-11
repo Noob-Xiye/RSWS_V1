@@ -127,7 +127,7 @@ async function fetchResources() {
   loading.value = true
   try {
     const res = await listResources({ page: page.value, page_size: pageSize.value, ...searchForm })
-    if (res.success && res.data) {
+    if (res.code === 0 && res.data) {
       resources.value = res.data.items
       total.value = res.data.total
     }

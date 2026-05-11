@@ -173,12 +173,12 @@ async function handleLogin() {
   loading.value = true
   try {
     const res = await userStore.login(form.username, loginType.value === 'password' ? form.password : form.code, loginType.value)
-    if (res.success) {
+    if (res.code === 0) {
       ElMessage.success('登录成功')
       const redirect = route.query.redirect as string
       router.push(redirect || '/user')
     } else {
-      ElMessage.error(res.message || '登录失败')
+      ElMessage.error(res.msg || '登录失败')
     }
   } catch (err: any) {
     ElMessage.error(err?.message || '登录失败')

@@ -56,7 +56,7 @@ onMounted(async () => {
   if (orderId) {
     try {
       const res = await getOrder(parseInt(orderId))
-      if (res.success && res.data) orderInfo.value = res.data
+      if (res.code === 0 && res.data) orderInfo.value = res.data
     } catch {}
   }
   timer = setInterval(() => {

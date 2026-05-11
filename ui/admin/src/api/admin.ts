@@ -18,10 +18,15 @@ export interface AdminListResponse {
   total_pages: number
 }
 
-// 登录响应（匹配后端 AdminLoginResponse）
+/**
+ * 管理员登录响应（匹配后端 AdminLoginResponse）
+ * 
+ * 后端返回: { admin: AdminInfo, api_key: string, expires_at: string }
+ * 注意：没有 token 字段，api_key 即为签名密钥
+ */
 export interface LoginResponse {
   admin: AdminInfo
-  token: string
+  api_key: string
   expires_at: string
 }
 
