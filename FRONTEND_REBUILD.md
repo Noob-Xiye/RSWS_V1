@@ -424,40 +424,62 @@ onMounted(fetchResources);
 
 ## 五、与后端 API 对接
 
-### API 签名机制
+### API 签名机制 (Cregis 方案)
 
-前端请求需携带签名：
+前端请求需在 Query 参数中携带签名：
 
 ```
-X-Api-Key: ak_xxxxxxxxxxxx
-X-Timestamp: 1714848000000
-X-Nonce: abc123
-X-Signature: HMAC-SHA256(api_secret, method + path + timestamp + nonce + body)
+?api_key=ak_xxxxxxxxxxxx
+&timestamp=1714848000000
+&nonce=abc123
+&sign=md5_hex_signature
 ```
 
-### 签名生成
+### 签名生成 (Cregis MD5)
 
 ```typescript
 import CryptoJS from 'crypto-js';
 
-function generateSignature({
-  method,
-  path,
-  timestamp,
-  nonce,
-  body,
-  secret,
-}: {
-  method: string;
-  path: string;
-  timestamp: number;
-  nonce: string;
-  body?: any;
-  secret: string;
-}): string {
-  const bodyStr = body ? JSON.stringify(body) : '';
-  const message = `${method}${path}${timestamp}${nonce}${bodyStr}`;
-  return CryptoJS.HmacSHA256(message, secret).toString();
+/**
+ * Cregis 签名算法
+ * 1. 排除 sign 参数，按 key ASCII 升序排序
+ * 2. 拼接: api_secret + key1 + value1 + key2 + value2 + ...
+ * 3. MD5 计算并转小写 hex
+ */
+function generateSignature(
+  params: Record<string, string>,
+  apiSecret: string
+): string {
+  // 1. 排除 sign 参数，排序
+  const keys = Object.keys(params)
+    .filter(key => key !== 'sign')
+    .sort();
+  
+  // 2. 拼接 key + value
+  const paramStr = keys.map(key => key + params[key]).join('');
+  
+  // 3. 拼接 api_secret 并计算 MD5
+  const signStr = apiSecret + paramStr;
+  return CryptoJS.MD5(signStr).toString();
+}
+
+// 使用示例
+function makeAuthenticatedRequest(url: string, apiKey: string, apiSecret: string) {
+  const timestamp = Date.now().toString();
+  const nonce = Math.random().toString(36).substring(2, 15);
+  
+  const params: Record<string, string> = {
+    api_key: apiKey,
+    timestamp,
+    nonce,
+  };
+  
+  // 添加签名
+  params.sign = generateSignature(params, apiSecret);
+  
+  // 构建带签名的 URL
+  const queryString = new URLSearchParams(params).toString();
+  return fetch(`${url}?${queryString}`);
 }
 ```
 

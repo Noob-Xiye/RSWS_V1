@@ -201,6 +201,84 @@ USDT 监听服务检测交易 → 匹配订单 → 确认支付
 
 ---
 
+## API 认证
+
+### Cregis 签名方案
+
+所有受保护的 API 端点需要在 Query 参数中携带签名：
+
+| 参数 | 说明 |
+|------|------|
+| `api_key` | API Key (登录后获取) |
+| `timestamp` | 时间戳 (毫秒) |
+| `nonce` | 随机字符串 |
+| `sign` | MD5 签名 |
+
+### 签名算法
+
+```
+1. 排除 sign 参数，按 key ASCII 升序排序
+2. 拼接: api_secret + key1 + value1 + key2 + value2 + ...
+3. MD5 计算并转小写 hex
+```
+
+### 示例
+
+```
+参数: api_key=test&timestamp=1234567890&nonce=abc123
+API Secret: my_secret
+
+排序后: api_key, nonce, timestamp
+拼接: my_secret + api_key + test + nonce + abc123 + timestamp + 1234567890
+MD5: f6b5f8c3e2a1d4c7b9e0f1a2b3c4d5e6
+```
+
+### 时间戳验证
+
+- 允许 ±5 分钟偏差
+- 防止请求被重放攻击
+
+### 前端实现
+
+```typescript
+import CryptoJS from 'crypto-js';
+
+function generateSignature(params: Record<string, string>, apiSecret: string): string {
+  const keys = Object.keys(params)
+    .filter(key => key !== 'sign')
+    .sort();
+  
+  const paramStr = keys.map(key => key + params[key]).join('');
+  const signStr = apiSecret + paramStr;
+  return CryptoJS.MD5(signStr).toString();
+}
+```
+
+### 后端验证
+
+Rust 实现使用 `md5` crate:
+
+```rust
+use std::collections::HashMap;
+use md5;
+
+fn compute_signature(params: &HashMap<String, String>, api_secret: &str) -> String {
+    let mut keys: Vec<&String> = params.keys()
+        .filter(|k| (*k).as_str() != "sign")
+        .collect();
+    keys.sort();
+    
+    let param_str: String = keys.iter()
+        .map(|k| format!("{}{}", k, params[*k]))
+        .collect();
+    
+    let sign_str = format!("{}{}", api_secret, param_str);
+    format!("{:x}", md5::compute(sign_str.as_bytes()))
+}
+```
+
+---
+
 ## 版本规划
 
 ### v0.1.0 (当前) ✅

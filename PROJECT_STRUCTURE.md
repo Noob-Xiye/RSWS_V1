@@ -262,14 +262,27 @@ type RswsResult<T> = Result<T, RswsError>;
 
 ## API 认证
 
-使用 **API Key + 签名** 认证：
+使用 **Cregis 签名方案** 认证：
+
+所有受保护的 API 端点需要在 Query 参数中携带签名：
 
 ```
-X-Api-Key: ak_xxxxxxxxxxxx
-X-Timestamp: 1714848000000
-X-Nonce: abc123
-X-Signature: HMAC-SHA256(api_secret, method + path + timestamp + nonce + body)
+?api_key=ak_xxxxxxxxxxxx
+&timestamp=1714848000000
+&nonce=abc123
+&sign=md5_hex_signature
 ```
+
+### Cregis 签名算法
+
+1. 排除 `sign` 参数，按 key ASCII 升序排序
+2. 拼接: `api_secret + key1 + value1 + key2 + value2 + ...`
+3. MD5 计算并转小写 hex
+
+### 时间戳防重放
+
+- 允许 ±5 分钟偏差
+- 防止请求被重放攻击
 
 ---
 
