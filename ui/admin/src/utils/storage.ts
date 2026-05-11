@@ -30,6 +30,12 @@ export function removeApiKey(): void {
   localStorage.removeItem(API_SECRET_KEY)
 }
 
+// 单独移除 API Secret
+// 注意：removeApiKey 会同时移除 secret，如果只需要移除 secret 使用此函数
+export function removeApiSecret(): void {
+  localStorage.removeItem(API_SECRET_KEY)
+}
+
 // API Secret 用于签名
 export function setApiSecret(secret: string): void {
   localStorage.setItem(API_SECRET_KEY, secret)

@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { getApiKey, getApiSecret, removeApiKey, removeApiSecret } from '@/utils/storage'
-import { generateRequestHeaders } from '@/utils/signature'
+import { generateSignParams } from '@/utils/signature'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5173/api/v1'
 
@@ -10,26 +10,24 @@ const request = axios.create({
   headers: { 'Content-Type': 'application/json' }
 })
 
-// 请求拦截器 - 添加 API Key 和签名
-request.interceptors.request.use((config) => {
+// 请求拦截器 - 添加 API Key 签名 (Cregis 方案)
+request.interceptors.request.use(async (config) => {
   const apiKey = getApiKey()
   const apiSecret = getApiSecret()
   
-  if (apiKey) {
-    config.headers['X-API-Key'] = apiKey
+  if (apiKey && apiSecret) {
+    // 生成签名参数 (Cregis 方案)
+    const signParams = generateSignParams({
+      apiKey,
+      apiSecret,
+      path: config.url || '/',
+      body: config.data,
+    })
     
-    // 如果有 apiSecret，生成签名
-    if (apiSecret) {
-      const headers = generateRequestHeaders({
-        apiKey,
-        apiSecret,
-        method: config.method || 'GET',
-        path: config.url || '/',
-        body: config.data,
-      })
-      config.headers['X-Timestamp'] = headers['X-Timestamp']
-      config.headers['X-Nonce'] = headers['X-Nonce']
-      config.headers['X-Signature'] = headers['X-Signature']
+    // 将签名参数添加到查询参数
+    config.params = {
+      ...config.params,
+      ...signParams,
     }
   }
   

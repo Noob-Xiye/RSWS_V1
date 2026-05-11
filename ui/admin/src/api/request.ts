@@ -1,5 +1,6 @@
 import axios from 'axios'
-import { getApiKey } from '@/utils/storage'
+import { getApiKey, getApiSecret, removeApiKey, removeApiSecret } from '@/utils/storage'
+import { generateSignParams } from '@/utils/signature'
 
 // API 基础地址
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5173/api/v1'
@@ -13,19 +14,31 @@ const request = axios.create({
   }
 })
 
-// 请求拦截器
-request.interceptors.request.use(
-  (config) => {
-    const apiKey = getApiKey()
-    if (apiKey) {
-      config.headers['X-API-Key'] = apiKey
+// 请求拦截器 - 添加 API Key 签名 (Cregis 方案)
+request.interceptors.request.use(async (config) => {
+  const apiKey = getApiKey()
+  const apiSecret = getApiSecret()
+  
+  if (apiKey && apiSecret) {
+    // 生成签名参数 (Cregis 方案)
+    const signParams = generateSignParams({
+      apiKey,
+      apiSecret,
+      path: config.url || '/',
+      body: config.data,
+    })
+    
+    // 将签名参数添加到查询参数
+    config.params = {
+      ...config.params,
+      ...signParams,
     }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
   }
-)
+  
+  return config
+}, (error) => {
+  return Promise.reject(error)
+})
 
 // 响应拦截器
 request.interceptors.response.use(
@@ -37,8 +50,8 @@ request.interceptors.response.use(
     if (response) {
       // 401 未授权，跳转登录
       if (response.status === 401) {
-        localStorage.removeItem('rsws_admin_api_key')
-        localStorage.removeItem('rsws_admin_token')
+        removeApiKey()
+        removeApiSecret()
         window.location.href = '/login'
       }
       return Promise.reject(response.data || { message: '请求失败' })
