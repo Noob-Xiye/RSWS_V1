@@ -85,7 +85,7 @@ pub async fn update_paypal_config(req: &mut Request, depot: &mut Depot, res: &mu
     let body: UpdatePayPalConfigRequest = match req.parse_json().await {
         Ok(body) => body,
         Err(e) => {
-            res.error(RswsError::bad_request(&format!("Invalid request body: {}", e)));
+            res.error(RswsError::bad_request(format!("Invalid request body: {}", e)));
             return;
         }
     };

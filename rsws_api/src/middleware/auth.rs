@@ -4,7 +4,9 @@
 //! 支持两种认证方式：
 //!   1. 签名认证（推荐）: api_key, timestamp, nonce, sign 作为请求参数
 //!   2. Header 认证（降级兼容）: X-API-Key, X-API-Secret headers
+//!
 //! 速率限制中间件
+//!
 //! Admin 权限检查中间件
 
 use salvo::prelude::*;
