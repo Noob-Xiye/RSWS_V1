@@ -28,8 +28,36 @@
 - 需对 `adminLogin` 后端返回进行确认
 
 ### 受保护接口
-- 所有 `/api/v1/admin/*` 需带 `X-API-Key` header（admin_api_key）
+- 所有 `/api/v1/admin/*` 需带签名认证参数（Query Parameters）
 - 非管理员访问 → 403 Forbidden
+
+### API 签名认证 (Cregis 方案)
+
+所有受保护的 API 端点需要包含以下查询参数：
+- `api_key`: API Key
+- `timestamp`: 时间戳（毫秒）
+- `nonce`: 随机字符串
+- `sign`: MD5 签名
+
+**签名算法**：
+```
+1. 收集所有参数（排除 sign）
+2. 按 key ASCII 升序排序
+3. 拼接: api_secret + key1 + value1 + key2 + value2 + ...
+4. MD5 计算并转小写 hex
+```
+
+**示例**：
+```
+参数: api_key=test&timestamp=1234567890&nonce=abc123
+API Secret: my_secret
+
+排序后: api_key, nonce, timestamp
+拼接: my_secret + api_key + test + nonce + abc123 + timestamp + 1234567890
+MD5: f6b5f8c3e2a1d4c7b9e0f1a2b3c4d5e6
+```
+
+**时间戳验证**：允许 ±5 分钟偏差
 
 ---
 
