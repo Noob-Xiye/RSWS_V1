@@ -458,11 +458,7 @@ impl AdminService {
         params: &HashMap<String, String>,
         sign: &str,
     ) -> Result<bool, RswsError> {
-        let record = match self
-            .admin_repo
-            .get_active_key_by_admin_id(admin_id)
-            .await?
-        {
+        let record = match self.admin_repo.get_active_key_by_admin_id(admin_id).await? {
             Some(r) => r,
             None => return Ok(false),
         };

@@ -5,9 +5,7 @@ use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_common::password::PasswordService;
 use rsws_db::{RedisService, UserRepository};
-use rsws_model::user_models::user::{
-    LoginRequest, LoginResponse, RegisterRequest, User, UserInfo,
-};
+use rsws_model::user_models::user::{LoginRequest, LoginResponse, RegisterRequest, User, UserInfo};
 use rsws_model::user_models::AdminUserView;
 use tracing::{info, warn};
 

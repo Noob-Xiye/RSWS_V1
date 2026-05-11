@@ -116,14 +116,12 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
 
                         match state.api_key_service.create(user_info.id, create_req).await {
                             Ok(api_key_resp) => {
-                                login_response.session_data = Some(
-                                    SessionData {
-                                        api_key: api_key_resp.api_key,
-                                        expires_at: api_key_resp
-                                            .expires_at
-                                            .unwrap_or_else(|| Utc::now() + Duration::days(7)),
-                                    },
-                                );
+                                login_response.session_data = Some(SessionData {
+                                    api_key: api_key_resp.api_key,
+                                    expires_at: api_key_resp
+                                        .expires_at
+                                        .unwrap_or_else(|| Utc::now() + Duration::days(7)),
+                                });
                             }
                             Err(e) => {
                                 tracing::error!("Failed to create api_key on login: {}", e);

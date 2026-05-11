@@ -89,7 +89,10 @@ impl ApiKeyRepository {
     /// 根据 user_id 获取活跃的 API Key（用于签名验证）
     ///
     /// Cregis 方案：前端传 user_id，后端用 user_id 查找 api_key 验签
-    pub async fn get_active_key_by_user_id(&self, user_id: i64) -> Result<Option<ApiKey>, RswsError> {
+    pub async fn get_active_key_by_user_id(
+        &self,
+        user_id: i64,
+    ) -> Result<Option<ApiKey>, RswsError> {
         let api_key_record = sqlx::query_as::<_, ApiKey>(
             r#"
             SELECT id, user_id, api_key, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at
@@ -110,10 +113,7 @@ impl ApiKeyRepository {
 
     /// 验证 API Key（旧方式，保留用于降级兼容）
     /// 现在只验证 api_key 是否存在且活跃，不再验证 api_secret
-    pub async fn validate(
-        &self,
-        api_key: &str,
-    ) -> Result<Option<ApiKey>, RswsError> {
+    pub async fn validate(&self, api_key: &str) -> Result<Option<ApiKey>, RswsError> {
         let api_key_record = sqlx::query_as::<_, ApiKey>(
             r#"
             SELECT id, user_id, api_key, name, permissions, rate_limit, last_used_at, expires_at, is_active, created_at, updated_at

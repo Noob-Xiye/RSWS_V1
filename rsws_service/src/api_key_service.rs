@@ -73,10 +73,7 @@ impl ApiKeyService {
     }
 
     /// 验证 API Key（按 user_id 验证，用于签名认证）
-    pub async fn validate_by_user_id(
-        &self,
-        user_id: i64,
-    ) -> Result<Option<ApiKey>, RswsError> {
+    pub async fn validate_by_user_id(&self, user_id: i64) -> Result<Option<ApiKey>, RswsError> {
         // 1) 先查 Redis
         if let Some(ref redis) = self.redis {
             if let Some(cached) = redis
