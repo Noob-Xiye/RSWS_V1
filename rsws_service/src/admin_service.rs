@@ -452,19 +452,23 @@ impl AdminService {
     ///
     /// 前端传 admin_id (=user_id) + timestamp + nonce + sign
     /// 后端通过 admin_id 查找 api_key，用 api_key 重算签名验签
+    /// 验证管理员签名（Cregis 方案：通过 admin_id 查找 api_key 验签）
+    ///
+    /// 返回 Ok(Some(api_key_id)) 验签通过
+    /// 返回 Ok(None) 验签失败（无活跃 key 或签名不匹配）
     pub async fn validate_signature_by_admin_id(
         &self,
         admin_id: i64,
         params: &HashMap<String, String>,
         sign: &str,
-    ) -> Result<bool, RswsError> {
+    ) -> Result<Option<i64>, RswsError> {
         let record = match self.admin_repo.get_active_key_by_admin_id(admin_id).await? {
             Some(r) => r,
-            None => return Ok(false),
+            None => return Ok(None),
         };
 
         // 单密钥方案：使用 api_key 作为签名密钥
-        let computed_sign = Self::compute_signature(params, &record.api_key);
+        let computed_sign = rsws_common::signature::compute_cregis_signature(params, &record.api_key);
 
         if computed_sign == sign {
             // 更新 last_used
@@ -472,7 +476,7 @@ impl AdminService {
                 .admin_repo
                 .update_admin_api_key_last_used(record.id)
                 .await;
-            Ok(true)
+            Ok(Some(record.id))
         } else {
             tracing::warn!(
                 "Admin signature mismatch for admin_id: {}. Expected: {}, Got: {}",
@@ -480,28 +484,7 @@ impl AdminService {
                 computed_sign,
                 sign
             );
-            Ok(false)
+            Ok(None)
         }
-    }
-
-    /// 计算签名（符合 Cregis 单密钥方案）
-    ///
-    /// api_key 作为签名密钥，前置到排序后的参数字符串
-    fn compute_signature(params: &HashMap<String, String>, api_key: &str) -> String {
-        // 1. 获取所有 key（排除 sign），排序
-        let mut keys: Vec<&String> = params.keys().filter(|k| (*k).as_str() != "sign").collect();
-        keys.sort();
-
-        // 2. 按 ASCII 顺序拼接 key + value
-        let param_str: String = keys
-            .iter()
-            .map(|k| format!("{}{}", k, params[*k]))
-            .collect();
-
-        // 3. 拼接 api_key（前置，与 Cregis 方案一致）
-        let sign_str = format!("{}{}", api_key, param_str);
-
-        // 4. MD5 + 小写 hex
-        format!("{:x}", md5::compute(sign_str.as_bytes()))
     }
 }

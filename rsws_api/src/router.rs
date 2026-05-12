@@ -152,8 +152,7 @@ pub fn create_router(state: AppState) -> Router {
                                 )
                                 .push(
                                     Router::with_path("api-keys/<key_id>")
-                                        .put(handler::admin::toggle_api_key_status)
-                                        .delete(handler::admin::delete_api_key),
+                                        .put(handler::admin::toggle_api_key_status),
                                 ),
                         )
                         // 用户管理

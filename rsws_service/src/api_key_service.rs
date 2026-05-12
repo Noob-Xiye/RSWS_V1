@@ -1,11 +1,10 @@
-//! API Key 服务
+﻿//! API Key 服务
 //!
 //! 新设计（Cregis 方案）：
 //! - api_key 作为签名密钥，前端持有用于签名
 //! - 签名验证：通过 user_id 查找 api_key，重算签名对比
 //! - 不再需要 api_secret
 
-use md5;
 use rsws_common::error::RswsError;
 use rsws_db::{ApiKeyRepository, RedisService};
 use rsws_model::api_key::{ApiKey, ApiKeyResponse, CreateApiKeyRequest};
@@ -232,7 +231,7 @@ impl ApiKeyService {
         let api_key = &api_key_record.api_key;
 
         // 2) 重算签名（Cregis: api_key 拼在排序参数前面）
-        let computed_sign = compute_signature(params, api_key);
+        let computed_sign = rsws_common::signature::compute_cregis_signature(params, api_key);
 
         // 3) 对比签名
         if computed_sign == sign {
@@ -249,34 +248,10 @@ impl ApiKeyService {
     }
 }
 
-/// 计算签名（Cregis 方案）
-///
-/// 算法：
-/// 1. 排除 sign 字段，按 key ASCII 升序排序
-/// 2. 拼接参数字符串（key + value）
-/// 3. 将 api_key 拼在字符串最前面
-/// 4. MD5 计算并转小写 hex
-fn compute_signature(params: &HashMap<String, String>, api_key: &str) -> String {
-    // 1. 获取所有 key（排除 sign），排序
-    let mut keys: Vec<&String> = params.keys().filter(|k| (*k).as_str() != "sign").collect();
-    keys.sort();
-
-    // 2. 按 ASCII 顺序拼接 key + value
-    let param_str: String = keys
-        .iter()
-        .map(|k| format!("{}{}", k, params[*k]))
-        .collect();
-
-    // 3. api_key 拼在最前面（Cregis 方案）
-    let sign_str = format!("{}{}", api_key, param_str);
-
-    // 4. MD5 + 小写 hex
-    format!("{:x}", md5::compute(sign_str.as_bytes()))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rsws_common::signature::compute_cregis_signature as compute_signature;
 
     #[test]
     fn test_compute_signature_basic() {
@@ -304,8 +279,8 @@ mod tests {
         params_without_sign.insert("user_id".to_string(), "test".to_string());
 
         let api_key = "secret";
-        let sig_with_sign = compute_signature(&params_with_sign, api_key);
-        let sig_without_sign = compute_signature(&params_without_sign, api_key);
+        let sig_with_sign = rsws_common::signature::compute_cregis_signature(&params_with_sign, api_key);
+        let sig_without_sign = rsws_common::signature::compute_cregis_signature(&params_without_sign, api_key);
 
         // 两种情况的签名应该相同
         assert_eq!(sig_with_sign, sig_without_sign);
@@ -322,8 +297,8 @@ mod tests {
         params2.insert("user_id".to_string(), "key".to_string());
 
         let api_key = "secret";
-        let sig1 = compute_signature(&params1, api_key);
-        let sig2 = compute_signature(&params2, api_key);
+        let sig1 = rsws_common::signature::compute_cregis_signature(&params1, api_key);
+        let sig2 = rsws_common::signature::compute_cregis_signature(&params2, api_key);
 
         // 签名应该相同（因为会排序）
         assert_eq!(sig1, sig2);

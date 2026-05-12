@@ -5,7 +5,6 @@
 //! - 验证签名：通过 user_id 查找 api_key，重算签名对比
 //! - 不再需要 api_secret
 
-use md5;
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_db::ApiKeyRepository;
@@ -50,7 +49,7 @@ impl AuthService {
         }
 
         // 2) 重算签名（Cregis: api_key 拼在排序参数前面）
-        let computed_sign = compute_signature(params, &api_key_record.api_key);
+        let computed_sign = rsws_common::signature::compute_cregis_signature(params, &api_key_record.api_key);
 
         // 3) 对比签名
         if computed_sign != sign {
@@ -64,29 +63,4 @@ impl AuthService {
 
         Ok(api_key_record.user_id)
     }
-}
-
-/// 计算签名（Cregis 方案）
-///
-/// 算法：
-/// 1. 排除 sign 字段，按 key ASCII 升序排序
-/// 2. 拼接参数字符串（key + value）
-/// 3. 将 api_key 拼在字符串最前面
-/// 4. MD5 计算并转小写 hex
-fn compute_signature(params: &HashMap<String, String>, api_key: &str) -> String {
-    // 1. 获取所有 key（排除 sign），排序
-    let mut keys: Vec<&String> = params.keys().filter(|k| (*k).as_str() != "sign").collect();
-    keys.sort();
-
-    // 2. 按 ASCII 顺序拼接 key + value
-    let param_str: String = keys
-        .iter()
-        .map(|k| format!("{}{}", k, params[*k]))
-        .collect();
-
-    // 3. api_key 拼在最前面（Cregis 方案）
-    let sign_str = format!("{}{}", api_key, param_str);
-
-    // 4. MD5 + 小写 hex
-    format!("{:x}", md5::compute(sign_str.as_bytes()))
 }

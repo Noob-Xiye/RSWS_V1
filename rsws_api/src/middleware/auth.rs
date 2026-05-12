@@ -155,14 +155,15 @@ pub async fn api_key_auth(
                     .validate_signature_by_admin_id(user_id, &params, &sign)
                     .await
                 {
-                    Ok(true) => {
+                    Ok(Some(api_key_id)) => {
                         depot.insert("user_id", user_id);
+                        depot.insert("api_key_id", api_key_id);
                         depot.insert("is_admin", true);
 
                         ctrl.call_next(req, depot, res).await;
                         return;
                     }
-                    Ok(false) | Err(_) => {
+                    Ok(None) | Err(_) => {
                         // 管理员验证也失败
                     }
                 }

@@ -1,12 +1,43 @@
 //! 签名服务
 //!
-//! 基于 HMAC-SHA256 的请求签名服务
+//! 基于 HMAC-SHA256 的请求签名服务（旧方案，保留兼容）
+//! 基于 MD5 的 Cregis 签名算法（当前方案）
 
 use crate::error::RswsError;
 use base64::{engine::general_purpose, Engine as _};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+// ==================== Cregis MD5 签名（当前方案） ====================
+
+/// 计算 Cregis 签名（MD5）
+///
+/// 算法：
+/// 1. 排除 sign 字段，按 key ASCII 升序排序
+/// 2. 拼接参数字符串（key + value）
+/// 3. 将 api_key 拼在字符串最前面
+/// 4. MD5 计算并转小写 hex
+///
+/// 此函数是全项目唯一签名实现，前后端（TypeScript CryptoJS.MD5）必须与之对齐。
+pub fn compute_cregis_signature(params: &HashMap<String, String>, api_key: &str) -> String {
+    // 1. 获取所有 key（排除 sign），排序
+    let mut keys: Vec<&String> = params.keys().filter(|k| k.as_str() != "sign").collect();
+    keys.sort();
+
+    // 2. 按 ASCII 顺序拼接 key + value
+    let param_str: String = keys
+        .iter()
+        .map(|k| format!("{}{}", k, params[*k]))
+        .collect();
+
+    // 3. api_key 拼在最前面
+    let sign_str = format!("{}{}", api_key, param_str);
+
+    // 4. MD5 + 小写 hex
+    format!("{:x}", md5::compute(sign_str.as_bytes()))
+}
 
 type HmacSha256 = Hmac<Sha256>;
 

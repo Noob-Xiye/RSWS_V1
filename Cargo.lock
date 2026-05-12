@@ -2601,6 +2601,7 @@ dependencies = [
  "config",
  "hmac",
  "lettre",
+ "md5",
  "once_cell",
  "rand 0.9.4",
  "redis",
