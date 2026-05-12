@@ -232,8 +232,6 @@ impl UserService {
         info!("User logged in: {} ({})", user.id, user.username);
 
         Ok(LoginResponse {
-            success: true,
-            message: "登录成功".to_string(),
             user_info: Some(UserInfo {
                 id: user.id,
                 email: user.email.clone(),

@@ -555,13 +555,6 @@ pub struct ToggleApiKeyStatusBody {
     )
 )]
 pub async fn toggle_api_key_status(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
     let admin_id: i64 = match depot.get("user_id") {
         Ok(id) => *id,
         Err(_) => {
@@ -1010,7 +1003,7 @@ pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Respo
         SELECT DATE(completed_at AT TIME ZONE 'UTC')::text AS date, COALESCE(SUM(amount), 0)::bigint AS revenue
         FROM orders
         WHERE status = 'completed'
-          AND completed_at >= NOW() - ($1 || ' days')::interval
+          AND completed_at >= NOW() - make_interval(days => $1)
         GROUP BY DATE(completed_at AT TIME ZONE 'UTC')
         ORDER BY date ASC
         "#,

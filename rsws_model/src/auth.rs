@@ -33,24 +33,6 @@ pub struct DeviceInfo {
     pub app_version: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoginResponse {
-    pub session_token: String,
-    pub api_key: String,
-    pub expires_at: DateTime<Utc>,
-    pub user_info: UserInfo,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserInfo {
-    pub id: i64,
-    pub username: String,
-    pub email: Option<String>,
-    pub nickname: Option<String>,
-    pub avatar: Option<String>,
-    pub permissions: Vec<String>,
-}
-
 // API请求签名结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiRequest {

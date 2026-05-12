@@ -49,7 +49,8 @@ impl AuthService {
         }
 
         // 2) 重算签名（Cregis: api_key 拼在排序参数前面）
-        let computed_sign = rsws_common::signature::compute_cregis_signature(params, &api_key_record.api_key);
+        let computed_sign =
+            rsws_common::signature::compute_cregis_signature(params, &api_key_record.api_key);
 
         // 3) 对比签名
         if computed_sign != sign {

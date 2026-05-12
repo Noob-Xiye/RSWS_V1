@@ -1,4 +1,4 @@
-﻿//! API Key 服务
+//! API Key 服务
 //!
 //! 新设计（Cregis 方案）：
 //! - api_key 作为签名密钥，前端持有用于签名
@@ -279,8 +279,10 @@ mod tests {
         params_without_sign.insert("user_id".to_string(), "test".to_string());
 
         let api_key = "secret";
-        let sig_with_sign = rsws_common::signature::compute_cregis_signature(&params_with_sign, api_key);
-        let sig_without_sign = rsws_common::signature::compute_cregis_signature(&params_without_sign, api_key);
+        let sig_with_sign =
+            rsws_common::signature::compute_cregis_signature(&params_with_sign, api_key);
+        let sig_without_sign =
+            rsws_common::signature::compute_cregis_signature(&params_without_sign, api_key);
 
         // 两种情况的签名应该相同
         assert_eq!(sig_with_sign, sig_without_sign);

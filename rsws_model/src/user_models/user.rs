@@ -71,22 +71,6 @@ pub struct VerifyCodeRequest {
     pub password: String,
 }
 
-/// 注册响应
-#[derive(Debug, Serialize, ToSchema)]
-pub struct RegisterResponse {
-    pub success: bool,
-    pub message: String,
-    pub user_id: Option<i64>,
-}
-
-/// 发送验证码响应
-#[derive(Debug, Serialize, ToSchema)]
-pub struct SendCodeResponse {
-    pub success: bool,
-    pub message: String,
-    pub expires_in: i64,
-}
-
 /// 登录请求（两种方式）
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
@@ -107,8 +91,6 @@ pub struct LoginRequest {
 /// 登录响应
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LoginResponse {
-    pub success: bool,
-    pub message: String,
     pub user_info: Option<UserInfo>,
     pub session_data: Option<SessionData>,
 }
