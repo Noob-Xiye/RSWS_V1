@@ -3,7 +3,7 @@ import { getApiKey, getAdminId, removeApiKey, removeAdminId } from '@/utils/stor
 import { generateSignParams } from '@/utils/signature'
 
 // API 基础地址
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5173/api/v1'
+const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 // 创建 axios 实例
 const request = axios.create({
@@ -26,7 +26,6 @@ request.interceptors.request.use(async (config) => {
     const signParams = generateSignParams({
       adminId,
       apiKey,
-      path: config.url || '/',
     })
     
     // 将签名参数添加到查询参数

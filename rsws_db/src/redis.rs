@@ -2,6 +2,7 @@
 
 use deadpool_redis::{Config as RedisConfig, Pool, Runtime};
 use redis::AsyncCommands;
+use redis::{ExistenceCheck, SetExpiry, SetOptions};
 use rsws_common::error::RswsError;
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::{debug, error};
@@ -59,6 +60,21 @@ impl RedisService {
         })?;
         debug!("Redis GET {} -> {:?}", key, result.is_some());
         Ok(result)
+    }
+
+    /// SET NX EX：仅当 key 不存在时设置（原子操作）
+    /// 返回 true 表示设置成功（key 不存在），false 表示 key 已存在
+    pub async fn set_nx_ex(&self, key: &str, value: &str, ttl_secs: u64) -> Result<bool, RswsError> {
+        let mut conn = self.get_connection().await?;
+        let opts = SetOptions::default()
+            .conditional_set(ExistenceCheck::NX)
+            .with_expiration(SetExpiry::EX(ttl_secs));
+        let result: Option<String> = conn.set_options(key, value, opts).await.map_err(|e| {
+            error!("Failed to set_nx_ex Redis key: {}", e);
+            RswsError::internal("Failed to set_nx_ex Redis key")
+        })?;
+        debug!("Redis SET NX EX {} -> {}", key, result.is_some());
+        Ok(result.is_some())
     }
 
     /// 删除键

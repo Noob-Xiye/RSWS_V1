@@ -57,8 +57,6 @@ export interface SignParams {
   adminId: string
   /** 签名密钥（不随请求传输） */
   apiKey: string
-  /** 请求路径 */
-  path: string
 }
 
 /**
@@ -67,8 +65,11 @@ export interface SignParams {
  * 只签名 query params（user_id, timestamp, nonce + 其他业务查询参数）
  * 不签名 body —— 后端 auth 中间件只从 query params 验签
  * 
- * @param options 包含 adminId, apiKey, path
+ * @param options 包含 adminId, apiKey
  * @returns 签名参数对象 { user_id, timestamp, nonce, sign }
+ * 
+ * 注意：当前不包含 path 参数签名。如需启用 path 签名防重放到其他端点，
+ * 需前后端同步改造（后端 auth 中间件也要加 path 验证）
  */
 export function generateSignParams(options: SignParams): Record<string, string> {
   const timestamp = getTimestamp()

@@ -9,6 +9,7 @@
 
 use crate::state::get_state;
 use rsws_common::error::RswsError;
+use rsws_db::redis::RedisService;
 use salvo::prelude::*;
 
 /// 获取真实客户端 IP（考虑可信代理）
@@ -44,6 +45,14 @@ fn get_real_client_ip(req: &Request, trusted_proxies: &[String]) -> String {
     }
 
     remote_ip
+}
+
+/// Nonce 去重检查（Redis SET NX EX）
+///
+/// 返回 Ok(true) 表示 nonce 首次使用（允许），Ok(false) 表示 nonce 已存在（拒绝重放）
+async fn check_nonce_once(redis: &RedisService, nonce: &str) -> Result<bool, RswsError> {
+    let key = format!("nonce:{}", nonce);
+    redis.set_nx_ex(&key, "1", 300).await
 }
 
 /// API Key 认证中间件（Cregis 方案）
@@ -115,7 +124,7 @@ pub async fn api_key_auth(
             std::collections::HashMap::new();
         params.insert("user_id".to_string(), user_id_str);
         params.insert("timestamp".to_string(), timestamp);
-        params.insert("nonce".to_string(), nonce);
+        params.insert("nonce".to_string(), nonce.clone());
 
         // 从查询参数收集其他业务参数
         if let Some(query) = req.query::<std::collections::HashMap<String, String>>("") {
@@ -139,6 +148,19 @@ pub async fn api_key_auth(
                 depot.insert("api_key_id", api_key_record.id);
                 depot.insert("is_admin", false);
 
+                // Nonce 去重检查
+                let redis = state.config_service.redis_client();
+                if let Ok(false) = check_nonce_once(redis, &nonce).await {
+                    res.status_code(StatusCode::UNAUTHORIZED);
+                    res.render(Json(
+                        rsws_common::response::ApiResponse::<()>::error_with_message(
+                            rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
+                            "Nonce already used (replay detected)",
+                        ),
+                    ));
+                    return;
+                }
+
                 let svc = state.api_key_service.clone();
                 let record_id = api_key_record.id;
                 tokio::spawn(async move {
@@ -159,6 +181,19 @@ pub async fn api_key_auth(
                         depot.insert("user_id", user_id);
                         depot.insert("api_key_id", api_key_id);
                         depot.insert("is_admin", true);
+
+                        // Nonce 去重检查
+                        let redis = state.config_service.redis_client();
+                        if let Ok(false) = check_nonce_once(redis, &nonce).await {
+                            res.status_code(StatusCode::UNAUTHORIZED);
+                            res.render(Json(
+                                rsws_common::response::ApiResponse::<()>::error_with_message(
+                                    rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
+                                    "Nonce already used (replay detected)",
+                                ),
+                            ));
+                            return;
+                        }
 
                         ctrl.call_next(req, depot, res).await;
                         return;

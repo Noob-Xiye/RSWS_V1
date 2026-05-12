@@ -2,7 +2,7 @@ import axios from 'axios'
 import { getApiKey, getUserId, removeApiKey, removeUserId } from '@/utils/storage'
 import { generateSignParams } from '@/utils/signature'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5173/api/v1'
+const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 const request = axios.create({
   baseURL: BASE_URL,
@@ -22,7 +22,6 @@ request.interceptors.request.use(async (config) => {
     const signParams = generateSignParams({
       userId,
       apiKey,
-      path: config.url || '/',
     })
     
     // 将签名参数添加到查询参数
