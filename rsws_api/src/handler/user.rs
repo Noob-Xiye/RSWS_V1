@@ -6,7 +6,7 @@ use crate::state::get_state;
 use chrono::{Duration, Utc};
 use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
 use rsws_model::user_models::user::{
-    ChangePasswordRequest, LoginRequest, RegisterRequest, SessionData, UpdateProfileRequest,
+    ChangePasswordRequest, LoginRequest, RegisterRequest, UpdateProfileRequest,
 };
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
@@ -64,10 +64,12 @@ pub async fn register(req: &mut Request, depot: &mut Depot, res: &mut Response) 
             match state.user_service.register(&data).await {
                 Ok(user) => {
                     res.success(serde_json::json!({
-                        "id": user.id,
-                        "email": user.email,
-                        "username": user.username,
-                        "nickname": user.nickname,
+                        "user": {
+                            "id": user.id,
+                            "email": user.email,
+                            "username": user.username,
+                            "nickname": user.nickname,
+                        },
                         "message": "Registration successful"
                     }));
                 }
@@ -106,7 +108,7 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
             match state.user_service.login(&data).await {
                 Ok(mut login_response) => {
                     // 登录成功后，创建并持久化 api_key
-                    if let Some(ref user_info) = login_response.user_info {
+                    if let Some(ref user) = login_response.user {
                         let create_req = rsws_model::api_key::CreateApiKeyRequest {
                             name: "login_session".to_string(),
                             permissions: vec!["all".to_string()],
@@ -114,19 +116,19 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
                             expires_in_days: Some(7),
                         };
 
-                        match state.api_key_service.create(user_info.id, create_req).await {
+                        match state.api_key_service.create(user.id, create_req).await {
                             Ok(api_key_resp) => {
-                                login_response.session_data = Some(SessionData {
-                                    api_key: api_key_resp.api_key,
-                                    expires_at: api_key_resp
+                                login_response.api_key = Some(api_key_resp.api_key);
+                                login_response.expires_at = Some(
+                                    api_key_resp
                                         .expires_at
                                         .unwrap_or_else(|| Utc::now() + Duration::days(7)),
-                                });
+                                );
                             }
                             Err(e) => {
                                 tracing::error!("Failed to create api_key on login: {}", e);
                                 // 登录成功但 api_key 创建失败，仍然返回用户信息
-                                // 前端需要处理 session_data 为 None 的情况
+                                // 前端需要处理 api_key 为 None 的情况
                             }
                         }
                     }

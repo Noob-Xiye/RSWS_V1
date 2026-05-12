@@ -35,20 +35,20 @@ export const useUserStore = defineStore('user', () => {
       // 后端 ApiResponse 格式: { code: 0, msg: "success", data: LoginResponse }
       const loginData = res.data
       if (res.code === 0 && loginData) {
-        if (loginData.session_data?.api_key && loginData.user_info?.id) {
-          apiKey.value = loginData.session_data.api_key
-          setApiKey(loginData.session_data.api_key)
-          userId.value = String(loginData.user_info.id)
-          setUserId(String(loginData.user_info.id))
+        if (loginData.api_key && loginData.user?.id) {
+          apiKey.value = loginData.api_key
+          setApiKey(loginData.api_key)
+          userId.value = String(loginData.user.id)
+          setUserId(String(loginData.user.id))
         }
-        if (loginData.user_info) {
+        if (loginData.user) {
           userInfo.value = {
-            id: loginData.user_info.id ?? 0,
-            email: loginData.user_info.email ?? '',
-            username: loginData.user_info.username ?? '',
-            nickname: loginData.user_info.nickname,
-            avatar_url: loginData.user_info.avatar_url,
-            is_active: loginData.user_info.is_active ?? false,
+            id: loginData.user.id ?? 0,
+            email: loginData.user.email ?? '',
+            username: loginData.user.username ?? '',
+            nickname: loginData.user.nickname,
+            avatar_url: loginData.user.avatar_url,
+            is_active: loginData.user.is_active ?? false,
             created_at: '',
             updated_at: '',
           }
@@ -67,15 +67,15 @@ export const useUserStore = defineStore('user', () => {
       // 后端 ApiResponse 格式: { code: 0, msg: "success", data: RegisterResponse }
       const regData = res.data
       if (res.code === 0 && regData) {
-        // 注册不返回 session_data，前端只存 userInfo
-        if (regData.user_info) {
+        // 注册不返回 api_key，前端只存 userInfo
+        if (regData.user) {
           userInfo.value = {
-            id: regData.user_info.id ?? 0,
-            email: regData.user_info.email ?? '',
-            username: regData.user_info.username ?? '',
-            nickname: regData.user_info.nickname,
-            avatar_url: regData.user_info.avatar_url,
-            is_active: regData.user_info.is_active ?? false,
+            id: regData.user.id ?? 0,
+            email: regData.user.email ?? '',
+            username: regData.user.username ?? '',
+            nickname: regData.user.nickname,
+            avatar_url: regData.user.avatar_url,
+            is_active: regData.user.is_active ?? false,
             created_at: '',
             updated_at: '',
           }

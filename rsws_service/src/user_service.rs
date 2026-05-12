@@ -232,7 +232,7 @@ impl UserService {
         info!("User logged in: {} ({})", user.id, user.username);
 
         Ok(LoginResponse {
-            user_info: Some(UserInfo {
+            user: Some(UserInfo {
                 id: user.id,
                 email: user.email.clone(),
                 username: user.username.clone(),
@@ -240,7 +240,8 @@ impl UserService {
                 avatar_url: user.avatar_url.clone(),
                 is_active: user.is_active,
             }),
-            session_data: None, // handler 层填充
+            api_key: None,    // handler 层填充
+            expires_at: None, // handler 层填充
         })
     }
 

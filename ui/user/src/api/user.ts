@@ -22,17 +22,12 @@ export interface LoginRequest {
 }
 
 /**
- * 后端 LoginResponse (user_service 返回的结构)
- * 
- * 注意：后端不返回 success 字段，成功与否由 ApiResponse.code === 0 判断
+ * 后端 LoginResponse（与管理员端 AdminLoginResponse 统一扁平结构）
  */
 export interface LoginResponse {
-  user_info?: Partial<User>
-  session_data?: {
-    api_key: string
-    expires_at?: string
-  }
-  message?: string
+  user?: Partial<User>
+  api_key?: string
+  expires_at?: string
 }
 
 export interface RegisterRequest {
@@ -43,14 +38,10 @@ export interface RegisterRequest {
 }
 
 /**
- * 后端 RegisterResponse
+ * 后端 RegisterResponse（与 LoginResponse 统一结构）
  */
 export interface RegisterResponse {
-  user_info?: Partial<User>
-  session_data?: {
-    api_key: string
-    expires_at?: string
-  }
+  user?: Partial<User>
   message?: string
 }
 

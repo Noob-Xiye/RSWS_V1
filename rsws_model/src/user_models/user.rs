@@ -88,11 +88,12 @@ pub struct LoginRequest {
     pub user_agent: Option<String>,
 }
 
-/// 登录响应
+/// 登录响应（与管理员 AdminLoginResponse 统一扁平结构）
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LoginResponse {
-    pub user_info: Option<UserInfo>,
-    pub session_data: Option<SessionData>,
+    pub user: Option<UserInfo>,
+    pub api_key: Option<String>,
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
 /// 用户信息
@@ -104,14 +105,6 @@ pub struct UserInfo {
     pub nickname: String, // 显示名称
     pub avatar_url: Option<String>,
     pub is_active: bool,
-}
-
-/// 会话数据（Cregis 单密钥方案）
-#[derive(Debug, Serialize, ToSchema)]
-pub struct SessionData {
-    /// 签名密钥（前端持有，不随请求传输）
-    pub api_key: String,
-    pub expires_at: DateTime<Utc>,
 }
 
 /// 管理员视图用户信息（分页列表用）
