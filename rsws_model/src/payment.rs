@@ -57,6 +57,23 @@ pub struct CreateOrderRequest {
     pub payment_method: String,
 }
 
+/// 管理员订单详情（含关联的用户名和资源标题）
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AdminOrderDetail {
+    pub id: i64,
+    pub user_id: i64,
+    pub user_name: Option<String>,
+    pub user_email: Option<String>,
+    pub resource_id: i64,
+    pub resource_title: Option<String>,
+    pub amount: i64,
+    pub status: String,
+    pub payment_method: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub expired_at: Option<DateTime<Utc>>,
+}
+
 // ==================== 支付交易 ====================
 
 /// 交易状态

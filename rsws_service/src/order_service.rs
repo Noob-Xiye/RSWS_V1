@@ -68,6 +68,20 @@ impl OrderService {
             .await
     }
 
+    /// 管理员获取全部订单列表（含用户名、资源标题、支持筛选）
+    pub async fn admin_list_orders(
+        &self,
+        status: Option<&str>,
+        user_id: Option<i64>,
+        payment_method: Option<&str>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<rsws_model::payment::AdminOrderDetail>, i64), RswsError> {
+        self.order_repo
+            .list_all_detail(status, user_id, payment_method, page, page_size)
+            .await
+    }
+
     /// 更新订单状态
     pub async fn update_status(&self, order_id: i64, status: &str) -> Result<(), RswsError> {
         // 验证状态值

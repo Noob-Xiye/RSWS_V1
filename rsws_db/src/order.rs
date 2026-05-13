@@ -166,6 +166,90 @@ impl OrderRepository {
         Ok((orders, total.0))
     }
 
+    /// 管理员获取全部订单列表（含用户名、资源标题、支持筛选）
+    pub async fn list_all_detail(
+        &self,
+        status: Option<&str>,
+        user_id: Option<i64>,
+        payment_method: Option<&str>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<rsws_model::payment::AdminOrderDetail>, i64), RswsError> {
+        let offset = (page - 1) * page_size;
+
+        // 构建动态 WHERE 子句（使用条件绑定，每个筛选参数始终 bind 但用条件跳过）
+        let mut where_parts: Vec<String> = Vec::new();
+        if status.is_some() {
+            where_parts.push("o.status = $1::order_status".to_string());
+        }
+        if user_id.is_some() {
+            where_parts.push(format!("o.user_id = ${}", if status.is_some() { 2 } else { 1 }));
+        }
+        if payment_method.is_some() {
+            let idx = where_parts.len() + 1;
+            where_parts.push(format!("o.payment_method = ${}", idx));
+        }
+
+        let where_clause = if where_parts.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", where_parts.join(" AND "))
+        };
+
+        let base_select = format!(
+            r#"
+            SELECT o.id, o.user_id, u.nickname as user_name, u.email as user_email,
+                   o.resource_id, r.title as resource_title,
+                   o.amount, o.status, o.payment_method,
+                   o.created_at, o.updated_at, o.expired_at
+            FROM orders o
+            LEFT JOIN users u ON o.user_id = u.id
+            LEFT JOIN resources r ON o.resource_id = r.id
+            {} ORDER BY o.created_at DESC
+            "#,
+            where_clause
+        );
+
+        // 手动绑定参数（按 where_parts 出现顺序）
+        let lim = page_size;
+        let off = offset;
+        let limit_idx = where_parts.len() + 1;
+        let offset_idx = where_parts.len() + 2;
+
+        let query_str = format!("{} LIMIT ${} OFFSET ${}", base_select, limit_idx, offset_idx);
+        let count_str = format!("SELECT COUNT(*) FROM orders o {}", where_clause);
+
+        // 使用 raw query 动态绑定
+        let mut query = sqlx::query_as::<_, rsws_model::payment::AdminOrderDetail>(&query_str);
+        let mut count_query = sqlx::query_as::<_, (i64,)>(&count_str);
+
+        if let Some(s) = status {
+            query = query.bind(s);
+            count_query = count_query.bind(s);
+        }
+        if let Some(uid) = user_id {
+            query = query.bind(uid);
+            count_query = count_query.bind(uid);
+        }
+        if let Some(pm) = payment_method {
+            query = query.bind(pm);
+            count_query = count_query.bind(pm);
+        }
+        query = query.bind(lim).bind(off);
+
+        let orders = query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to list orders: {}", e)))?;
+
+        let total: (i64,) = count_query
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to count orders: {}", e)))?;
+
+        Ok((orders, total.0))
+    }
+
     /// 检查用户是否已购买资源
     pub async fn check_user_purchased(
         &self,
