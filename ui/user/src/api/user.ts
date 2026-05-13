@@ -2,106 +2,97 @@ import request, { type ApiResponse } from './request'
 
 // ========== 用户相关类型 ==========
 
-export interface User {
+/** 用户信息（对齐后端 UserInfo） */
+export interface UserInfo {
   id: number
   email: string
   username: string
-  nickname?: string
-  avatar_url?: string | null
-  balance?: string
+  nickname: string
+  avatar_url: string | null
   is_active: boolean
-  created_at: string
-  updated_at: string
 }
 
+/** 登录请求（对齐后端 LoginRequest） */
 export interface LoginRequest {
-  login: string  // username 或 email
-  password?: string
-  verification_code?: string
   login_type: 'password' | 'code'
+  username?: string
+  password?: string
+  email?: string
+  verification_code?: string
 }
 
-/**
- * 后端 LoginResponse（与管理员端 AdminLoginResponse 统一扁平结构）
- */
+/** 登录响应（对齐后端 LoginResponse 扁平结构） */
 export interface LoginResponse {
-  user?: Partial<User>
+  user?: UserInfo
   api_key?: string
   expires_at?: string
 }
 
+/** 注册请求（对齐后端 RegisterRequest） */
 export interface RegisterRequest {
+  username: string
+  nickname: string
   email: string
   password: string
-  username: string
-  verification_code?: string
 }
 
-/**
- * 后端 RegisterResponse（与 LoginResponse 统一结构）
- */
+/** 注册响应 */
 export interface RegisterResponse {
-  user?: Partial<User>
+  user?: {
+    id: number
+    email: string
+    username: string
+    nickname: string
+  }
   message?: string
 }
 
+/** 更新资料请求（对齐后端 UpdateProfileRequest） */
 export interface UpdateProfileRequest {
   nickname?: string
   avatar_url?: string
 }
 
+/** 修改密码请求（对齐后端 ChangePasswordRequest） */
 export interface ChangePasswordRequest {
   old_password: string
   new_password: string
 }
 
+/** 发送验证码请求（对齐后端 SendVerificationCodeRequest） */
 export interface SendCodeRequest {
   email: string
-  scene: 'register' | 'login' | 'reset_password'
+  code_type: 'register' | 'login' | 'reset_password'
 }
 
 // ========== API 函数 ==========
 
-/**
- * 用户登录
- * 返回 ApiResponse<LoginResponse>，由 code === 0 判断成功
- */
+/** 用户登录 */
 export async function login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
   return request.post('/user/login', data)
 }
 
-/**
- * 用户注册
- * 返回 ApiResponse<RegisterResponse>，由 code === 0 判断成功
- */
+/** 用户注册 */
 export async function register(data: RegisterRequest): Promise<ApiResponse<RegisterResponse>> {
   return request.post('/user/register', data)
 }
 
-/**
- * 获取当前用户信息
- */
-export async function getUserInfo(): Promise<ApiResponse<User>> {
+/** 获取当前用户信息 */
+export async function getUserInfo(): Promise<ApiResponse<UserInfo>> {
   return request.get('/user/info')
 }
 
-/**
- * 更新用户资料
- */
-export async function updateProfile(data: UpdateProfileRequest): Promise<ApiResponse<User>> {
+/** 更新用户资料 */
+export async function updateProfile(data: UpdateProfileRequest): Promise<ApiResponse<UserInfo>> {
   return request.put('/user/profile', data)
 }
 
-/**
- * 修改密码
- */
+/** 修改密码 */
 export async function changePassword(data: ChangePasswordRequest): Promise<ApiResponse<{ message: string }>> {
   return request.post('/user/change-password', data)
 }
 
-/**
- * 发送验证码
- */
-export async function sendVerificationCode(data: SendCodeRequest): Promise<ApiResponse<{ success: boolean; message: string }>> {
+/** 发送验证码 */
+export async function sendVerificationCode(data: SendCodeRequest): Promise<ApiResponse<{ message: string }>> {
   return request.post('/user/send-code', data)
 }

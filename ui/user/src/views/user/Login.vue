@@ -160,7 +160,7 @@ async function handleSendCode() {
     if (codeCountdown.value <= 0 && codeTimer) clearInterval(codeTimer)
   }, 1000)
   try {
-    await sendVerificationCode({ email: form.username, scene: 'login' })
+    await sendVerificationCode({ email: form.username, code_type: 'login' })
     ElMessage.success('验证码已发送')
   } catch {
     ElMessage.error('发送失败，请稍后重试')

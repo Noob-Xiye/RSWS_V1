@@ -1,39 +1,46 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { register as apiRegister, getUserInfo, login as apiLogin, type LoginResponse, type RegisterResponse } from '@/api/user'
+import { register as apiRegister, getUserInfo, login as apiLogin, type LoginResponse, type RegisterResponse, type UserInfo as ApiUserInfo } from '@/api/user'
 import { setApiKey, getApiKey, removeApiKey, setUserId, getUserId, removeUserId } from '@/utils/storage'
 
-export interface UserInfo {
+export interface LocalUserInfo {
   id: number
   email: string
   username: string
-  nickname?: string
-  avatar_url?: string | null
-  balance?: string
+  nickname: string
+  avatar_url: string | null
   is_active: boolean
-  created_at: string
-  updated_at: string
+}
+
+function mapUserInfo(u: Partial<ApiUserInfo>): LocalUserInfo {
+  return {
+    id: u.id ?? 0,
+    email: u.email ?? '',
+    username: u.username ?? '',
+    nickname: u.nickname ?? '',
+    avatar_url: u.avatar_url ?? null,
+    is_active: u.is_active ?? false,
+  }
 }
 
 export const useUserStore = defineStore('user', () => {
-  const userInfo = ref<UserInfo | null>(null)
+  const userInfo = ref<LocalUserInfo | null>(null)
   const apiKey = ref<string | null>(getApiKey())
   const userId = ref<string | null>(getUserId())
 
   const isLoggedIn = computed(() => !!apiKey.value)
   const username = computed(() => userInfo.value?.nickname || userInfo.value?.username || '未登录')
-  const balance = computed(() => userInfo.value?.balance || '0')
 
   async function login(loginStr: string, passwordOrCode: string, loginType: 'password' | 'code') {
     try {
       const res = await apiLogin({
-        login: loginStr,
+        login_type: loginType,
+        username: loginType === 'password' ? loginStr : undefined,
+        email: loginType === 'code' ? loginStr : undefined,
         password: loginType === 'password' ? passwordOrCode : undefined,
         verification_code: loginType === 'code' ? passwordOrCode : undefined,
-        login_type: loginType,
       })
-      // 后端 ApiResponse 格式: { code: 0, msg: "success", data: LoginResponse }
-      const loginData = res.data
+      const loginData: LoginResponse | undefined = res.data
       if (res.code === 0 && loginData) {
         if (loginData.api_key && loginData.user?.id) {
           apiKey.value = loginData.api_key
@@ -42,16 +49,7 @@ export const useUserStore = defineStore('user', () => {
           setUserId(String(loginData.user.id))
         }
         if (loginData.user) {
-          userInfo.value = {
-            id: loginData.user.id ?? 0,
-            email: loginData.user.email ?? '',
-            username: loginData.user.username ?? '',
-            nickname: loginData.user.nickname,
-            avatar_url: loginData.user.avatar_url,
-            is_active: loginData.user.is_active ?? false,
-            created_at: '',
-            updated_at: '',
-          }
+          userInfo.value = mapUserInfo(loginData.user)
         }
         return { code: 0, msg: '登录成功' }
       }
@@ -61,24 +59,18 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  async function register(email: string, password: string, username: string) {
+  async function register(email: string, password: string, username: string, nickname?: string) {
     try {
-      const res = await apiRegister({ email, password, username })
-      // 后端 ApiResponse 格式: { code: 0, msg: "success", data: RegisterResponse }
-      const regData = res.data
-      if (res.code === 0 && regData) {
-        // 注册不返回 api_key，前端只存 userInfo
-        if (regData.user) {
-          userInfo.value = {
-            id: regData.user.id ?? 0,
-            email: regData.user.email ?? '',
-            username: regData.user.username ?? '',
-            nickname: regData.user.nickname,
-            avatar_url: regData.user.avatar_url,
-            is_active: regData.user.is_active ?? false,
-            created_at: '',
-            updated_at: '',
-          }
+      const res = await apiRegister({ email, password, username, nickname: nickname || username })
+      const regData: RegisterResponse | undefined = res.data
+      if (res.code === 0 && regData?.user) {
+        userInfo.value = {
+          id: regData.user.id ?? 0,
+          email: regData.user.email ?? '',
+          username: regData.user.username ?? '',
+          nickname: regData.user.nickname ?? '',
+          avatar_url: null,
+          is_active: true,
         }
         return { code: 0, msg: '注册成功' }
       }
@@ -93,16 +85,7 @@ export const useUserStore = defineStore('user', () => {
     try {
       const res = await getUserInfo()
       if (res.code === 0 && res.data) {
-        userInfo.value = {
-          id: res.data.id ?? 0,
-          email: res.data.email ?? '',
-          username: res.data.username ?? '',
-          nickname: res.data.nickname,
-          avatar_url: res.data.avatar_url,
-          is_active: res.data.is_active ?? false,
-          created_at: res.data.created_at || '',
-          updated_at: res.data.updated_at || '',
-        }
+        userInfo.value = mapUserInfo(res.data)
       }
     } catch {
       // ignore
@@ -126,7 +109,6 @@ export const useUserStore = defineStore('user', () => {
     userId,
     isLoggedIn,
     username,
-    balance,
     login,
     register,
     logout,
