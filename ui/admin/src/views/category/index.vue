@@ -1,0 +1,264 @@
+<template>
+  <div class="page-container">
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>分类管理</span>
+          <el-button type="primary" @click="openDialog()">
+            <el-icon><Plus /></el-icon> 新建分类
+          </el-button>
+        </div>
+      </template>
+
+      <el-table
+        :data="categories"
+        v-loading="loading"
+        stripe
+        row-key="id"
+        :row-class-name="rowClassName"
+      >
+        <el-table-column prop="sort_order" label="排序" width="80" align="center" />
+        <el-table-column prop="name" label="分类名称" min-width="150" />
+        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.description || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="resource_count" label="资源数" width="90" align="center" />
+        <el-table-column prop="is_active" label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-switch
+              :model-value="row.is_active"
+              @change="(val: boolean) => handleToggleStatus(row, val)"
+              :loading="row._switching"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="170">
+          <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" link @click="openDialog(row)">
+              编辑
+            </el-button>
+            <el-button
+              v-if="!row.resource_count"
+              type="danger" size="small" link
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 新建/编辑对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="editingCategory ? '编辑分类' : '新建分类'"
+      width="480px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="80px"
+        @submit.prevent
+      >
+        <el-form-item label="名称" prop="name">
+          <el-input v-model="form.name" placeholder="请输入分类名称" maxlength="100" show-word-limit />
+        </el-form-item>
+        <el-form-item label="描述" prop="description">
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            placeholder="请输入分类描述（选填）"
+            :rows="3"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="排序" prop="sort_order">
+          <el-input-number v-model="form.sort_order" :min="0" :max="9999" />
+          <span class="form-tip">数值越小越靠前</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import type { Category } from '@/api/category'
+import { adminListCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
+
+const loading = ref(false)
+const submitting = ref(false)
+const categories = ref<(Category & { _switching?: boolean })[]>([])
+
+// 对话框
+const dialogVisible = ref(false)
+const editingCategory = ref<Category | null>(null)
+const formRef = ref<FormInstance>()
+
+const form = reactive({
+  name: '',
+  description: '',
+  sort_order: 0,
+})
+
+const rules: FormRules = {
+  name: [
+    { required: true, message: '请输入分类名称', trigger: 'blur' },
+    { max: 100, message: '名称不能超过100个字符', trigger: 'blur' },
+  ],
+}
+
+function rowClassName({ row }: { row: Category & { _switching?: boolean } }) {
+  return row.is_active ? '' : 'inactive-row'
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+async function fetchCategories() {
+  loading.value = true
+  try {
+    const res = await adminListCategories()
+    if (res.code === 0 && res.data) {
+      categories.value = res.data.categories
+    }
+  } catch {
+    ElMessage.error('获取分类列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+function openDialog(category?: Category) {
+  editingCategory.value = category || null
+  if (category) {
+    form.name = category.name
+    form.description = category.description || ''
+    form.sort_order = category.sort_order
+  } else {
+    form.name = ''
+    form.description = ''
+    form.sort_order = Math.max(...categories.value.map(c => c.sort_order), 0) + 1
+  }
+  dialogVisible.value = true
+}
+
+async function handleSubmit() {
+  if (!formRef.value) return
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  submitting.value = true
+  try {
+    if (editingCategory.value) {
+      const res = await updateCategory(editingCategory.value.id, {
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        sort_order: form.sort_order,
+      })
+      if (res.code === 0) {
+        ElMessage.success('更新成功')
+        dialogVisible.value = false
+        fetchCategories()
+      } else {
+        ElMessage.error(res.msg || '更新失败')
+      }
+    } else {
+      const res = await createCategory({
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        sort_order: form.sort_order,
+      })
+      if (res.code === 0) {
+        ElMessage.success('创建成功')
+        dialogVisible.value = false
+        fetchCategories()
+      } else {
+        ElMessage.error(res.msg || '创建失败')
+      }
+    }
+  } catch {
+    ElMessage.error('操作失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function handleToggleStatus(category: Category & { _switching?: boolean }, val: boolean) {
+  category._switching = true
+  try {
+    const res = await updateCategory(category.id, { is_active: val })
+    if (res.code === 0) {
+      ElMessage.success(val ? '已启用' : '已停用')
+      fetchCategories()
+    } else {
+      ElMessage.error(res.msg || '操作失败')
+    }
+  } catch {
+    ElMessage.error('操作失败')
+  } finally {
+    category._switching = false
+  }
+}
+
+async function handleDelete(category: Category) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除分类「${category.name}」吗？此操作不可恢复。`,
+      '删除确认',
+      { type: 'warning', confirmButtonText: '确定删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  try {
+    const res = await deleteCategory(category.id)
+    if (res.code === 0) {
+      ElMessage.success('删除成功')
+      fetchCategories()
+    } else {
+      ElMessage.error(res.msg || '删除失败')
+    }
+  } catch {
+    ElMessage.error('删除失败')
+  }
+}
+
+onMounted(() => fetchCategories())
+</script>
+
+<style scoped>
+.page-container {
+  padding: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-tip {
+  margin-left: 12px;
+  color: #999;
+  font-size: 12px;
+}
+
+:deep(.inactive-row) {
+  opacity: 0.5;
+}
+</style>

@@ -14,6 +14,7 @@
           <router-link to="/resource" class="nav-link" :class="{ active: $route.path.startsWith('/resource') }">资源管理</router-link>
           <router-link to="/order" class="nav-link" :class="{ active: $route.path.startsWith('/order') }">订单管理</router-link>
           <router-link to="/payment" class="nav-link" :class="{ active: $route.path.startsWith('/payment') }">支付配置</router-link>
+          <router-link to="/category" class="nav-link" :class="{ active: $route.path.startsWith('/category') }">分类管理</router-link>
           <router-link to="/log" class="nav-link" :class="{ active: $route.path.startsWith('/log') }">日志查询</router-link>
           <router-link to="/admin" class="nav-link" :class="{ active: $route.path.startsWith('/admin') }">管理员</router-link>
         </nav>

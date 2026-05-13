@@ -193,6 +193,21 @@ pub fn create_router(state: AppState) -> Router {
                                         .put(handler::admin::update_usdt_wallet),
                                 ),
                         )
+                        // 分类管理
+                        .push(
+                            Router::with_path("categories")
+                                .get(handler::category::admin_list_categories)
+                                .post(handler::category::create_category),
+                        )
+                        .push(
+                            Router::with_path("categories/<id>")
+                                .put(handler::category::update_category)
+                                .delete(handler::category::delete_category),
+                        )
+                        .push(
+                            Router::with_path("categories/sort")
+                                .put(handler::category::batch_update_sort),
+                        )
                         // PayPal 配置管理
                         .push(
                             Router::with_path("paypal-configs")

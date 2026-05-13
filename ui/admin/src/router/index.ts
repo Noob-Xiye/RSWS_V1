@@ -50,6 +50,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '日志查询' }
   },
   {
+    path: '/category',
+    name: 'CategoryManagement',
+    component: () => import('@/views/category/index.vue'),
+    meta: { requiresAuth: true, title: '分类管理' }
+  },
+  {
     path: '/admin',
     name: 'AdminManagement',
     component: () => import('@/views/admin/index.vue'),
