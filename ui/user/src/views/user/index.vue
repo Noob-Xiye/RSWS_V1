@@ -99,11 +99,11 @@
               <div v-else class="order-list">
                 <div v-for="order in recentOrders" :key="order.id" class="order-item">
                   <div class="order-info">
-                    <span class="order-no">{{ order.order_no }}</span>
+                    <span class="order-no">#{{ order.id }}</span>
                     <span class="order-resource">{{ order.resource_title }}</span>
                   </div>
                   <div class="order-right">
-                    <span class="order-amount">{{ order.amount }} USDT</span>
+                    <span class="order-amount">{{ (order.amount / 100).toFixed(2) }} USDT</span>
                     <el-tag :type="getStatusType(order.status)" size="small" effect="dark">{{ getStatusText(order.status) }}</el-tag>
                   </div>
                 </div>
@@ -198,7 +198,7 @@ async function handleChangePassword() {
 async function fetchRecentOrders() {
   loadingOrders.value = true
   try {
-    const res = await listOrders({ page: 1, limit: 5 })
+    const res = await listOrders({ page: 1, page_size: 5 })
     if (res.code === 0 && res.data) recentOrders.value = res.data.items
   } catch { recentOrders.value = [] }
   finally { loadingOrders.value = false }

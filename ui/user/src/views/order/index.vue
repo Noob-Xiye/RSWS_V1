@@ -29,7 +29,7 @@
         <div v-else class="order-list">
           <div v-for="order in filteredOrders" :key="order.id" class="order-card">
             <div class="order-header">
-              <span class="order-no">{{ order.order_no }}</span>
+              <span class="order-no">#{{ order.id }}</span>
               <el-tag :type="getStatusType(order.status)" size="small" effect="dark">{{ getStatusText(order.status) }}</el-tag>
             </div>
             <div class="order-body">
@@ -176,7 +176,7 @@ async function fetchOrders() {
   if (!userStore.isLoggedIn) { router.push('/login'); return }
   loading.value = true
   try {
-    const res = await listOrders({ page: page.value, limit: pageSize })
+    const res = await listOrders({ page: page.value, page_size: pageSize })
     if (res.code === 0 && res.data) { orders.value = res.data.items; total.value = res.data.total }
   } catch { orders.value = [] }
   finally { loading.value = false }
