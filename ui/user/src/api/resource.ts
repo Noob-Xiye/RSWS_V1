@@ -36,7 +36,7 @@ export type ResourceDetail = Resource & {
 
 export interface PurchaseCheckResponse {
   purchased: boolean
-  order_id?: number
+  resource_id: number
 }
 
 export interface DownloadInfo {

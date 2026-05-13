@@ -31,6 +31,7 @@ export interface CreateOrderResponse {
   status: OrderStatus
   expired_at?: string
   // PayPal 支付相关
+  paypal_order_id?: string
   approve_url?: string
   message?: string
 }
@@ -56,7 +57,7 @@ export async function cancelOrder(id: number): Promise<ApiResponse<{ id: number;
 }
 
 // 轮询订单状态（USDT 支付用）
-export async function checkOrderStatus(id: number): Promise<ApiResponse<{ id: number; status: OrderStatus }>> {
+export async function checkOrderStatus(id: number): Promise<ApiResponse<{ id: number; status: OrderStatus; confirmations?: number; required_confirmations?: number }>> {
   return request.get(`/order/${id}/status`)
 }
 
@@ -65,6 +66,7 @@ export async function checkOrderStatus(id: number): Promise<ApiResponse<{ id: nu
 export interface UsdtAddressResponse {
   network: string
   address: string
+  contract?: string
 }
 
 // 获取 USDT 收款地址
