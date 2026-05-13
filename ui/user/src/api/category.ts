@@ -1,5 +1,6 @@
-import axios from 'axios'
+import request, { type ApiResponse } from './request'
 
+/** 分类信息（用户端简化版） */
 export interface Category {
   id: number
   name: string
@@ -10,7 +11,11 @@ export interface Category {
   updated_at?: string
 }
 
-export const getCategoryList = async (): Promise<Category[]> => {
-  const response = await axios.get('/categories')
-  return response.data.data || response.data
+/** 获取活跃分类列表（公开端点，无需签名，但走统一 request 保证路径正确） */
+export async function getCategoryList(): Promise<Category[]> {
+  const res = await request.get<{ categories: Category[] }>('/categories')
+  if (res.code === 0 && res.data) {
+    return res.data.categories
+  }
+  return []
 }
