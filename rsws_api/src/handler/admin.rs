@@ -1135,10 +1135,17 @@ pub async fn list_users(req: &mut Request, depot: &mut Depot, res: &mut Response
         }
     };
 
+    let total_pages = if page_size > 0 {
+        (total + page_size - 1) / page_size
+    } else {
+        1
+    };
+
     res.success(serde_json::json!({
-        "data": users,
+        "items": users,
         "total": total,
         "page": page,
         "page_size": page_size,
+        "total_pages": total_pages,
     }));
 }
