@@ -3,46 +3,31 @@ import request, { type ApiResponse, type PaginatedResponse, type PaginationParam
 export type OrderStatus = 'pending' | 'paid' | 'completed' | 'cancelled' | 'refunded'
 export type PaymentMethod = 'paypal' | 'usdt_trc20' | 'usdt_erc20'
 
-export interface Order {
+/** 管理员订单详情（对齐后端 AdminOrderDetail） */
+export interface AdminOrder {
   id: number
-  order_no: string
   user_id: number
-  user_name: string
-  user_email?: string
+  user_name: string | null
+  user_email: string | null
   resource_id: number
-  resource_title: string
-  amount: string
-  status: OrderStatus
-  payment_method: PaymentMethod | null
-  transaction_id: string | null
-  tx_hash: string | null
+  resource_title: string | null
+  amount: number          // 分(cents)，显示时除以100
+  status: string
+  payment_method: string | null
   created_at: string
-  paid_at: string | null
-  completed_at: string | null
+  updated_at: string
+  expired_at: string | null
 }
 
-export interface OrderListParams extends PaginationParams {
-  order_no?: string
+export interface AdminOrderListParams extends PaginationParams {
+  status?: string
   user_id?: number
-  status?: OrderStatus
-  payment_method?: PaymentMethod
-  start_date?: string
-  end_date?: string
+  payment_method?: string
 }
 
-// 获取订单列表
-export async function listOrders(params?: OrderListParams): Promise<ApiResponse<PaginatedResponse<Order>>> {
-  return request.get('/order', { params })
-}
-
-// 获取订单详情
-export async function getOrder(id: number): Promise<ApiResponse<Order>> {
-  return request.get(`/order/${id}`)
-}
-
-// 取消订单
-export async function cancelOrder(id: number): Promise<ApiResponse<void>> {
-  return request.post(`/order/${id}/cancel`)
+/** 管理员获取全部订单列表 */
+export async function adminListOrders(params?: AdminOrderListParams): Promise<ApiResponse<PaginatedResponse<AdminOrder>>> {
+  return request.get('/admin/orders', { params })
 }
 
 // 退款
