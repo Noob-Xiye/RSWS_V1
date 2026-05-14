@@ -307,32 +307,117 @@ impl LogService {
     pub async fn query_system_logs(
         &self,
         level: Option<&str>,
-        _module: Option<&str>,
-        _user_id: Option<i64>,
+        module: Option<&str>,
+        user_id: Option<i64>,
+        start_time: Option<chrono::DateTime<chrono::Utc>>,
+        end_time: Option<chrono::DateTime<chrono::Utc>>,
         page: i64,
         page_size: i64,
     ) -> Result<(Vec<Value>, i64), RswsError> {
-        let mut conditions = vec!["1=1".to_string()];
-        if level.is_some() {
-            conditions.push("log_level = ".to_string());
+        // 动态构建 WHERE 条件
+        let mut conditions: Vec<String> = vec!["1=1".to_string()];
+        let mut param_idx = 1;
+
+        let level_param = if let Some(lvl) = level {
+            conditions.push(format!("log_level = ${}", param_idx));
+            param_idx += 1;
+            Some(lvl.to_string())
+        } else {
+            None
+        };
+
+        let module_param = if let Some(mod_name) = module {
+            conditions.push(format!("module = ${}", param_idx));
+            param_idx += 1;
+            Some(mod_name.to_string())
+        } else {
+            None
+        };
+
+        let user_id_param = if let Some(uid) = user_id {
+            conditions.push(format!("user_id = ${}", param_idx));
+            param_idx += 1;
+            Some(uid)
+        } else {
+            None
+        };
+
+        let start_time_param = if let Some(st) = start_time {
+            conditions.push(format!("created_at >= ${}", param_idx));
+            param_idx += 1;
+            Some(st)
+        } else {
+            None
+        };
+
+        let end_time_param = if let Some(et) = end_time {
+            conditions.push(format!("created_at <= ${}", param_idx));
+            param_idx += 1;
+            Some(et)
+        } else {
+            None
+        };
+
+        let where_clause = conditions.join(" AND ");
+
+        // COUNT 查询
+        let count_sql = format!("SELECT COUNT(*) FROM system_logs WHERE {}", where_clause);
+        let mut count_query = sqlx::query_as::<_, (i64,)>(&count_sql);
+        
+        if let Some(ref lvl) = level_param {
+            count_query = count_query.bind(lvl);
+        }
+        if let Some(ref mod_name) = module_param {
+            count_query = count_query.bind(mod_name);
+        }
+        if let Some(uid) = user_id_param {
+            count_query = count_query.bind(uid);
+        }
+        if let Some(ref st) = start_time_param {
+            count_query = count_query.bind(st);
+        }
+        if let Some(ref et) = end_time_param {
+            count_query = count_query.bind(et);
         }
 
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM system_logs")
+        let count: (i64,) = count_query
             .fetch_one(&self.pool)
             .await
             .map_err(|e| RswsError::internal(format!("Failed to count system logs: {}", e)))?;
 
-        let logs: Vec<Value> = sqlx::query_as::<_, (Value,)>(
-            "SELECT to_jsonb(t) FROM (SELECT * FROM system_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2) t"
-        )
-        .bind(page_size)
-        .bind((page - 1) * page_size)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to query system logs: {}", e)))?
-        .into_iter()
-        .map(|(v,)| v)
-        .collect();
+        // SELECT 查询
+        let offset = (page - 1) * page_size;
+        let select_sql = format!(
+            "SELECT to_jsonb(t) FROM (SELECT * FROM system_logs WHERE {} ORDER BY created_at DESC LIMIT ${} OFFSET ${}) t",
+            where_clause, param_idx, param_idx + 1
+        );
+        
+        let mut select_query = sqlx::query_as::<_, (Value,)>(&select_sql);
+        
+        if let Some(ref lvl) = level_param {
+            select_query = select_query.bind(lvl);
+        }
+        if let Some(ref mod_name) = module_param {
+            select_query = select_query.bind(mod_name);
+        }
+        if let Some(uid) = user_id_param {
+            select_query = select_query.bind(uid);
+        }
+        if let Some(ref st) = start_time_param {
+            select_query = select_query.bind(st);
+        }
+        if let Some(ref et) = end_time_param {
+            select_query = select_query.bind(et);
+        }
+        select_query = select_query.bind(page_size).bind(offset);
+
+        let logs: Vec<Value> = select_query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| RswsError::internal(format!("Failed to query system logs: {}", e)))?
+            .into_iter()
+            .map(|(v,)| v)
+            .collect();
 
         Ok((logs, count.0))
     }

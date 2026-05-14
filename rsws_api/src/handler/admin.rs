@@ -782,36 +782,49 @@ pub async fn delete_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
 )]
 pub async fn query_system_logs(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let level: Option<String> = req.query("level");
+    let module: Option<String> = req.query("module");
+    let user_id: Option<i64> = req.query("user_id");
+    let start_time: Option<String> = req.query("start_time");
+    let end_time: Option<String> = req.query("end_time");
     let page: i64 = req.query("page").unwrap_or(1);
     let page_size: i64 = req.query("page_size").unwrap_or(20);
+
+    // 解析时间参数
+    let start_time_dt: Option<DateTime<Utc>> = start_time
+        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+        .map(|dt| dt.with_timezone(&Utc));
+    
+    let end_time_dt: Option<DateTime<Utc>> = end_time
+        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+        .map(|dt| dt.with_timezone(&Utc));
 
     let state = get_state(depot);
     match state
         .log_service
         .query_system_logs(
             level.as_deref(),
-            None, // module
-            None, // user_id
+            module.as_deref(),
+            user_id,
+            start_time_dt,
+            end_time_dt,
             page,
             page_size,
         )
         .await
     {
         Ok((logs, total)) => {
-            let total_pages = if page_size > 0 {
-                (total + page_size - 1) / page_size
-            } else {
-                0
-            };
+            let page_count = (total + page_size - 1) / page_size;
             res.success(serde_json::json!({
-                "items": logs,
+                "list": logs,
                 "total": total,
                 "page": page,
                 "page_size": page_size,
-                "total_pages": total_pages,
+                "page_count": page_count
             }));
         }
-        Err(e) => res.error(e),
+        Err(e) => {
+            res.error(e);
+        }
     }
 }
 
