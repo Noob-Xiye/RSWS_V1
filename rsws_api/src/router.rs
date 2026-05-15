@@ -134,7 +134,10 @@ pub fn create_router(state: AppState) -> Router {
                                     Router::with_path("<key_id>/api-keys")
                                         .delete(handler::admin::delete_api_key),
                                 )
-                                
+                                .push(
+                                    Router::with_path("api-keys/<key_id>")
+                                        .put(handler::admin::toggle_api_key_status),
+                                )
                         )
                         .push(
                             Router::with_path("<id>")
