@@ -133,7 +133,8 @@ pub fn create_router(state: AppState) -> Router {
                                 .push(
                                     Router::with_path("<key_id>/api-keys")
                                         .delete(handler::admin::delete_api_key),
-                                ),
+                                )
+                                
                         )
                         .push(
                             Router::with_path("<id>")
@@ -150,10 +151,7 @@ pub fn create_router(state: AppState) -> Router {
                                     Router::with_path("reset-password")
                                         .post(handler::admin::reset_admin_password),
                                 )
-                                .push(
-                                    Router::with_path("api-keys/<key_id>")
-                                        .put(handler::admin::toggle_api_key_status),
-                                ),
+                                
                         )
                         // 用户管理
                         .push(
