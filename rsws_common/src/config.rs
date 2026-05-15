@@ -53,13 +53,33 @@ pub struct AppConfig {
 pub fn load_config() -> Result<AppConfig, ConfigError> {
     let config = Config::builder()
         // 1. 从 config.toml 读取基础配置
-        .add_source(config::File::with_name("config.toml"))
+        .add_source(config::File::with_name("config.toml").required(false))
         // 2. 环境变量覆盖（RSWS_ 前缀，支持 RSWS_DATABASE_URL 覆盖 database.url 等）
         .add_source(
             Environment::with_prefix("RSWS")
                 .prefix_separator("_")
                 .separator("_"),
         )
+        // Provide sensible defaults for Docker/env-only mode
+        .add_source(config::File::from_str(r#"
+[server]
+host = "0.0.0.0"
+port = 5170
+cors_origins = ["*"]
+trusted_proxies = []
+
+[database]
+url = ""
+max_connections = 10
+min_connections = 1
+
+[redis]
+url = ""
+pool_size = 10
+
+[encryption]
+key = "change-this-32-byte-encryption-k"
+"#, config::FileFormat::Toml))
         .build()?;
 
     config.try_deserialize::<AppConfig>()

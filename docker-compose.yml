@@ -57,6 +57,7 @@ services:
       RSWS_SERVER_PORT: "5170"
       RSWS_APP_LOG_LEVEL: "${LOG_LEVEL:-info}"
       RUST_LOG: "${LOG_LEVEL:-info}"
+      RSWS_ENCRYPTION_KEY: "${ENCRYPTION_KEY:-change-this-32-byte-encryption-k}"
     depends_on:
       postgres:
         condition: service_healthy
