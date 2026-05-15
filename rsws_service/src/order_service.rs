@@ -61,10 +61,10 @@ impl OrderService {
         &self,
         user_id: i64,
         page: i32,
-        limit: i32,
+        page_size: i32,
     ) -> Result<(Vec<OrderDetail>, i64), RswsError> {
         self.order_repo
-            .list_detail_by_user(user_id, page, limit)
+            .list_detail_by_user(user_id, page, page_size)
             .await
     }
 

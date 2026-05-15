@@ -133,9 +133,9 @@ impl OrderRepository {
         &self,
         user_id: i64,
         page: i32,
-        limit: i32,
+        page_size: i32,
     ) -> Result<(Vec<OrderDetail>, i64), RswsError> {
-        let offset = (page as i64 - 1) * limit as i64;
+        let offset = (page as i64 - 1) * page_size as i64;
 
         // JOIN resources 表获取标题
         let orders = sqlx::query_as::<_, OrderDetail>(
@@ -150,7 +150,7 @@ impl OrderRepository {
             "#,
         )
         .bind(user_id)
-        .bind(limit as i64)
+        .bind(page_size as i64)
         .bind(offset)
         .fetch_all(&self.pool)
         .await

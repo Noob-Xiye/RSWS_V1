@@ -34,18 +34,18 @@ pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Respons
     };
 
     let page: i32 = req.query("page").unwrap_or(1);
-    let limit: i32 = req.query("limit").unwrap_or(20);
+    let page_size: i32 = req.query("page_size").unwrap_or(20);
 
     let state = get_state(depot);
 
     match state
         .order_service
-        .list_detail_by_user(user_id, page, limit)
+        .list_detail_by_user(user_id, page, page_size)
         .await
     {
         Ok((orders, total)) => {
-            let total_pages = if limit > 0 {
-                (total + limit as i64 - 1) / limit as i64
+            let total_pages = if page_size > 0 {
+                (total + page_size as i64 - 1) / page_size as i64
             } else {
                 0
             };
@@ -53,7 +53,7 @@ pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Respons
                 "items": orders,
                 "total": total,
                 "page": page,
-                "limit": limit,
+                "limit": page_size,
                 "total_pages": total_pages,
             }));
         }
