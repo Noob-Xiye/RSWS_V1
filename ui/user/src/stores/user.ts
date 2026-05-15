@@ -59,19 +59,25 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  async function register(email: string, password: string, username: string, nickname?: string) {
+  async function register(email: string, password: string, username: string, nickname: string, verificationCode: string) {
     try {
-      const res = await apiRegister({ email, password, username, nickname: nickname || username })
+      const res = await apiRegister({
+        email,
+        password,
+        username,
+        nickname,
+        verification_code: verificationCode,
+      })
       const regData: RegisterResponse | undefined = res.data
       if (res.code === 0 && regData?.user) {
-        userInfo.value = {
-          id: regData.user.id ?? 0,
-          email: regData.user.email ?? '',
-          username: regData.user.username ?? '',
-          nickname: regData.user.nickname ?? '',
-          avatar_url: null,
-          is_active: true,
+        // 注册成功自动登录：保存 api_key 和用户信息
+        if (regData.api_key && regData.user?.id) {
+          apiKey.value = regData.api_key
+          setApiKey(regData.api_key)
+          userId.value = String(regData.user.id)
+          setUserId(String(regData.user.id))
         }
+        userInfo.value = mapUserInfo(regData.user)
         return { code: 0, msg: '注册成功' }
       }
       return { code: -1, msg: res.msg || '注册失败' }

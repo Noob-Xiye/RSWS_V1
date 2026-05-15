@@ -53,6 +53,7 @@ pub struct RegisterRequest {
     pub nickname: String, // 显示名称
     pub email: String,
     pub password: String,
+    pub verification_code: String, // 邮箱验证码
 }
 
 /// 发送验证码请求
@@ -144,6 +145,7 @@ mod tests {
             nickname: "Test User".to_string(),
             email: "test@example.com".to_string(),
             password: "Password123".to_string(),
+            verification_code: "123456".to_string(),
         };
 
         assert_eq!(req.username, "testuser");

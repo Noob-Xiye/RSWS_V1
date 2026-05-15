@@ -34,16 +34,14 @@ export interface RegisterRequest {
   nickname: string
   email: string
   password: string
+  verification_code: string
 }
 
-/** 注册响应 */
+/** 注册响应（注册成功自动登录，结构同 LoginResponse） */
 export interface RegisterResponse {
-  user?: {
-    id: number
-    email: string
-    username: string
-    nickname: string
-  }
+  user?: UserInfo
+  api_key?: string
+  expires_at?: string
   message?: string
 }
 

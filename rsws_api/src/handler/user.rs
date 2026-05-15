@@ -63,15 +63,47 @@ pub async fn register(req: &mut Request, depot: &mut Depot, res: &mut Response) 
 
             match state.user_service.register(&data).await {
                 Ok(user) => {
-                    res.success(serde_json::json!({
-                        "user": {
-                            "id": user.id,
-                            "email": user.email,
-                            "username": user.username,
-                            "nickname": user.nickname,
-                        },
-                        "message": "Registration successful"
-                    }));
+                    // 注册成功，自动登录：创建并持久化 api_key
+                    let create_req = rsws_model::api_key::CreateApiKeyRequest {
+                        name: "login_session".to_string(),
+                        permissions: vec!["all".to_string()],
+                        rate_limit: Some(1000),
+                        expires_in_days: Some(7),
+                    };
+
+                    match state.api_key_service.create(user.id, create_req).await {
+                        Ok(api_key_resp) => {
+                            res.success(serde_json::json!({
+                                "user": {
+                                    "id": user.id,
+                                    "email": user.email,
+                                    "username": user.username,
+                                    "nickname": user.nickname,
+                                    "avatar_url": user.avatar_url,
+                                    "is_active": user.is_active,
+                                },
+                                "api_key": api_key_resp.api_key,
+                                "expires_at": api_key_resp.expires_at
+                                    .unwrap_or_else(|| chrono::Utc::now() + chrono::Duration::days(7))
+                                    .to_rfc3339(),
+                            }));
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to create api_key on register: {}", e);
+                            // 注册成功但 api_key 创建失败，仍返回用户信息
+                            res.success(serde_json::json!({
+                                "user": {
+                                    "id": user.id,
+                                    "email": user.email,
+                                    "username": user.username,
+                                    "nickname": user.nickname,
+                                    "avatar_url": user.avatar_url,
+                                    "is_active": user.is_active,
+                                },
+                                "message": "Registration successful, but auto-login failed"
+                            }));
+                        }
+                    }
                 }
                 Err(e) => {
                     res.error(e);

@@ -59,7 +59,21 @@ impl UserService {
 
     /// 用户注册
     pub async fn register(&self, req: &RegisterRequest) -> Result<User, RswsError> {
-        // 检查用户名是否已存在
+        // 1. 验证邮箱验证码
+        let redis = self
+            .redis
+            .as_ref()
+            .ok_or_else(|| RswsError::internal("Redis not configured"))?;
+
+        let (valid, remaining) = redis.verify_code(&req.email, "register", &req.verification_code).await?;
+        if !valid {
+            return Err(RswsError::business_with_message(
+                ErrorCode::AUTH_INVALID_CREDENTIALS,
+                format!("验证码错误，剩余尝试次数: {}", remaining),
+            ));
+        }
+
+        // 2. 检查用户名是否已存在
         if self
             .user_repo
             .find_user_by_username(&req.username)
@@ -69,7 +83,7 @@ impl UserService {
             return Err(RswsError::business(ErrorCode::USER_USERNAME_EXISTS));
         }
 
-        // 检查邮箱是否已存在
+        // 3. 检查邮箱是否已存在
         if self
             .user_repo
             .find_user_by_email(&req.email)
@@ -79,10 +93,10 @@ impl UserService {
             return Err(RswsError::business(ErrorCode::USER_EMAIL_EXISTS));
         }
 
-        // 哈希密码
+        // 4. 哈希密码
         let password_hash = PasswordService::hash(&req.password)?;
 
-        // 创建用户
+        // 5. 创建用户
         let user = self
             .user_repo
             .create_user(&req.username, &req.nickname, &req.email, &password_hash)
