@@ -4,24 +4,28 @@
 [![Release](https://github.com/Noob-Xiye/RSWS_V1/actions/workflows/release.yml/badge.svg)](https://github.com/Noob-Xiye/RSWS_V1/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **版本**: 0.1.0  
-> **状态**: 开发中
+> **版本**: 0.1.1  
+> **状态**: 生产可用
 
 ## 项目简介
 
-RSWS (Resource Sharing Web System) 是一个数字内容付费交易平台，支持：
+RSWS (Resource Sharing Web System) 是一个功能完整的**数字内容付费交易平台**，采用 Rust 高性能后端 + Vue 3 现代前端构建。
 
-- **平台自营**: 平台提供付费内容（文档、软件、资源包等）
-- **用户上传**: 创作者上传内容，设置价格销售
-- **平台抽佣**: 从每笔交易中收取平台服务费
-- **多币支付**: USDT (TRC20/ERC20) + PayPal
+### 核心功能
+
+- **双币支付**: 原生支持 USDT (TRC20/ERC20) 自动监听 + PayPal 支付
+- **创作者经济**: 用户可上传数字内容（文档、软件、资源包等）并自由定价销售
+- **平台抽佣**: 每笔交易自动结算平台服务费，支持灵活的佣金比例配置
+- **自动监听**: 后台服务自动轮询链上交易，支付到账后秒级开放下载权限
+- **管理后台**: 全面的运营管理套件——用户、资源、订单、支付配置、数据报表
 
 ### 典型应用场景
 
-- Minecraft MOD 整合包销售
-- 设计素材、文档模板
-- 软件工具、插件资源
-- 教程课程、知识付费
+- 游戏 MOD / 整合包销售平台
+- 设计素材 / 文档模板交易
+- 软件工具 / 插件分发
+- 教程课程 / 知识付费
+- 数字艺术品交易
 
 ---
 
@@ -166,7 +170,7 @@ bun run dev
 
 - [x] USDT (TRC20) 支付
 - [x] USDT (ERC20) 支付
-- [x] PayPal 支付（Webhook 真实签名验证）
+- [x] PayPal 支付（带 HMAC 签名验证）
 
 ---
 
@@ -355,7 +359,7 @@ async fn verify_signature(
 
 ## 版本规划
 
-### v0.1.0 (当前) ✅
+### v0.1.1 (当前) ✅
 
 - [x] 项目骨架重构
 - [x] USDT 监听服务
