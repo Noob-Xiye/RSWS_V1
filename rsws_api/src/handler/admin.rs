@@ -793,7 +793,7 @@ pub async fn query_system_logs(req: &mut Request, depot: &mut Depot, res: &mut R
     let start_time_dt: Option<DateTime<Utc>> = start_time
         .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
         .map(|dt| dt.with_timezone(&Utc));
-    
+
     let end_time_dt: Option<DateTime<Utc>> = end_time
         .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
         .map(|dt| dt.with_timezone(&Utc));

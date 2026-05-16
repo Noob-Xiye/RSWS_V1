@@ -362,7 +362,7 @@ impl LogService {
         // COUNT 查询
         let count_sql = format!("SELECT COUNT(*) FROM system_logs WHERE {}", where_clause);
         let mut count_query = sqlx::query_as::<_, (i64,)>(&count_sql);
-        
+
         if let Some(ref lvl) = level_param {
             count_query = count_query.bind(lvl);
         }
@@ -390,9 +390,9 @@ impl LogService {
             "SELECT to_jsonb(t) FROM (SELECT * FROM system_logs WHERE {} ORDER BY created_at DESC LIMIT ${} OFFSET ${}) t",
             where_clause, param_idx, param_idx + 1
         );
-        
+
         let mut select_query = sqlx::query_as::<_, (Value,)>(&select_sql);
-        
+
         if let Some(ref lvl) = level_param {
             select_query = select_query.bind(lvl);
         }

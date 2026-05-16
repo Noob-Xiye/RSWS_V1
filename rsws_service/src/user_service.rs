@@ -65,7 +65,9 @@ impl UserService {
             .as_ref()
             .ok_or_else(|| RswsError::internal("Redis not configured"))?;
 
-        let (valid, remaining) = redis.verify_code(&req.email, "register", &req.verification_code).await?;
+        let (valid, remaining) = redis
+            .verify_code(&req.email, "register", &req.verification_code)
+            .await?;
         if !valid {
             return Err(RswsError::business_with_message(
                 ErrorCode::AUTH_INVALID_CREDENTIALS,
@@ -376,7 +378,11 @@ impl UserService {
     }
 
     /// 发送验证码（通用，支持 register / login / reset_password）
-    pub async fn send_verification_code(&self, email: &str, code_type: &str) -> Result<i64, RswsError> {
+    pub async fn send_verification_code(
+        &self,
+        email: &str,
+        code_type: &str,
+    ) -> Result<i64, RswsError> {
         let redis = self
             .redis
             .as_ref()
@@ -415,7 +421,10 @@ impl UserService {
                 .await?;
         }
 
-        info!("Verification code sent to {} for code_type: {}", email, code_type);
+        info!(
+            "Verification code sent to {} for code_type: {}",
+            email, code_type
+        );
         Ok(300)
     }
 

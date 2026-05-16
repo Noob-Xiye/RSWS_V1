@@ -82,15 +82,18 @@ impl CategoryRepository {
 
     /// 获取最大 sort_order 值
     pub async fn max_sort_order(&self) -> Result<i32, sqlx::Error> {
-        let result = sqlx::query_scalar::<_, Option<i32>>(
-            "SELECT MAX(sort_order) FROM categories",
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let result = sqlx::query_scalar::<_, Option<i32>>("SELECT MAX(sort_order) FROM categories")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(result.unwrap_or(0))
     }
 
-    pub async fn create(&self, name: &str, description: Option<&str>, sort_order: i32) -> Result<Category, sqlx::Error> {
+    pub async fn create(
+        &self,
+        name: &str,
+        description: Option<&str>,
+        sort_order: i32,
+    ) -> Result<Category, sqlx::Error> {
         let category = sqlx::query_as::<_, Category>(
             r#"INSERT INTO categories (name, description, sort_order)
             VALUES ($1, $2, $3)
@@ -104,7 +107,14 @@ impl CategoryRepository {
         Ok(category)
     }
 
-    pub async fn update(&self, id: i64, name: Option<&str>, description: Option<Option<&str>>, sort_order: Option<i32>, is_active: Option<bool>) -> Result<Option<Category>, sqlx::Error> {
+    pub async fn update(
+        &self,
+        id: i64,
+        name: Option<&str>,
+        description: Option<Option<&str>>,
+        sort_order: Option<i32>,
+        is_active: Option<bool>,
+    ) -> Result<Option<Category>, sqlx::Error> {
         let existing = self.find_by_id(id).await?;
         let cat = match existing {
             Some(c) => c,

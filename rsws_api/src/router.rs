@@ -137,7 +137,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .push(
                                     Router::with_path("api-keys/<key_id>")
                                         .put(handler::admin::toggle_api_key_status),
-                                )
+                                ),
                         )
                         .push(
                             Router::with_path("<id>")
@@ -153,8 +153,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .push(
                                     Router::with_path("reset-password")
                                         .post(handler::admin::reset_admin_password),
-                                )
-                                
+                                ),
                         )
                         // 用户管理
                         .push(
@@ -210,10 +209,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .put(handler::category::batch_update_sort),
                         )
                         // 订单管理
-                        .push(
-                            Router::with_path("orders")
-                                .get(handler::order::admin_list_orders),
-                        )
+                        .push(Router::with_path("orders").get(handler::order::admin_list_orders))
                         // PayPal 配置管理
                         .push(
                             Router::with_path("paypal-configs")

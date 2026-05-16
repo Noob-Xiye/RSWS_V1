@@ -183,7 +183,10 @@ impl OrderRepository {
             where_parts.push("o.status = $1::order_status".to_string());
         }
         if user_id.is_some() {
-            where_parts.push(format!("o.user_id = ${}", if status.is_some() { 2 } else { 1 }));
+            where_parts.push(format!(
+                "o.user_id = ${}",
+                if status.is_some() { 2 } else { 1 }
+            ));
         }
         if payment_method.is_some() {
             let idx = where_parts.len() + 1;
@@ -216,7 +219,10 @@ impl OrderRepository {
         let limit_idx = where_parts.len() + 1;
         let offset_idx = where_parts.len() + 2;
 
-        let query_str = format!("{} LIMIT ${} OFFSET ${}", base_select, limit_idx, offset_idx);
+        let query_str = format!(
+            "{} LIMIT ${} OFFSET ${}",
+            base_select, limit_idx, offset_idx
+        );
         let count_str = format!("SELECT COUNT(*) FROM orders o {}", where_clause);
 
         // 使用 raw query 动态绑定

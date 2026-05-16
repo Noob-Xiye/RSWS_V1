@@ -114,7 +114,10 @@ pub async fn create_category(req: &mut Request, depot: &mut Depot, res: &mut Res
     let max_order = repo.max_sort_order().await.unwrap_or(0);
     let sort_order = body.sort_order.unwrap_or(max_order + 1);
 
-    match repo.create(body.name.trim(), body.description.as_deref(), sort_order).await {
+    match repo
+        .create(body.name.trim(), body.description.as_deref(), sort_order)
+        .await
+    {
         Ok(category) => res.success(category),
         Err(e) => res.error(RswsError::Database(e)),
     }
@@ -194,7 +197,10 @@ pub async fn delete_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         Ok(count) if count > 0 => {
             res.http_error(
                 salvo::http::StatusCode::CONFLICT,
-                format!("该分类下还有 {} 个资源，无法删除。请先将资源移至其他分类或删除。", count),
+                format!(
+                    "该分类下还有 {} 个资源，无法删除。请先将资源移至其他分类或删除。",
+                    count
+                ),
             );
             return;
         }
@@ -231,7 +237,11 @@ pub async fn batch_update_sort(req: &mut Request, depot: &mut Depot, res: &mut R
         return;
     }
 
-    let orders: Vec<(i64, i32)> = body.orders.iter().map(|item| (item.id, item.sort_order)).collect();
+    let orders: Vec<(i64, i32)> = body
+        .orders
+        .iter()
+        .map(|item| (item.id, item.sort_order))
+        .collect();
 
     match repo.batch_update_sort_order(&orders).await {
         Ok(()) => res.ok(),

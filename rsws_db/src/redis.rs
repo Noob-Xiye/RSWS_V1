@@ -64,7 +64,12 @@ impl RedisService {
 
     /// SET NX EX：仅当 key 不存在时设置（原子操作）
     /// 返回 true 表示设置成功（key 不存在），false 表示 key 已存在
-    pub async fn set_nx_ex(&self, key: &str, value: &str, ttl_secs: u64) -> Result<bool, RswsError> {
+    pub async fn set_nx_ex(
+        &self,
+        key: &str,
+        value: &str,
+        ttl_secs: u64,
+    ) -> Result<bool, RswsError> {
         let mut conn = self.get_connection().await?;
         let opts = SetOptions::default()
             .conditional_set(ExistenceCheck::NX)
