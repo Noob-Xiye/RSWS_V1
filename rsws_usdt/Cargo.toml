@@ -1,6 +1,6 @@
 [package]
 name = "rsws_usdt"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "USDT transaction monitoring service (built-in epusdt capability)"
 
