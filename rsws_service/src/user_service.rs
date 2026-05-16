@@ -376,14 +376,14 @@ impl UserService {
     }
 
     /// 发送验证码（通用，支持 register / login / reset_password）
-    pub async fn send_verification_code(&self, email: &str, scene: &str) -> Result<i64, RswsError> {
+    pub async fn send_verification_code(&self, email: &str, code_type: &str) -> Result<i64, RswsError> {
         let redis = self
             .redis
             .as_ref()
             .ok_or_else(|| RswsError::internal("Redis not configured"))?;
 
         // register 场景不检查用户存在性，login / reset_password 需要检查
-        if scene != "register" {
+        if code_type != "register" {
             let user = self
                 .user_repo
                 .find_user_by_email(email)
@@ -395,7 +395,7 @@ impl UserService {
         }
 
         // 检查是否已有验证码（防止频繁发送）
-        if redis.has_verification_code(email, scene).await? {
+        if redis.has_verification_code(email, code_type).await? {
             return Err(RswsError::business_with_message(
                 ErrorCode::RATE_LIMIT_EXCEEDED,
                 "验证码已发送，请稍后再试",
@@ -406,16 +406,16 @@ impl UserService {
         let code = format!("{:06}", rand::random::<u32>() % 1_000_000);
 
         // 存储验证码
-        redis.set_verification_code(email, scene, &code).await?;
+        redis.set_verification_code(email, code_type, &code).await?;
 
         // 发送邮件
         if let Some(ref email_service) = self.email_service {
             email_service
-                .send_verification_code(email, &code, scene)
+                .send_verification_code(email, &code, code_type)
                 .await?;
         }
 
-        info!("Verification code sent to {} for scene: {}", email, scene);
+        info!("Verification code sent to {} for code_type: {}", email, code_type);
         Ok(300)
     }
 

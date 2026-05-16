@@ -237,9 +237,13 @@ pub async fn update_profile(req: &mut Request, depot: &mut Depot, res: &mut Resp
                     Ok(user) => {
                         res.success(serde_json::json!({
                             "id": user.id,
+                            "email": user.email,
+                            "username": user.username,
                             "nickname": user.nickname,
                             "avatar_url": user.avatar_url,
-                            "message": "Profile updated successfully"
+                            "is_active": user.is_active,
+                            "created_at": user.created_at,
+                            "updated_at": user.updated_at,
                         }));
                     }
                     Err(e) => {
@@ -305,7 +309,7 @@ pub async fn change_password(req: &mut Request, depot: &mut Depot, res: &mut Res
 #[derive(Debug, Deserialize)]
 pub struct SendCodeRequest {
     pub email: String,
-    pub scene: String,
+    pub code_type: String,
 }
 
 #[endpoint(
@@ -324,7 +328,7 @@ pub async fn send_code(req: &mut Request, _depot: &mut Depot, res: &mut Response
 
             match state
                 .user_service
-                .send_verification_code(&data.email, &data.scene)
+                .send_verification_code(&data.email, &data.code_type)
                 .await
             {
                 Ok(_ttl) => {

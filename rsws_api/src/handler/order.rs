@@ -53,7 +53,7 @@ pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Respons
                 "items": orders,
                 "total": total,
                 "page": page,
-                "limit": page_size,
+                "page_size": page_size,
                 "total_pages": total_pages,
             }));
         }
