@@ -18,7 +18,7 @@ export interface UserListParams extends PaginationParams {
 
 /** 获取用户列表 */
 export async function listUsers(params?: UserListParams): Promise<ApiResponse<PaginatedResponse<AdminUser>>> {
-  return request.get('/admin/users', { params })
+  return request.get('/admin/user', { params })
 }
 
 /** 禁用用户 */
