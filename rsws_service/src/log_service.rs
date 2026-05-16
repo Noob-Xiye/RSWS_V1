@@ -37,6 +37,15 @@ pub struct LogService {
     pool: PgPool,
 }
 
+/// 查询系统日志的参数
+pub struct LogQueryParams {
+    pub level: Option<String>,
+    pub module: Option<String>,
+    pub user_id: Option<i64>,
+    pub start_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub end_time: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 impl LogService {
     /// 创建日志服务实例
     pub fn new(pool: PgPool) -> Self {
@@ -305,11 +314,7 @@ impl LogService {
     /// 查询系统日志（分页）
     pub async fn query_system_logs(
         &self,
-        level: Option<&str>,
-        module: Option<&str>,
-        user_id: Option<i64>,
-        start_time: Option<chrono::DateTime<chrono::Utc>>,
-        end_time: Option<chrono::DateTime<chrono::Utc>>,
+        params: LogQueryParams,
         page: i64,
         page_size: i64,
     ) -> Result<(Vec<Value>, i64), RswsError> {
@@ -317,7 +322,7 @@ impl LogService {
         let mut conditions: Vec<String> = vec!["1=1".to_string()];
         let mut param_idx = 1;
 
-        let level_param = if let Some(lvl) = level {
+        let level_param = if let Some(ref lvl) = params.level {
             conditions.push(format!("log_level = ${}", param_idx));
             param_idx += 1;
             Some(lvl.to_string())
@@ -325,7 +330,7 @@ impl LogService {
             None
         };
 
-        let module_param = if let Some(mod_name) = module {
+        let module_param = if let Some(ref mod_name) = params.module {
             conditions.push(format!("module = ${}", param_idx));
             param_idx += 1;
             Some(mod_name.to_string())
@@ -333,7 +338,7 @@ impl LogService {
             None
         };
 
-        let user_id_param = if let Some(uid) = user_id {
+        let user_id_param = if let Some(uid) = params.user_id {
             conditions.push(format!("user_id = ${}", param_idx));
             param_idx += 1;
             Some(uid)
@@ -341,7 +346,7 @@ impl LogService {
             None
         };
 
-        let start_time_param = if let Some(st) = start_time {
+        let start_time_param = if let Some(ref st) = params.start_time {
             conditions.push(format!("created_at >= ${}", param_idx));
             param_idx += 1;
             Some(st)
@@ -349,7 +354,7 @@ impl LogService {
             None
         };
 
-        let end_time_param = if let Some(et) = end_time {
+        let end_time_param = if let Some(ref et) = params.end_time {
             conditions.push(format!("created_at <= ${}", param_idx));
             param_idx += 1;
             Some(et)
