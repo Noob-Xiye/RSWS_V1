@@ -799,17 +799,16 @@ pub async fn query_system_logs(req: &mut Request, depot: &mut Depot, res: &mut R
         .map(|dt| dt.with_timezone(&Utc));
 
     let state = get_state(depot);
+    let params = rsws_service::log_service::LogQueryParams {
+        level,
+        module,
+        user_id,
+        start_time: start_time_dt,
+        end_time: end_time_dt,
+    };
     match state
         .log_service
-        .query_system_logs(
-            level.as_deref(),
-            module.as_deref(),
-            user_id,
-            start_time_dt,
-            end_time_dt,
-            page,
-            page_size,
-        )
+        .query_system_logs(params, page, page_size)
         .await
     {
         Ok((logs, total)) => {
