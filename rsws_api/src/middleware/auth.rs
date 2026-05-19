@@ -138,11 +138,12 @@ pub async fn api_key_auth(
         let state = get_state(depot);
 
         // 用户签名认证
-        match state
+        let user_validate_result = state
             .api_key_service
             .validate_signature_by_user_id(user_id, &params, &sign)
-            .await
-        {
+            .await;
+        tracing::info!("validate_signature_by_user_id for user_id={}: {:?}", user_id, user_validate_result);
+        match user_validate_result {
             Ok(Some(api_key_record)) => {
                 depot.insert("user_id", api_key_record.user_id);
                 depot.insert("api_key_id", api_key_record.id);

@@ -2550,7 +2550,7 @@ dependencies = [
 
 [[package]]
 name = "rsws_api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "deadpool-redis",
@@ -2572,7 +2572,7 @@ dependencies = [
 
 [[package]]
 name = "rsws_bin"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "config",
  "deadpool-redis",
@@ -2591,7 +2591,7 @@ dependencies = [
 
 [[package]]
 name = "rsws_common"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2619,7 +2619,7 @@ dependencies = [
 
 [[package]]
 name = "rsws_db"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -2641,7 +2641,7 @@ dependencies = [
 
 [[package]]
 name = "rsws_model"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "rsws_common",
@@ -2654,9 +2654,10 @@ dependencies = [
 
 [[package]]
 name = "rsws_service"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
+ "base64",
  "chrono",
  "deadpool-redis",
  "hmac",
@@ -2678,7 +2679,7 @@ dependencies = [
 
 [[package]]
 name = "rsws_usdt"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aes-gcm",
  "anyhow",

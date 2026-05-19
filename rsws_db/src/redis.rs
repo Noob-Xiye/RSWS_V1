@@ -159,6 +159,31 @@ impl RedisService {
         })?;
         Ok(result)
     }
+    /// 扫描匹配模式的键（使用 SCAN，非阻塞）
+    ///
+    /// # Arguments
+    /// * `pattern` - 匹配模式（如 "admin_apikey:*"）
+    /// * `count` - 每次 SCAN 返回的最大元素数（建议 100）
+    ///
+    /// # Returns
+    /// 匹配的所有键列表
+    pub async fn scan_keys(&self, pattern: &str, count: u32) -> Result<Vec<String>, RswsError> {
+        let mut conn = self.get_connection().await?;
+        let mut iter: redis::AsyncIter<String> = conn.scan_match(pattern).await.map_err(|e| {
+            error!("Failed to scan Redis keys: {}", e);
+            RswsError::internal("Failed to scan Redis keys")
+        })?;
+        
+        let mut keys = Vec::new();
+        while let Some(key) = iter.next_item().await {
+            keys.push(key);
+            if keys.len() >= count as usize {
+                break;
+            }
+        }
+        Ok(keys)
+    }
+
 }
 
 // ==================== 验证码缓存 ====================

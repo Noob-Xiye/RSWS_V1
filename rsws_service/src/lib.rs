@@ -40,8 +40,7 @@ pub use user_payment_service::UserPaymentService;
 pub use user_service::UserService;
 pub use webhook_service::WebhookService;
 
-use rsws_db::{
-    ApiKeyRepository, OrderRepository, PaymentRepository, RedisService, ResourceRepository,
+use rsws_db::{OrderRepository, PaymentRepository, RedisService, ResourceRepository,
     UserRepository, WalletRepository,
 };
 use std::sync::Arc;
@@ -68,9 +67,9 @@ pub fn create_cross_platform_service() -> CrossPlatformService {
     CrossPlatformService::new()
 }
 
-/// 创建 API Key 服务（已自动使用 Arc<ApiKeyRepository>）
-pub fn create_api_key_service(pool: sqlx::PgPool) -> ApiKeyService {
-    ApiKeyService::new(Arc::new(ApiKeyRepository::new(pool)))
+/// 创建 API Key 服务（纯 Redis，无 DB）
+pub fn create_api_key_service(redis: RedisService) -> ApiKeyService {
+    ApiKeyService::new(Arc::new(redis))
 }
 
 /// 创建用户服务

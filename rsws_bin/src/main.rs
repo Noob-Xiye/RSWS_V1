@@ -187,10 +187,7 @@ async fn main() -> Result<(), RswsError> {
     };
     let order_service = rsws_service::create_order_service(pool.clone());
     let resource_service = rsws_service::create_resource_service(pool.clone());
-    let api_key_service = rsws_service::ApiKeyService::with_redis(
-        std::sync::Arc::new(rsws_db::ApiKeyRepository::new(pool.clone())),
-        redis_pool.clone(),
-    );
+    let api_key_service = rsws_service::ApiKeyService::new(std::sync::Arc::new(redis_pool.clone()));
     let wallet_repo = rsws_db::WalletRepository::new(pool.clone());
 
     // PayPal 服务 — 配置从 DB 读取

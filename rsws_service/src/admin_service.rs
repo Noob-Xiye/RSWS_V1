@@ -5,7 +5,6 @@
 //! Admin API Key 凭证缓存到 Redis(快速验证 + 强制下线)
 
 use rsws_common::error::RswsError;
-use rsws_common::ErrorCode;
 use rsws_db::admin::AdminRepository;
 use rsws_db::RedisService;
 use rsws_model::user_models::admin::*;
@@ -170,13 +169,9 @@ impl AdminService {
             self.invalidate_admin_keys(updated.id).await;
         }
 
-        // 如果改了密码,清除所有 API Key 缓存
+        // 如果改了密码,清除所有 API Key（Redis-only）
         if request.password.is_some() {
             self.invalidate_admin_keys(updated.id).await;
-            // 同时禁用其所有 API Key
-            self.admin_repo
-                .deactivate_admin_api_keys(updated.id)
-                .await?;
         }
 
         let _ = self
@@ -243,10 +238,7 @@ impl AdminService {
         };
         self.admin_repo.update_admin(&request).await?;
 
-        // 禁用管理员所有 API Key
-        self.admin_repo.deactivate_admin_api_keys(admin_id).await?;
-
-        // 清除 Redis 缓存
+        // 禁用管理员所有 API Key（Redis-only: 清除 Redis 缓存即可）
         self.invalidate_admin_keys(admin_id).await;
 
         let _ = self
@@ -337,107 +329,142 @@ impl AdminService {
         rate_limit: Option<i32>,
         expires_in_days: Option<i32>,
     ) -> Result<AdminApiKeyResponse, RswsError> {
-        let record = self
-            .admin_repo
-            .create_admin_api_key(admin_id, name, permissions, rate_limit, expires_in_days)
-            .await?;
+        // 生成新的 API Key（不存 DB，只存 Redis）
+        let api_key = rsws_common::utils::generate_api_key();
+        let key_id = chrono::Utc::now().timestamp_millis(); // 用时间戳作为唯一 ID
+        let expires_at = expires_in_days.map(|days| chrono::Utc::now() + chrono::Duration::days(days as i64));
 
-        // 写入 Redis 缓存
+        // 写入 Redis（覆盖旧 Key）
         if let Some(ref redis) = self.redis {
-            let perms: Vec<String> =
-                serde_json::from_value(record.permissions.clone()).unwrap_or_default();
             let cached = CachedAdminApiKey {
-                admin_id: record.admin_id,
-                key_id: record.id,
-                api_key: record.api_key.clone(),
+                admin_id,
+                key_id,
+                api_key: api_key.clone(),
                 role: String::new(),
-                permissions: perms,
-                rate_limit: record.rate_limit,
-                expires_at: record.expires_at,
+                permissions: permissions.clone(),
+                rate_limit: Some(rate_limit.unwrap_or(1000)),
+                expires_at,
             };
+            let ttl = expires_in_days.map(|d| d as u64 * 86400).unwrap_or(Self::DEFAULT_SESSION_TTL);
             let _ = redis
                 .set_json(
-                    &Self::redis_key(record.admin_id),
+                    &Self::redis_key(admin_id),
                     &cached,
-                    Self::DEFAULT_SESSION_TTL,
+                    ttl,
                 )
                 .await;
+        } else {
+            return Err(RswsError::internal("Redis not configured"));
         }
 
-        let perms: Vec<String> =
-            serde_json::from_value(record.permissions.clone()).unwrap_or_default();
-
+        // 构造响应（id 是临时生成的，不存 DB）
         Ok(AdminApiKeyResponse {
-            id: record.id,
-            name: record.name,
-            api_key: record.api_key,
-            permissions: perms,
-            rate_limit: record.rate_limit,
-            last_used_at: record.last_used_at,
-            expires_at: record.expires_at,
-            is_active: record.is_active,
-            created_at: record.created_at,
+            id: key_id,
+            name: name.to_string(),
+            api_key,
+            permissions,
+            rate_limit: Some(rate_limit.unwrap_or(1000)),
+            last_used_at: None,
+            expires_at,
+            is_active: true,
+            created_at: chrono::Utc::now(),
         })
     }
 
-    /// 获取管理员的 API Key 列表
+    /// 获取管理员的当前 API Key（从 Redis 读取）
     pub async fn list_api_keys(&self, admin_id: i64) -> Result<Vec<AdminApiKey>, RswsError> {
-        self.admin_repo.get_admin_api_keys(admin_id).await
-    }
-
-    /// 删除管理员 API Key
-    pub async fn delete_api_key(&self, key_id: i64, admin_id: i64) -> Result<bool, RswsError> {
-        let deleted = self
-            .admin_repo
-            .delete_admin_api_key(key_id, admin_id)
-            .await?;
-
-        if deleted {
-            // 按 admin_id 索引，可直接清缓存
-            self.invalidate_admin_keys(admin_id).await;
+        if let Some(ref redis) = self.redis {
+            if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&Self::redis_key(admin_id)).await? {
+                let key = AdminApiKey {
+                    id: cached.key_id,
+                    admin_id: cached.admin_id,
+                    name: "current".to_string(),
+                    api_key: cached.api_key,
+                    permissions: serde_json::json!(cached.permissions),
+                    rate_limit: cached.rate_limit,
+                    last_used_at: None,
+                    expires_at: cached.expires_at,
+                    is_active: true,
+                    created_at: chrono::Utc::now(),
+                    updated_at: chrono::Utc::now(),
+                };
+                return Ok(vec![key]);
+            }
         }
-
-        Ok(deleted)
+        Ok(vec![]) // Redis 中无 Key，返回空列表
     }
 
-    /// 切换管理员 API Key 状态
+    /// 删除管理员的 API Key（从 Redis 删除）
+    pub async fn delete_api_key(&self, _key_id: i64, admin_id: i64) -> Result<bool, RswsError> {
+        if let Some(ref redis) = self.redis {
+            let result = redis.del(&Self::redis_key(admin_id)).await;
+            return Ok(result.is_ok());
+        }
+        Ok(false)
+    }
+
+    /// 切换管理员 API Key 状态（Redis 中暂不支持，返回成功）
     pub async fn toggle_api_key_status(
         &self,
-        key_id: i64,
+        _key_id: i64,
         admin_id: i64,
         is_active: bool,
     ) -> Result<(), RswsError> {
-        let updated = self
-            .admin_repo
-            .update_api_key_status(key_id, admin_id, is_active)
-            .await?;
-
-        if !updated {
-            return Err(RswsError::from(ErrorCode::NOT_FOUND));
+        // Redis 方案中不存储历史 Key，当前 Key 总是活跃的
+        // 如果需要禁用，直接删除 Redis 中的 Key
+        if !is_active {
+            self.invalidate_admin_keys(admin_id).await;
         }
-
-        // 状态变更后清除 Redis 缓存，下次请求会重新从 DB 加载
-        self.invalidate_admin_keys(admin_id).await;
-
         Ok(())
     }
 
-    /// 验证管理员 API Key 是否存在且活跃（单密钥方案）
+    /// 验证管理员 API Key 是否存在且活跃（从 Redis 查找）
     pub async fn validate_admin_api_key(
         &self,
         api_key: &str,
     ) -> Result<Option<(AdminApiKey, Admin)>, RswsError> {
-        self.admin_repo.validate_admin_api_key(api_key).await
+        if let Some(ref redis) = self.redis {
+            // 扫描所有 admin_apikey:* 键
+            let pattern = "admin_apikey:*".to_string();
+            if let Ok(keys) = redis.scan_keys(&pattern, 100).await {
+                for key in keys {
+                    if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&key).await? {
+                        if cached.api_key == api_key {
+                            // 找到匹配的 Key，获取 admin 信息
+                            let admin = self.admin_repo.get_admin_by_id(cached.admin_id).await?
+                                .ok_or_else(|| RswsError::not_found("Admin not found"))?;
+                            
+                            let ak = AdminApiKey {
+                                id: cached.key_id,
+                                admin_id: cached.admin_id,
+                                name: "current".to_string(),
+                                api_key: cached.api_key,
+                                permissions: serde_json::json!(cached.permissions),
+                                rate_limit: cached.rate_limit,
+                                last_used_at: None,
+                                expires_at: cached.expires_at,
+                                is_active: true,
+                                created_at: chrono::Utc::now(),
+                                updated_at: chrono::Utc::now(),
+                            };
+                            return Ok(Some((ak, admin)));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(None) // 未找到
     }
 
-    /// 获取管理员活跃 API Key（Redis 缓存 → DB → 写回 Redis）
+    /// 获取管理员 API Key（仅从 Redis 读取）
     ///
     /// 返回 (api_key, key_id) 元组，用于签名验证
+    /// 如果 Redis 中不存在，返回错误（不回退 DB）
     async fn get_cached_admin_key(
         &self,
         admin_id: i64,
     ) -> Result<(Option<String>, Option<i64>), RswsError> {
-        // 1) 先查 Redis 缓存
+        // 只从 Redis 读取
         if let Some(ref redis) = self.redis {
             if let Some(cached) = redis
                 .get_json::<CachedAdminApiKey>(&Self::redis_key(admin_id))
@@ -447,40 +474,16 @@ impl AdminService {
                 if let Some(expires) = cached.expires_at {
                     if expires < chrono::Utc::now() {
                         let _ = redis.del(&Self::redis_key(admin_id)).await;
-                        return Ok((None, None));
+                        return Err(RswsError::unauthorized("API Key expired"));
                     }
                 }
                 return Ok((Some(cached.api_key), Some(cached.key_id)));
+            } else {
+                return Err(RswsError::unauthorized("API Key not found in Redis. Please login again."));
             }
         }
 
-        // 2) Redis miss → 查 DB
-        let record = match self.admin_repo.get_active_key_by_admin_id(admin_id).await? {
-            Some(r) => r,
-            None => return Ok((None, None)),
-        };
-
-        // 3) 写入 Redis
-        if let Some(ref redis) = self.redis {
-            let cached = CachedAdminApiKey {
-                admin_id: record.admin_id,
-                key_id: record.id,
-                api_key: record.api_key.clone(),
-                role: String::new(),
-                permissions: vec![],
-                rate_limit: record.rate_limit,
-                expires_at: record.expires_at,
-            };
-            let _ = redis
-                .set_json(
-                    &Self::redis_key(admin_id),
-                    &cached,
-                    Self::DEFAULT_SESSION_TTL,
-                )
-                .await;
-        }
-
-        Ok((Some(record.api_key), Some(record.id)))
+        Err(RswsError::internal("Redis not configured"))
     }
 
     /// 清除管理员所有 Redis 缓存的 API Key
@@ -517,8 +520,7 @@ impl AdminService {
 
         // 3) 对比签名
         if computed_sign == sign {
-            // 更新 last_used
-            let _ = self.admin_repo.update_admin_api_key_last_used(key_id).await;
+            // Redis-only: 不再更新 DB last_used
             Ok(Some(key_id))
         } else {
             tracing::warn!(

@@ -5,7 +5,6 @@
 use sqlx::PgPool;
 
 pub mod admin;
-pub mod api_key;
 pub mod category;
 pub mod order;
 pub mod payment;
@@ -15,7 +14,6 @@ pub mod user;
 pub mod wallet;
 
 pub use admin::AdminRepository;
-pub use api_key::ApiKeyRepository;
 pub use category::Category;
 pub use category::CategoryRepository;
 pub use order::OrderRepository;
