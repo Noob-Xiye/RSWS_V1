@@ -175,7 +175,7 @@ impl RedisService {
         })?;
 
         let mut keys = Vec::new();
-        while let Some(key) = iter.next_item().await {
+        while let Some(key) = iter.next_item().await? {
             keys.push(key);
             if keys.len() >= count as usize {
                 break;

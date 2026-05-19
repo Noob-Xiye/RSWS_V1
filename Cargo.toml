@@ -40,7 +40,7 @@ serde_json = "1.0.142"
 sqlx = { version = "0.8.2", features = ["runtime-tokio-rustls", "postgres", "chrono", "rust_decimal", "migrate", "derive"], default-features = false }
 
 # Redis
-redis = { version = "0.32.4", features = ["tokio-comp"], default-features = false }
+redis = { version = "0.32.4", features = ["tokio-comp", "safe_iterators"], default-features = false }
 deadpool-redis = { version = "0.22.0", features = ["rt_tokio_1"], default-features = false }
 
 # 配置管理
@@ -60,7 +60,7 @@ chrono = { version = "0.4.39", features = ["serde"] }
 rust_decimal = { version = "1.37.0", features = ["serde"] }
 
 # 邮件（rustls）
-lettre = { version = "0.11.11", features = ["tokio1-rustls-tls", "smtp-transport", "builder"], default-features = false }
+lettre = { version = "0.11.22", features = ["tokio1-rustls-tls", "smtp-transport", "builder"], default-features = false }
 
 # ID 生成
 rust-snowflake = "0.1.3"
