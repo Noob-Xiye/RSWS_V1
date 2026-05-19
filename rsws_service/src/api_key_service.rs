@@ -215,19 +215,19 @@ impl ApiKeyService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use rsws_common::utils::generate_api_key;
 
     #[test]
     fn test_generate_api_key() {
-        let api_key = ApiKeyService::generate_api_key();
+        let api_key = generate_api_key();
         assert!(api_key.starts_with("ak_"));
         assert!(api_key.len() > 10);
     }
 
     #[test]
     fn test_generate_api_key_unique() {
-        let key1 = ApiKeyService::generate_api_key();
-        let key2 = ApiKeyService::generate_api_key();
+        let key1 = generate_api_key();
+        let key2 = generate_api_key();
         assert_ne!(key1, key2);
     }
 }
