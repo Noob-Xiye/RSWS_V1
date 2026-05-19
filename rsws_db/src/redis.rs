@@ -175,15 +175,10 @@ impl RedisService {
         })?;
 
         let mut keys = Vec::new();
-        loop {
-            match iter.next_item().await {
-                Some(Ok(key)) => {
-                    keys.push(key);
-                    if keys.len() >= count as usize {
-                        break;
-                    }
-                }
-                _ => break,
+        while let Some(Ok(key)) = iter.next_item().await {
+            keys.push(key);
+            if keys.len() >= count as usize {
+                break;
             }
         }
         Ok(keys)
