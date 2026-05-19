@@ -72,6 +72,24 @@ services:
       retries: 5
       start_period: 15s
 
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rsws-nginx
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3000}:3000"
+      - "${USER_PORT:-3001}:3001"
+    depends_on:
+      rsws:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/ && curl -sf http://localhost:3001/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 volumes:
   postgres_data:
   redis_data:
