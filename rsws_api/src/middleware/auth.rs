@@ -142,7 +142,11 @@ pub async fn api_key_auth(
             .api_key_service
             .validate_signature_by_user_id(user_id, &params, &sign)
             .await;
-        tracing::info!("validate_signature_by_user_id for user_id={}: {:?}", user_id, user_validate_result);
+        tracing::info!(
+            "validate_signature_by_user_id for user_id={}: {:?}",
+            user_id,
+            user_validate_result
+        );
         match user_validate_result {
             Ok(Some(api_key_record)) => {
                 depot.insert("user_id", api_key_record.user_id);

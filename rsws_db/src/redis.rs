@@ -173,7 +173,7 @@ impl RedisService {
             error!("Failed to scan Redis keys: {}", e);
             RswsError::internal("Failed to scan Redis keys")
         })?;
-        
+
         let mut keys = Vec::new();
         while let Some(key) = iter.next_item().await {
             keys.push(key);
@@ -183,7 +183,6 @@ impl RedisService {
         }
         Ok(keys)
     }
-
 }
 
 // ==================== 验证码缓存 ====================

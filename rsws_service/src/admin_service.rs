@@ -332,7 +332,8 @@ impl AdminService {
         // 生成新的 API Key（不存 DB，只存 Redis）
         let api_key = rsws_common::utils::generate_api_key();
         let key_id = chrono::Utc::now().timestamp_millis(); // 用时间戳作为唯一 ID
-        let expires_at = expires_in_days.map(|days| chrono::Utc::now() + chrono::Duration::days(days as i64));
+        let expires_at =
+            expires_in_days.map(|days| chrono::Utc::now() + chrono::Duration::days(days as i64));
 
         // 写入 Redis（覆盖旧 Key）
         if let Some(ref redis) = self.redis {
@@ -345,13 +346,11 @@ impl AdminService {
                 rate_limit: Some(rate_limit.unwrap_or(1000)),
                 expires_at,
             };
-            let ttl = expires_in_days.map(|d| d as u64 * 86400).unwrap_or(Self::DEFAULT_SESSION_TTL);
+            let ttl = expires_in_days
+                .map(|d| d as u64 * 86400)
+                .unwrap_or(Self::DEFAULT_SESSION_TTL);
             let _ = redis
-                .set_json(
-                    &Self::redis_key(admin_id),
-                    &cached,
-                    ttl,
-                )
+                .set_json(&Self::redis_key(admin_id), &cached, ttl)
                 .await;
         } else {
             return Err(RswsError::internal("Redis not configured"));
@@ -374,7 +373,10 @@ impl AdminService {
     /// 获取管理员的当前 API Key（从 Redis 读取）
     pub async fn list_api_keys(&self, admin_id: i64) -> Result<Vec<AdminApiKey>, RswsError> {
         if let Some(ref redis) = self.redis {
-            if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&Self::redis_key(admin_id)).await? {
+            if let Some(cached) = redis
+                .get_json::<CachedAdminApiKey>(&Self::redis_key(admin_id))
+                .await?
+            {
                 let key = AdminApiKey {
                     id: cached.key_id,
                     admin_id: cached.admin_id,
@@ -431,9 +433,12 @@ impl AdminService {
                     if let Some(cached) = redis.get_json::<CachedAdminApiKey>(&key).await? {
                         if cached.api_key == api_key {
                             // 找到匹配的 Key，获取 admin 信息
-                            let admin = self.admin_repo.get_admin_by_id(cached.admin_id).await?
+                            let admin = self
+                                .admin_repo
+                                .get_admin_by_id(cached.admin_id)
+                                .await?
                                 .ok_or_else(|| RswsError::not_found("Admin not found"))?;
-                            
+
                             let ak = AdminApiKey {
                                 id: cached.key_id,
                                 admin_id: cached.admin_id,
@@ -479,7 +484,9 @@ impl AdminService {
                 }
                 return Ok((Some(cached.api_key), Some(cached.key_id)));
             } else {
-                return Err(RswsError::unauthorized("API Key not found in Redis. Please login again."));
+                return Err(RswsError::unauthorized(
+                    "API Key not found in Redis. Please login again.",
+                ));
             }
         }
 

@@ -1,17 +1,17 @@
 //! API Key service (Pure Redis, no DB)
-//! 
+//!
 //! Cregis scheme:
 //! - api_key is signing key, held by frontend for signing, NOT transmitted
 //! - Backend looks up api_key by user_id for verification
 //! - No database needed
 
 use rsws_common::error::RswsError;
+use rsws_common::utils::generate_api_key;
 use rsws_db::RedisService;
 use rsws_model::api_key::{ApiKey, ApiKeyResponse, CreateApiKeyRequest};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use rsws_common::utils::generate_api_key;
 
 /// CachedApiKey stored in Redis
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,7 +57,8 @@ impl ApiKeyService {
 
     /// Validate API Key by user_id (for signature verification)
     pub async fn validate_by_user_id(&self, user_id: i64) -> Result<Option<ApiKey>, RswsError> {
-        if let Some(cached) = self.redis
+        if let Some(cached) = self
+            .redis
             .get_json::<CachedApiKey>(&Self::redis_key(user_id))
             .await?
         {
@@ -96,7 +97,7 @@ impl ApiKeyService {
     ) -> Result<ApiKeyResponse, RswsError> {
         // Generate api_key (as signing key)
         let api_key = generate_api_key();
-        
+
         // Calculate expiry
         let expires_at = request
             .expires_in_days
@@ -133,7 +134,8 @@ impl ApiKeyService {
 
     /// Get user's API Keys (from Redis)
     pub async fn get_user_keys(&self, user_id: i64) -> Result<Vec<ApiKey>, RswsError> {
-        if let Some(cached) = self.redis
+        if let Some(cached) = self
+            .redis
             .get_json::<CachedApiKey>(&Self::redis_key(user_id))
             .await?
         {
@@ -209,7 +211,6 @@ impl ApiKeyService {
             Ok(None)
         }
     }
-
 }
 
 #[cfg(test)]

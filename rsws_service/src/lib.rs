@@ -40,8 +40,9 @@ pub use user_payment_service::UserPaymentService;
 pub use user_service::UserService;
 pub use webhook_service::WebhookService;
 
-use rsws_db::{OrderRepository, PaymentRepository, RedisService, ResourceRepository,
-    UserRepository, WalletRepository,
+use rsws_db::{
+    OrderRepository, PaymentRepository, RedisService, ResourceRepository, UserRepository,
+    WalletRepository,
 };
 use std::sync::Arc;
 
