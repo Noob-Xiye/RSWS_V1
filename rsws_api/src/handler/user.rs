@@ -22,7 +22,7 @@ use serde::Deserialize;
         (status_code = 404, description = "用户不存在"),
     )
 )]
-pub async fn get_user(Path(id): Path<i64>, depot: &mut Depot, res: &mut Response) {
+pub async fn get_user(id: Path<i64>, depot: &mut Depot, res: &mut Response) {
     let state = get_state(depot);
 
     match state.user_service.get_user(id).await {
