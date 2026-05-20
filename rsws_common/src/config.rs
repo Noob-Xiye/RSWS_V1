@@ -1,6 +1,6 @@
 //! 静态配置
 //!
-//! 仅保留启动时必需的配置（server/database/redis/encryption）。
+//! 只保留启动时必需的配置（server/database/redis/encryption）。
 //! 所有业务配置（PayPal/区块链/Email/USDT监听等）从数据库读取，
 //! 通过 ConfigService 提供。
 //!
@@ -11,16 +11,39 @@
 use config::{Config, ConfigError, Environment};
 use serde::Deserialize;
 
+/// TLS 配置（可选，启用后支持 HTTPS + HTTP/3）
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct TlsConfig {
+    /// 是否启用 TLS
+    #[serde(default)]
+    pub enabled: bool,
+    /// TLS 证书路径（PEM 格式）
+    #[serde(default)]
+    pub cert_path: String,
+    /// TLS 私钥路径（PEM 格式）
+    #[serde(default)]
+    pub key_path: String,
+    /// 是否启用 HTTP/3（需要 quinn）
+    #[serde(default)]
+    pub http3: bool,
+    /// HTTP/3 监听端口（默认与 server.port 相同）
+    #[serde(default)]
+    pub http3_port: Option<u16>,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub cors_origins: Vec<String>,
-    /// 可信代理 IP 列表（用于获取真实客户端 IP）
+    /// 信任代理 IP 列表（用于获取真实客户端 IP）
     /// 生产环境应配置 Nginx/Cloudflare 等 CDN 的 IP
     /// 开发环境可配置为空或 ["127.0.0.1"]
     #[serde(default)]
     pub trusted_proxies: Vec<String>,
+    /// TLS 配置（可选）
+    #[serde(default)]
+    pub tls: TlsConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -41,7 +64,7 @@ pub struct EncryptionConfig {
     pub key: String,
 }
 
-/// 应用静态配置（仅 config.toml 中的连接配置）
+/// 应用静态配置（从 config.toml 中的连接配置）
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub server: ServerConfig,
@@ -60,6 +83,10 @@ host = "0.0.0.0"
 port = 5170
 cors_origins = ["*"]
 trusted_proxies = []
+
+[server.tls]
+enabled = false
+http3 = false
 
 [database]
 url = ""

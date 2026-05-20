@@ -12,6 +12,7 @@ use rsws_common::config::load_config;
 use rsws_common::error::RswsError;
 use rsws_db::RedisPool;
 use salvo::prelude::*;
+use salvo::conn::rustls::{Keycert, RustlsConfig};
 use salvo::Server;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
@@ -263,14 +264,57 @@ async fn main() -> Result<(), RswsError> {
         warn!("USDT listener disabled (no active listen configs in database)");
     }
 
-    // ========== 6. 启动 HTTP 服务 ==========
+    // ========== 6. 启动 HTTP/HTTPS/HTTP3 服务 ==========
     let router = router::create_router(app_state);
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
-    info!("Server listening on http://{}", addr);
 
-    let acceptor = TcpListener::new(addr).bind().await;
-    Server::new(acceptor).serve(router).await;
+    if config.server.tls.enabled {
+        let tls_config = &config.server.tls;
+
+        // 验证证书文件存在
+        if !std::path::Path::new(&tls_config.cert_path).exists() {
+            error!("TLS cert file not found: {}", tls_config.cert_path);
+            return Err(RswsError::internal("TLS cert file not found"));
+        }
+        if !std::path::Path::new(&tls_config.key_path).exists() {
+            error!("TLS key file not found: {}", tls_config.key_path);
+            return Err(RswsError::internal("TLS key file not found"));
+        }
+
+        // 加载 rustls 证书
+        let rustls_config = RustlsConfig::new(
+            Keycert::new()
+                .key_from_path(&tls_config.key_path)
+                .map_err(|e| {
+                    error!("Failed to read TLS key: {}", e);
+                    RswsError::internal("Failed to read TLS key file")
+                })?
+                .cert_from_path(&tls_config.cert_path)
+                .map_err(|e| {
+                    error!("Failed to read TLS cert: {}", e);
+                    RswsError::internal("Failed to read TLS cert file")
+                })?,
+        );
+
+        // HTTPS + HTTP/2 (RustlsListener)
+        let https_listener = TcpListener::new(addr.clone())
+            .rustls(rustls_config.clone())
+            .bind()
+            .await;
+        info!("HTTPS server listening on https://{}", addr);
+
+        // HTTP/3 支持待实现（需要 quinn::ServerConfig 转换）
+        if tls_config.http3 {
+            warn!("HTTP/3 is configured but not yet implemented. Running HTTPS only.");
+        }
+        Server::new(https_listener).serve(router).await;
+    } else {
+        // 纯 HTTP 模式（开发环境）
+        info!("Server listening on http://{} (TLS disabled)", addr);
+        let acceptor = TcpListener::new(addr).bind().await;
+        Server::new(acceptor).serve(router).await;
+    }
 
     Ok(())
 }

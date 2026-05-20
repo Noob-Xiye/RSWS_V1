@@ -12,7 +12,7 @@ resolver = "2"
 
 [workspace.dependencies]
 # Salvo 核心和插件，全部禁用默认特性，统一启用 rustls
-salvo = { git = "https://github.com/salvo-rs/salvo", features = ["oapi", "cors", "compression", "serve-static", "rustls", "ring", "server", "http1", "http2", "affix-state"], default-features = false }
+salvo = { git = "https://github.com/salvo-rs/salvo", features = ["oapi", "cors", "compression", "serve-static", "rustls", "ring", "server", "http1", "http2", "quinn", "affix-state"], default-features = false }
 salvo-cache = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-compression = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-cors = { git = "https://github.com/salvo-rs/salvo", default-features = false }
