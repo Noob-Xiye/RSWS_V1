@@ -9,25 +9,21 @@ use rsws_model::user_models::user::{
     ChangePasswordRequest, LoginRequest, RegisterRequest, UpdateProfileRequest,
 };
 use salvo::prelude::*;
-use salvo::Path;
 use salvo_oapi::endpoint;
 use serde::Deserialize;
 
 /// 获取用户信息（按 ID）
 #[endpoint(
-    parameters(
-        ("id", Path, description = "用户ID"),
-    ),
     responses(
         (status_code = 200, description = "成功"),
         (status_code = 404, description = "用户不存在"),
     )
 )]
-pub async fn get_user(id: Path<i64>, depot: &mut Depot, res: &mut Response) {
-    let user_id = id.0;  // Path<T> 是元组结构体
+pub async fn get_user(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let id: i64 = req.param("id").unwrap_or(0);
     let state = get_state(depot);
 
-    match state.user_service.get_user(user_id).await {
+    match state.user_service.get_user(id).await {
         Ok(user) => {
             res.success(serde_json::json!({
                 "id": user.id,
