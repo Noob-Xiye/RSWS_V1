@@ -22,8 +22,8 @@ use serde::Deserialize;
         (status_code = 404, description = "用户不存在"),
     )
 )]
-pub async fn get_user(id: PathParam<i64>, depot: &mut Depot, res: &mut Response) {
-    let user_id = id.into_inner();
+pub async fn get_user(id: salvo::http::Path<i64>, depot: &mut Depot, res: &mut Response) {
+    let user_id = id.0;  // Path<T> 是元组结构体，用 .0 提取
     let state = get_state(depot);
 
     match state.user_service.get_user(user_id).await {
