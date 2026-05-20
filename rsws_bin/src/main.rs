@@ -13,6 +13,7 @@ use rsws_common::error::RswsError;
 use rsws_db::RedisPool;
 use salvo::prelude::*;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
+use std::convert::TryInto;
 use salvo::Server;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
@@ -297,18 +298,49 @@ async fn main() -> Result<(), RswsError> {
                 })?,
         );
 
-        // HTTPS + HTTP/2 (RustlsListener)
-        let https_listener = TcpListener::new(addr.clone())
-            .rustls(rustls_config.clone())
-            .bind()
-            .await;
-        info!("HTTPS server listening on https://{}", addr);
 
-        // HTTP/3 支持待实现（需要 quinn::ServerConfig 转换）
+
+        // HTTP/3 (QuinnListener) - 需要 quinn feature
         if tls_config.http3 {
-            warn!("HTTP/3 is configured but not yet implemented. Running HTTPS only.");
+            use salvo::conn::quinn::QuinnListener;
+
+            let http3_port = tls_config.http3_port.unwrap_or(config.server.port);
+            let http3_addr = format!("{}:{}", config.server.host, http3_port);
+
+            // RustlsConfig 可以转换为 quinn::ServerConfig
+            let quinn_server_config: salvo::conn::quinn::ServerConfig =
+                rustls_config.clone().try_into().map_err(|e| {
+                    error!("Failed to create Quinn server config: {:?}", e);
+                    RswsError::internal("Failed to create HTTP/3 server config")
+                })?;
+
+            // 创建 QuinnListener (HTTP/3) - 注意：需要在 bind 之前 join
+            let quinn_listener = QuinnListener::new(quinn_server_config, http3_addr.clone());
+
+            // 先创建 HTTPS listener (未 bind)
+            let https_listener = TcpListener::new(addr.clone())
+                .rustls(rustls_config.clone());
+
+            // 组合两个 listener，然后一起 bind
+            let joined = https_listener.join(quinn_listener);
+            let acceptor = joined.try_bind().await.map_err(|e| {
+                error!("Failed to bind HTTPS/HTTP3 listeners: {:?}", e);
+                RswsError::internal("Failed to bind HTTPS/HTTP3 listeners")
+            })?;
+
+            info!("HTTPS server listening on https://{}", addr);
+            info!("HTTP/3 server listening on https://{} (QUIC)", http3_addr);
+
+            Server::new(acceptor).serve(router).await;
+        } else {
+            // 仅 HTTPS
+            let https_listener = TcpListener::new(addr.clone())
+                .rustls(rustls_config)
+                .bind()
+                .await;
+            info!("HTTPS server listening on https://{}", addr);
+            Server::new(https_listener).serve(router).await;
         }
-        Server::new(https_listener).serve(router).await;
     } else {
         // 纯 HTTP 模式（开发环境）
         info!("Server listening on http://{} (TLS disabled)", addr);
