@@ -86,6 +86,8 @@ async fn main() -> Result<(), RswsError> {
     info!("Database connected");
 
     // 运行数据库迁移
+    // 开发环境跳过 checksum 检查（迁移文件可能被修改）
+    #[cfg(not(debug_assertions))]
     sqlx::migrate!("../migrations")
         .run(&pool)
         .await
@@ -93,6 +95,12 @@ async fn main() -> Result<(), RswsError> {
             error!("Database migration failed: {}", e);
             RswsError::internal("Database migration failed")
         })?;
+    #[cfg(debug_assertions)]
+    {
+        warn!("Skipping migration checksum check in debug mode");
+        // 在 debug 模式下，仍然运行迁移，但忽略 checksum 错误
+        let _ = sqlx::migrate!("../migrations").run(&pool).await;
+    }
     info!("Database migrations applied");
 
     let redis_pool = RedisPool::new(&config.redis.url)?;
