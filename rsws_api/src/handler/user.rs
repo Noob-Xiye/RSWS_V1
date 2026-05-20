@@ -15,7 +15,7 @@ use serde::Deserialize;
 /// 获取用户信息（按 ID）
 #[endpoint(
     parameters(
-        ("id", description = "用户ID"),
+        ("id", Path, description = "用户ID"),
     ),
     responses(
         (status_code = 200, description = "成功"),

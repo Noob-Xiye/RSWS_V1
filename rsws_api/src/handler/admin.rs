@@ -233,7 +233,7 @@ pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Respons
 /// 获取指定管理员信息
 #[endpoint(
     parameters(
-        ("id", description = "管理员ID"),
+        ("id", Path, description = "管理员ID"),
     ),
     responses(
         (status_code = 200, description = "成功"),
@@ -261,7 +261,7 @@ pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response)
 /// 停用管理员
 #[endpoint(
     parameters(
-        ("id", description = "管理员ID"),
+        ("id", Path, description = "管理员ID"),
     ),
     responses(
         (status_code = 200, description = "成功"),
@@ -310,7 +310,7 @@ pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Re
 /// 激活管理员
 #[endpoint(
     parameters(
-        ("id", description = "管理员ID"),
+        ("id", Path, description = "管理员ID"),
     ),
     responses(
         (status_code = 200, description = "成功"),
@@ -358,7 +358,7 @@ pub async fn activate_admin(req: &mut Request, depot: &mut Depot, res: &mut Resp
 /// 重置管理员密码
 #[endpoint(
     parameters(
-        ("id", description = "管理员ID"),
+        ("id", Path, description = "管理员ID"),
     ),
     request_body = ResetPasswordBody,
     responses(
@@ -500,8 +500,8 @@ pub async fn list_api_keys(_req: &mut Request, depot: &mut Depot, res: &mut Resp
 /// 删除管理员 API Key
 #[endpoint(
     parameters(
-        ("id", description = "管理员ID"),
-        ("key_id", description = "API Key ID"),
+        ("id", Path, description = "管理员ID"),
+        ("key_id", Path, description = "API Key ID"),
     ),
     responses(
         (status_code = 200, description = "删除成功"),
@@ -546,7 +546,7 @@ pub struct ToggleApiKeyStatusBody {
 /// 切换管理员 API Key 状态
 #[endpoint(
     parameters(
-        ("key_id", description = "API Key ID"),
+        ("key_id", Path, description = "API Key ID"),
     ),
     request_body = ToggleApiKeyStatusBody,
     responses(
@@ -612,7 +612,7 @@ pub async fn list_log_configs(_req: &mut Request, depot: &mut Depot, res: &mut R
 /// 获取指定日志配置
 #[endpoint(
     parameters(
-        ("key", description = "配置键名"),
+        ("key", Path, description = "配置键名"),
     ),
     responses(
         (status_code = 200, description = "成功"),
@@ -696,7 +696,7 @@ pub struct UpdateLogConfigBody {
 /// 更新日志配置
 #[endpoint(
     parameters(
-        ("key", description = "配置键名"),
+        ("key", Path, description = "配置键名"),
     ),
     request_body = UpdateLogConfigBody,
     responses(
@@ -740,7 +740,7 @@ pub async fn update_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
 /// 删除日志配置
 #[endpoint(
     parameters(
-        ("key", description = "配置键名"),
+        ("key", Path, description = "配置键名"),
     ),
     responses(
         (status_code = 200, description = "删除成功"),
@@ -854,7 +854,7 @@ pub async fn list_usdt_wallets(_req: &mut Request, depot: &mut Depot, res: &mut 
 /// 更新或创建 USDT 钱包
 #[endpoint(
     parameters(
-        ("network", description = "网络类型: tron/ethereum"),
+        ("network", Path, description = "网络类型: tron/ethereum"),
     ),
     request_body = UsdtWalletRequest,
     responses(
@@ -1045,7 +1045,7 @@ pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Respo
 /// 禁用用户
 #[endpoint(
     parameters(
-        ("id", description = "用户ID"),
+        ("id", Path, description = "用户ID"),
     ),
     responses(
         (status_code = 200, description = "禁用成功"),
@@ -1077,7 +1077,7 @@ pub async fn deactivate_user(req: &mut Request, depot: &mut Depot, res: &mut Res
 /// 启用用户
 #[endpoint(
     parameters(
-        ("id", description = "用户ID"),
+        ("id", Path, description = "用户ID"),
     ),
     responses(
         (status_code = 200, description = "启用成功"),
