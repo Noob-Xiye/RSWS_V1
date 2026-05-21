@@ -11,6 +11,7 @@ use crate::state::get_state;
 use chrono::{DateTime, Duration, Utc};
 use rsws_common::{error_code::ErrorCode, ResponseExt, RswsError};
 use rsws_db::{order::OrderRepository, resource::ResourceRepository, user::UserRepository};
+use rsws_model::resource::CreateResourceRequest;
 use rsws_model::user_models::admin::{AdminLoginResponse, DailyOrderCount, DashboardStats};
 use rsws_service::UpdateLogConfigRequest;
 use salvo::prelude::*;
@@ -1123,4 +1124,56 @@ pub async fn list_users(req: &mut Request, depot: &mut Depot, res: &mut Response
         "page_size": page_size,
         "total_pages": total_pages,
     }));
+}
+
+/// 管理员创建平台资源
+#[endpoint(
+    request_body = CreateResourceRequest,
+    responses(
+        (status_code = 201, description = "创建成功"),
+        (status_code = 400, description = "请求格式错误"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 403, description = "非管理员"),
+    )
+)]
+pub async fn create_platform_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let admin_id: i64 = match depot.get("user_id") {
+        Ok(id) => *id,
+        Err(_) => {
+            res.http_error(StatusCode::UNAUTHORIZED, "Not authenticated");
+            return;
+        }
+    };
+
+    let body = req.parse_json::<CreateResourceRequest>().await;
+
+    match body {
+        Ok(data) => {
+            if data.title.trim().is_empty() {
+                res.error_msg(
+                    RswsError::from(ErrorCode::INVALID_PARAMETER),
+                    "Title cannot be empty",
+                );
+                return;
+            }
+
+            let state = get_state(depot);
+
+            match state.resource_service.create(data, admin_id, rsws_model::resource::OWNER_TYPE_PLATFORM, admin_id).await {
+                Ok(resource) => {
+                    res.status_code(StatusCode::CREATED);
+                    res.success(resource);
+                }
+                Err(e) => {
+                    res.error(e);
+                }
+            }
+        }
+        Err(e) => {
+            res.error_msg(
+                RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
+                format!("Invalid request: {}", e),
+            );
+        }
+    }
 }

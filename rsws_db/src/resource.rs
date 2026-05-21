@@ -1,4 +1,4 @@
-﻿//! Resource repository
+//! Resource repository
 
 use rsws_common::error::RswsError;
 use rsws_common::snowflake::next_id;
@@ -115,6 +115,8 @@ impl ResourceRepository {
         &self,
         user_id: i64,
         req: &CreateResourceRequest,
+        owner_type: &str,
+        provider_id: i64,
     ) -> Result<Resource, RswsError> {
         // 鐢熸垚闆姳 ID
         let id = next_id();
@@ -123,7 +125,7 @@ impl ResourceRepository {
         let display_images_array: Option<Vec<String>> = req.display_images.clone();
 
         let resource = sqlx::query_as::<_, Resource>(
-            "INSERT INTO resources (id, user_id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, supported_os, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'user', $15, 0) RETURNING *"
+            "INSERT INTO resources (id, user_id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, supported_os, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 0) RETURNING *"
         )
         .bind(id)
         .bind(user_id)
@@ -139,7 +141,8 @@ impl ResourceRepository {
         .bind(&req.precautions)
         .bind(&display_images_array)
         .bind(&req.supported_os)
-        .bind(user_id) // provider_id = user_id for user-created resources
+        .bind(owner_type)
+        .bind(provider_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| RswsError::internal(format!("Failed to create resource: {}", e)))?;

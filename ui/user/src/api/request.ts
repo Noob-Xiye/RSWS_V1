@@ -20,7 +20,8 @@ request.interceptors.request.use(async (config) => {
     // 注意：只传 user_id，不传 api_key
     // 注意：不传 body，后端只读 query params 签名
     // 提取请求路径（不含 query params）用于签名防篡改
-    const requestPath = config.url || ''
+    // axios 的 config.url 不含 baseURL，需要拼接完整路径以匹配后端 req.uri().path()
+    const requestPath = (config.url ? `/api/v1/${config.url.replace(/^\//, '')}` : '')
     const signParams = generateSignParams({
       userId,
       apiKey,

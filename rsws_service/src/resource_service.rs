@@ -60,13 +60,15 @@ impl ResourceService {
         &self,
         req: CreateResourceRequest,
         user_id: i64,
+        owner_type: &str,
+        provider_id: i64,
     ) -> Result<Resource, RswsError> {
         // 验证价格
         if req.price < 0 {
             return Err(RswsError::business(ErrorCode::INVALID_PARAMETER));
         }
 
-        let resource = self.resource_repo.create(user_id, &req).await?;
+        let resource = self.resource_repo.create(user_id, &req, owner_type, provider_id).await?;
 
         info!("Resource created: {} by user {}", resource.id, user_id);
 

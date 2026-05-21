@@ -5,6 +5,10 @@ use salvo_oapi::ToSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+/// 资源归属类型常量
+pub const OWNER_TYPE_USER: &str = "user";
+pub const OWNER_TYPE_PLATFORM: &str = "platform";
+
 /// 资源
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Resource {

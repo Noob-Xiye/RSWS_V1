@@ -210,6 +210,8 @@ pub fn create_router(state: AppState) -> Router {
                         )
                         // 订单管理
                         .push(Router::with_path("orders").get(handler::order::admin_list_orders))
+                        // 平台资源管理
+                        .push(Router::with_path("resources").post(handler::admin::create_platform_resource))
                         // PayPal 配置管理
                         .push(
                             Router::with_path("paypal-configs")
