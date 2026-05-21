@@ -16,6 +16,7 @@ export interface Resource {
   usage_guide: string | null
   precautions: string | null
   display_images: string[] | null
+  supported_os: string[] | null
   provider_type: string
   provider_id: number | null
   commission_rate: number
@@ -62,4 +63,14 @@ export async function deleteResource(id: number): Promise<ApiResponse<void>> {
 // 切换资源上下架状态
 export async function toggleResourceActive(id: number, is_active: boolean): Promise<ApiResponse<Resource>> {
   return request.put(`/resource/${id}`, { is_active })
+}
+
+// 创建资源
+export async function createResource(data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
+  return request.post('/resource', data)
+}
+
+// 更新资源
+export async function updateResource(id: number, data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
+  return request.put(`/resource/${id}`, data)
 }

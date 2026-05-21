@@ -4,9 +4,14 @@
       <template #header>
         <div class="card-header">
           <span>资源管理</span>
-          <el-button type="primary" size="small" @click="fetchResources">
-            <el-icon><Refresh /></el-icon> 刷新
-          </el-button>
+          <div>
+            <el-button type="primary" size="small" @click="handleCreate">
+              <el-icon><Plus /></el-icon> 创建资源
+            </el-button>
+            <el-button size="small" @click="fetchResources">
+              <el-icon><Refresh /></el-icon> 刷新
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -61,13 +66,22 @@
           </template>
         </el-table-column>
         <el-table-column prop="download_count" label="下载量" width="90" align="center" />
+        <el-table-column label="支持系统" width="150">
+          <template #default="{ row }">
+            <el-tag v-for="os in row.supported_os || []" :key="os" size="small" style="margin-right: 2px">
+              {{ os === 'macos' ? 'macOS' : os === 'ios' ? 'iOS' : os.charAt(0).toUpperCase() + os.slice(1) }}
+            </el-tag>
+            <span v-if="!row.supported_os || row.supported_os.length === 0" class="text-muted">未设置</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="user_id" label="发布者ID" width="100" />
         <el-table-column prop="created_at" label="创建时间" width="170">
           <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" link @click="handleView(row)">详情</el-button>
+            <el-button type="primary" size="small" link @click="handleEdit(row)">编辑</el-button>
             <el-button
               :type="row.is_active ? 'warning' : 'success'"
               size="small" link
@@ -112,6 +126,12 @@
         <el-descriptions-item label="详细介绍" :span="2">{{ currentResource.detail_description || '无' }}</el-descriptions-item>
         <el-descriptions-item label="使用指南" :span="2">{{ currentResource.usage_guide || '无' }}</el-descriptions-item>
         <el-descriptions-item label="注意事项" :span="2">{{ currentResource.precautions || '无' }}</el-descriptions-item>
+        <el-descriptions-item label="支持系统" :span="2">
+          <el-tag v-for="os in currentResource.supported_os || []" :key="os" size="small" style="margin-right: 4px">
+            {{ os === 'macos' ? 'macOS' : os === 'ios' ? 'iOS' : os.charAt(0).toUpperCase() + os.slice(1) }}
+          </el-tag>
+          <span v-if="!currentResource.supported_os || currentResource.supported_os.length === 0" class="text-muted">未设置</span>
+        </el-descriptions-item>
         <el-descriptions-item label="创建时间" :span="1">{{ formatDate(currentResource.created_at) }}</el-descriptions-item>
         <el-descriptions-item label="更新时间" :span="1">{{ formatDate(currentResource.updated_at) }}</el-descriptions-item>
       </el-descriptions>
@@ -127,6 +147,42 @@
         <el-button type="danger" @click="handleDelete(currentResource!); detailVisible = false">
           删除此资源
         </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 创建/编辑资源对话框 -->
+    <el-dialog v-model="formVisible" :title="isEditing ? '编辑资源' : '创建资源'" width="800px">
+      <el-form :model="form" label-width="100px">
+        <el-form-item label="标题" required>
+          <el-input v-model="form.title" placeholder="请输入资源标题" />
+        </el-form-item>
+        <el-form-item label="分类">
+          <el-select v-model="form.category_id" placeholder="请选择分类" clearable>
+            <el-option v-for="cat in categoryOptions" :key="cat.id" :label="cat.name" :value="cat.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="价格 (USDT)" required>
+          <el-input-number v-model="form.price" :min="0" :precision="2" />
+        </el-form-item>
+        <el-form-item label="支持系统">
+          <el-checkbox-group v-model="form.supported_os">
+            <el-checkbox label="windows">Windows</el-checkbox>
+            <el-checkbox label="macos">macOS</el-checkbox>
+            <el-checkbox label="linux">Linux</el-checkbox>
+            <el-checkbox label="ios">iOS</el-checkbox>
+            <el-checkbox label="android">Android</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="form.description" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="详细介绍">
+          <el-input v-model="form.detail_description" type="textarea" :rows="5" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="formVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
   </div>
@@ -153,7 +209,20 @@ const searchForm = reactive({
 })
 
 const detailVisible = ref(false)
+const formVisible = ref(false)
+const isEditing = ref(false)
 const currentResource = ref<Resource | null>(null)
+const form = reactive({
+  id: undefined as number | undefined,
+  title: '',
+  description: '',
+  price: 0,
+  category_id: undefined as number | undefined,
+  supported_os: [] as string[],
+  detail_description: '',
+  usage_guide: '',
+  precautions: '',
+})
 
 /** 前端本地根据 is_active 过滤（后端列表不传 active 参数时返回全部） */
 const filteredResources = computed(() => {
@@ -213,6 +282,62 @@ function handleReset() {
 function handleView(row: Resource) {
   currentResource.value = row
   detailVisible.value = true
+}
+
+function handleCreate() {
+  isEditing.value = false
+  Object.assign(form, {
+    id: undefined,
+    title: '',
+    description: '',
+    price: 0,
+    category_id: undefined,
+    supported_os: [],
+    detail_description: '',
+    usage_guide: '',
+    precautions: '',
+  })
+  formVisible.value = true
+}
+
+function handleEdit(row: Resource) {
+  isEditing.value = true
+  Object.assign(form, {
+    id: row.id,
+    title: row.title,
+    description: row.description || '',
+    price: row.price / 100, // 分转元
+    category_id: row.category_id,
+    supported_os: row.supported_os || [],
+    detail_description: row.detail_description || '',
+    usage_guide: row.usage_guide || '',
+    precautions: row.precautions || '',
+  })
+  formVisible.value = true
+}
+
+async function handleSubmit() {
+  if (!form.title) {
+    ElMessage.warning('请输入资源标题')
+    return
+  }
+  try {
+    const payload = {
+      ...form,
+      price: Math.round(form.price * 100), // 元转分
+    }
+    if (isEditing.value && form.id) {
+      // await updateResource(form.id, payload)
+      ElMessage.success('更新成功（后端待实现）')
+    } else {
+      // await createResource(payload)
+      ElMessage.success('创建成功（后端待实现）')
+    }
+    formVisible.value = false
+    fetchResources()
+  } catch (err) {
+    ElMessage.error('操作失败')
+  }
 }
 
 async function handleToggle(row: Resource) {
