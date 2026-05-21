@@ -11,6 +11,7 @@
       </template>
 
       <el-table
+        ref="tableRef"
         :data="treeData"
         v-loading="loading"
         stripe
@@ -105,10 +106,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import Sortable from 'sortablejs'
 import type { Category } from '@/api/category'
-import { adminListCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
+import { adminListCategories, createCategory, updateCategory, deleteCategory, batchUpdateSort } from '@/api/category'
 
 interface TreeRow extends Category {
   children?: TreeRow[]
@@ -118,6 +120,8 @@ interface TreeRow extends Category {
 const loading = ref(false)
 const submitting = ref(false)
 const categories = ref<TreeRow[]>([])
+let sortableInstance: Sortable | null = null
+const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 
 // 构建树形数据
 const treeData = computed(() => {
@@ -185,6 +189,42 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
+
+function initSortable() {
+  nextTick(() => {
+    const el = tableRef.value?.$el?.querySelector('.el-table__body-wrapper tbody')
+    if (!el || sortableInstance) return
+
+    sortableInstance = Sortable.create(el, {
+      animation: 150,
+      handle: '.el-table__row', // 整行可拖
+      ghostClass: 'sortable-ghost',
+      onEnd: async (evt) => {
+        const { oldIndex, newIndex } = evt
+        if (oldIndex === newIndex) return
+
+        // 只处理顶级分类拖拽（简化）
+        const items = treeData.value
+        const moved = items.splice(oldIndex!, 1)[0]
+        items.splice(newIndex!, 0, moved)
+
+        // 更新排序
+        const orders = items.map((c, i) => ({ id: c.id, sort_order: i }))
+        try {
+          const res = await batchUpdateSort(orders)
+          if (res.code !== 0) {
+            ElMessage.error(res.msg || '排序失败')
+            fetchCategories() // 回滚
+          }
+        } catch {
+          ElMessage.error('排序失败')
+          fetchCategories()
+        }
+      },
+    })
+  })
+}
+
 async function fetchCategories() {
   loading.value = true
   try {
@@ -196,6 +236,7 @@ async function fetchCategories() {
     ElMessage.error('获取分类列表失败')
   } finally {
     loading.value = false
+    initSortable()
   }
 }
 
@@ -321,5 +362,10 @@ onMounted(() => fetchCategories())
 
 :deep(.inactive-row) {
   opacity: 0.5;
+}
+
+:deep(.sortable-ghost) {
+  opacity: 0.4;
+  background: #f0f9ff;
 }
 </style>
