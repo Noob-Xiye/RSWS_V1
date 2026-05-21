@@ -22,7 +22,7 @@ pub struct Resource {
     pub usage_guide: Option<String>,
     pub precautions: Option<String>,
     pub display_images: Option<serde_json::Value>,
-    pub provider_type: String,
+    pub owner_type: String,
     pub provider_id: Option<i64>,
     pub commission_rate: i64,
     pub download_count: i64,

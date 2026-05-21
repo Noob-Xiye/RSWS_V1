@@ -201,7 +201,7 @@ impl OrderRepository {
 
         let base_select = format!(
             r#"
-            SELECT o.id, o.user_id, u.nickname as user_name, u.email as user_email,
+            SELECT o.id, o.user_id, u.username as user_name, u.email as user_email,
                    o.resource_id, r.title as resource_title,
                    o.amount, o.status, o.payment_method,
                    o.created_at, o.updated_at, o.expired_at
