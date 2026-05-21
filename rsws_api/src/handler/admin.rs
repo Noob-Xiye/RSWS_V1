@@ -965,7 +965,7 @@ pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Re
 /// 收入图表
 #[endpoint(
     parameters(
-        ("days", description = "天数，默认30天"),
+        ("days", Query, description = "天数，默认30天"),
     ),
     responses(
         (status_code = 200, description = "获取成功"),
@@ -976,7 +976,7 @@ pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Respo
     let pool = &state.pool;
 
     // 解析参数
-    let days: i64 = req.param("days").unwrap_or(30).clamp(1, 365);
+    let days: i64 = req.query("days").unwrap_or(30).clamp(1, 365);
 
     // 查询每日收入
     let rows: Vec<(String, i64)> = match sqlx::query_as(
