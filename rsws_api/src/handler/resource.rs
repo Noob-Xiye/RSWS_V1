@@ -70,9 +70,6 @@ pub async fn list_resources(req: &mut Request, depot: &mut Depot, res: &mut Resp
 
 /// 获取资源详情
 #[endpoint(
-    parameters(
-        ("id", Path, description = "资源ID"),
-    ),
     responses(
         (status_code = 200, description = "成功"),
         (status_code = 404, description = "资源不存在"),
@@ -154,9 +151,6 @@ pub async fn create_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
 
 /// 更新资源
 #[endpoint(
-    parameters(
-        ("id", Path, description = "资源ID"),
-    ),
     request_body = UpdateResourceRequest,
     responses(
         (status_code = 200, description = "更新成功"),
@@ -208,9 +202,6 @@ pub async fn update_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
 
 /// 删除资源
 #[endpoint(
-    parameters(
-        ("id", Path, description = "资源ID"),
-    ),
     responses(
         (status_code = 200, description = "删除成功"),
         (status_code = 401, description = "未认证"),

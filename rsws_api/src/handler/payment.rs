@@ -259,9 +259,6 @@ pub async fn usdt_webhook(req: &mut Request, depot: &mut Depot, res: &mut Respon
 
 /// 获取 USDT 收款地址
 #[endpoint(
-    parameters(
-        ("network", Path, description = "网络类型: tron/ethereum"),
-    ),
     responses(
         (status_code = 200, description = "成功"),
         (status_code = 401, description = "未认证"),

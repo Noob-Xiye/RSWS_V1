@@ -65,9 +65,6 @@ pub async fn list_orders(req: &mut Request, depot: &mut Depot, res: &mut Respons
 
 /// 获取订单详情
 #[endpoint(
-    parameters(
-        ("id", Path, description = "订单ID"),
-    ),
     responses(
         (status_code = 200, description = "成功"),
         (status_code = 404, description = "订单不存在"),
@@ -226,9 +223,6 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
 
 /// 取消订单
 #[endpoint(
-    parameters(
-        ("id", Path, description = "订单ID"),
-    ),
     responses(
         (status_code = 200, description = "取消成功"),
         (status_code = 401, description = "未认证"),
@@ -269,9 +263,6 @@ pub async fn cancel_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
 
 /// 退款订单
 #[endpoint(
-    parameters(
-        ("id", Path, description = "订单ID"),
-    ),
     responses(
         (status_code = 200, description = "退款成功"),
         (status_code = 403, description = "非管理员"),
@@ -312,9 +303,6 @@ pub async fn refund_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
 
 /// 完成订单
 #[endpoint(
-    parameters(
-        ("id", Path, description = "订单ID"),
-    ),
     responses(
         (status_code = 200, description = "完成成功"),
         (status_code = 403, description = "非管理员"),
@@ -355,9 +343,6 @@ pub async fn complete_order(req: &mut Request, depot: &mut Depot, res: &mut Resp
 
 /// 检查订单状态（USDT 支付轮询）
 #[endpoint(
-    parameters(
-        ("id", Path, description = "订单ID"),
-    ),
     responses(
         (status_code = 200, description = "成功"),
         (status_code = 404, description = "订单不存在"),
@@ -396,9 +381,6 @@ pub async fn check_order_status(req: &mut Request, depot: &mut Depot, res: &mut 
 
 /// 检查用户是否已购买某资源
 #[endpoint(
-    parameters(
-        ("resource_id", Path, description = "资源ID"),
-    ),
     responses(
         (status_code = 200, description = "成功"),
         (status_code = 401, description = "未认证"),
@@ -441,9 +423,6 @@ pub async fn check_purchase(req: &mut Request, depot: &mut Depot, res: &mut Resp
 
 /// 获取资源下载信息
 #[endpoint(
-    parameters(
-        ("resource_id", Path, description = "资源ID"),
-    ),
     responses(
         (status_code = 200, description = "成功"),
         (status_code = 401, description = "未认证"),
