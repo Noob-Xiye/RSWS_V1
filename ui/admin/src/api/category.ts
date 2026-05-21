@@ -5,6 +5,8 @@ export interface Category {
   id: number
   name: string
   description: string | null
+  parent_id: number | null
+  path: string | null
   sort_order: number
   is_active: boolean
   resource_count?: number
@@ -16,6 +18,7 @@ export interface Category {
 export interface CreateCategoryRequest {
   name: string
   description?: string
+  parent_id?: number | null
   sort_order?: number
 }
 
@@ -23,6 +26,7 @@ export interface CreateCategoryRequest {
 export interface UpdateCategoryRequest {
   name?: string
   description?: string
+  parent_id?: number | null
   sort_order?: number
   is_active?: boolean
 }

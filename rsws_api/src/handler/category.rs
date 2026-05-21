@@ -2,7 +2,7 @@
 
 use crate::state::get_state;
 use rsws_common::{ResponseExt, RswsError};
-use rsws_db::category::CategoryRepository;
+use rsws_db::category::{CategoryRepository, CategoryTreeNode};
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
 use serde::Deserialize;
@@ -20,9 +20,13 @@ pub async fn list_categories(_req: &mut Request, depot: &mut Depot, res: &mut Re
     let repo = CategoryRepository::new(state.pool());
 
     match repo.find_all().await {
-        Ok(categories) => res.success(serde_json::json!({
-            "categories": categories
-        })),
+        Ok(categories) => {
+            let tree = CategoryRepository::build_tree(&categories);
+            res.success(serde_json::json!({
+                "categories": categories,
+                "tree": tree
+            }))
+        }
         Err(e) => res.error(RswsError::Database(e)),
     }
 }
@@ -33,6 +37,7 @@ pub async fn list_categories(_req: &mut Request, depot: &mut Depot, res: &mut Re
 pub struct CreateCategoryRequest {
     pub name: String,
     pub description: Option<String>,
+    pub parent_id: Option<i64>,
     pub sort_order: Option<i32>,
 }
 
@@ -40,6 +45,7 @@ pub struct CreateCategoryRequest {
 pub struct UpdateCategoryRequest {
     pub name: Option<String>,
     pub description: Option<String>,
+    pub parent_id: Option<Option<i64>>,
     pub sort_order: Option<i32>,
     pub is_active: Option<bool>,
 }
@@ -71,6 +77,8 @@ pub async fn admin_list_categories(_req: &mut Request, depot: &mut Depot, res: &
                     "id": cat.id,
                     "name": cat.name,
                     "description": cat.description,
+                    "parent_id": cat.parent_id,
+                    "path": cat.path,
                     "sort_order": cat.sort_order,
                     "is_active": cat.is_active,
                     "resource_count": count,
@@ -111,11 +119,11 @@ pub async fn create_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         return;
     }
 
-    let max_order = repo.max_sort_order().await.unwrap_or(0);
+    let max_order = repo.max_sort_order_under_parent(body.parent_id).await.unwrap_or(0);
     let sort_order = body.sort_order.unwrap_or(max_order + 1);
 
     match repo
-        .create(body.name.trim(), body.description.as_deref(), sort_order)
+        .create(body.name.trim(), body.description.as_deref(), body.parent_id, sort_order)
         .await
     {
         Ok(category) => res.success(category),
@@ -167,6 +175,7 @@ pub async fn update_category(req: &mut Request, depot: &mut Depot, res: &mut Res
             id,
             body.name.as_deref().map(|s| s.trim()),
             Some(desc_ref),
+            body.parent_id,
             body.sort_order,
             body.is_active,
         )

@@ -11,17 +11,19 @@
       </template>
 
       <el-table
-        :data="categories"
+        :data="treeData"
         v-loading="loading"
         stripe
         row-key="id"
+        :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
         :row-class-name="rowClassName"
+        default-expand-all
       >
-        <el-table-column prop="sort_order" label="排序" width="80" align="center" />
-        <el-table-column prop="name" label="分类名称" min-width="150" />
+        <el-table-column prop="name" label="分类名称" min-width="200" />
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ row.description || '-' }}</template>
         </el-table-column>
+        <el-table-column prop="sort_order" label="排序" width="80" align="center" />
         <el-table-column prop="resource_count" label="资源数" width="90" align="center" />
         <el-table-column prop="is_active" label="状态" width="90" align="center">
           <template #default="{ row }">
@@ -69,6 +71,16 @@
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入分类名称" maxlength="100" show-word-limit />
         </el-form-item>
+        <el-form-item label="父分类" prop="parent_id">
+          <el-select v-model="form.parent_id" placeholder="无（顶级分类）" clearable style="width: 100%">
+            <el-option
+              v-for="cat in parentOptions"
+              :key="cat.id"
+              :label="cat.name"
+              :value="cat.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input
             v-model="form.description"
@@ -93,14 +105,58 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import type { Category } from '@/api/category'
 import { adminListCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
 
+interface TreeRow extends Category {
+  children?: TreeRow[]
+  _switching?: boolean
+}
+
 const loading = ref(false)
 const submitting = ref(false)
-const categories = ref<(Category & { _switching?: boolean })[]>([])
+const categories = ref<TreeRow[]>([])
+
+// 构建树形数据
+const treeData = computed(() => {
+  const map = new Map<number, TreeRow>()
+  const roots: TreeRow[] = []
+
+  // 创建所有节点
+  categories.value.forEach(cat => {
+    map.set(cat.id, { ...cat, children: [] })
+  })
+
+  // 构建树
+  categories.value.forEach(cat => {
+    const node = map.get(cat.id)!
+    if (cat.parent_id && map.has(cat.parent_id)) {
+      map.get(cat.parent_id)!.children!.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+
+  return roots
+})
+
+// 父分类选项（排除自身及其后代）
+const parentOptions = computed(() => {
+  if (!editingCategory.value) return categories.value
+  const id = editingCategory.value.id
+  // 排除自身和后代
+  const descendantIds = new Set<number>()
+  const collectDescendants = (parentId: number) => {
+    descendantIds.add(parentId)
+    categories.value.forEach(c => {
+      if (c.parent_id === parentId) collectDescendants(c.id)
+    })
+  }
+  collectDescendants(id)
+  return categories.value.filter(c => !descendantIds.has(c.id))
+})
 
 // 对话框
 const dialogVisible = ref(false)
@@ -110,6 +166,7 @@ const formRef = ref<FormInstance>()
 const form = reactive({
   name: '',
   description: '',
+  parent_id: null as number | null,
   sort_order: 0,
 })
 
@@ -120,7 +177,7 @@ const rules: FormRules = {
   ],
 }
 
-function rowClassName({ row }: { row: Category & { _switching?: boolean } }) {
+function rowClassName({ row }: { row: TreeRow }) {
   return row.is_active ? '' : 'inactive-row'
 }
 
@@ -147,10 +204,12 @@ function openDialog(category?: Category) {
   if (category) {
     form.name = category.name
     form.description = category.description || ''
+    form.parent_id = category.parent_id
     form.sort_order = category.sort_order
   } else {
     form.name = ''
     form.description = ''
+    form.parent_id = null
     form.sort_order = Math.max(...categories.value.map(c => c.sort_order), 0) + 1
   }
   dialogVisible.value = true
@@ -167,6 +226,7 @@ async function handleSubmit() {
       const res = await updateCategory(editingCategory.value.id, {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
+        parent_id: form.parent_id,
         sort_order: form.sort_order,
       })
       if (res.code === 0) {
@@ -180,6 +240,7 @@ async function handleSubmit() {
       const res = await createCategory({
         name: form.name.trim(),
         description: form.description.trim() || undefined,
+        parent_id: form.parent_id,
         sort_order: form.sort_order,
       })
       if (res.code === 0) {
@@ -197,7 +258,7 @@ async function handleSubmit() {
   }
 }
 
-async function handleToggleStatus(category: Category & { _switching?: boolean }, val: boolean) {
+async function handleToggleStatus(category: TreeRow, val: boolean) {
   category._switching = true
   try {
     const res = await updateCategory(category.id, { is_active: val })
@@ -217,12 +278,12 @@ async function handleToggleStatus(category: Category & { _switching?: boolean },
 async function handleDelete(category: Category) {
   try {
     await ElMessageBox.confirm(
-      `确定删除分类「${category.name}」吗？此操作不可恢复。`,
+      `确定删除分类「${category.name}」吗？子分类将变为顶级分类。此操作不可恢复。`,
       '删除确认',
       { type: 'warning', confirmButtonText: '确定删除', cancelButtonText: '取消' }
     )
   } catch {
-    return // 用户取消
+    return
   }
 
   try {
