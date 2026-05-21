@@ -24,6 +24,7 @@ pub struct Resource {
     pub display_images: Option<serde_json::Value>,
     pub owner_type: String,
     pub provider_id: Option<i64>,
+    pub supported_os: Option<serde_json::Value>,
     pub commission_rate: i64,
     pub download_count: i64,
     pub created_at: DateTime<Utc>,
@@ -44,6 +45,7 @@ pub struct CreateResourceRequest {
     pub usage_guide: Option<String>,
     pub precautions: Option<String>,
     pub display_images: Option<Vec<String>>,
+    pub supported_os: Option<Vec<String>>,
 }
 
 /// 更新资源请求
@@ -61,6 +63,7 @@ pub struct UpdateResourceRequest {
     pub usage_guide: Option<String>,
     pub precautions: Option<String>,
     pub display_images: Option<Vec<String>>,
+    pub supported_os: Option<Vec<String>>,
 }
 
 /// 资源列表响应

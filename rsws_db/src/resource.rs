@@ -1,25 +1,25 @@
-//! Resource repository
+﻿//! Resource repository
 
 use rsws_common::error::RswsError;
 use rsws_common::snowflake::next_id;
 use rsws_model::resource::{CreateResourceRequest, Resource, UpdateResourceRequest};
 use sqlx::PgPool;
 
-/// 资源仓储
+/// 璧勬簮浠撳偍
 pub struct ResourceRepository {
     pool: PgPool,
 }
 
 impl ResourceRepository {
-    /// 创建资源仓储实例
+    /// 鍒涘缓璧勬簮浠撳偍瀹炰緥
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    /// 根据 ID 获取资源
+    /// 鏍规嵁 ID 鑾峰彇璧勬簮
     pub async fn get_by_id(&self, id: i64) -> Result<Option<Resource>, RswsError> {
         let resource = sqlx::query_as::<_, Resource>(
-            "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE id = $1 AND is_active = true",
+            "SELECT * FROM resources WHERE id = $1 AND is_active = true",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -29,7 +29,7 @@ impl ResourceRepository {
         Ok(resource)
     }
 
-    /// 获取资源列表
+    /// 鑾峰彇璧勬簮鍒楄〃
     pub async fn get_list(
         &self,
         category_id: Option<i64>,
@@ -40,7 +40,7 @@ impl ResourceRepository {
 
         let (resources, total) = if let Some(cat_id) = category_id {
             let resources = sqlx::query_as::<_, Resource>(
-                "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE category_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                "SELECT * FROM resources WHERE category_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT $2 OFFSET $3",
             )
             .bind(cat_id)
             .bind(page_size)
@@ -60,7 +60,7 @@ impl ResourceRepository {
             (resources, total.0)
         } else {
             let resources = sqlx::query_as::<_, Resource>(
-                "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE is_active = true ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                "SELECT * FROM resources WHERE is_active = true ORDER BY created_at DESC LIMIT $1 OFFSET $2",
             )
             .bind(page_size)
             .bind(offset)
@@ -82,7 +82,7 @@ impl ResourceRepository {
         Ok((resources, total))
     }
 
-    /// 获取用户上传的资源
+    /// 鑾峰彇鐢ㄦ埛涓婁紶鐨勮祫婧?
     pub async fn get_user_resources(
         &self,
         user_id: i64,
@@ -92,7 +92,7 @@ impl ResourceRepository {
         let offset = (page - 1) * page_size;
 
         let resources = sqlx::query_as::<_, Resource>(
-            "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            "SELECT * FROM resources WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
         )
         .bind(user_id)
         .bind(page_size)
@@ -110,20 +110,20 @@ impl ResourceRepository {
         Ok((resources, total.0))
     }
 
-    /// 创建资源
+    /// 鍒涘缓璧勬簮
     pub async fn create(
         &self,
         user_id: i64,
         req: &CreateResourceRequest,
     ) -> Result<Resource, RswsError> {
-        // 生成雪花 ID
+        // 鐢熸垚闆姳 ID
         let id = next_id();
 
-        // 将 display_images 从 Vec<String> 转换为 PostgreSQL 数组格式
+        // 灏?display_images 浠?Vec<String> 杞崲涓?PostgreSQL 鏁扮粍鏍煎紡
         let display_images_array: Option<Vec<String>> = req.display_images.clone();
 
         let resource = sqlx::query_as::<_, Resource>(
-            "INSERT INTO resources (id, user_id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'user', $14, 0) RETURNING id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at"
+            "INSERT INTO resources (id, user_id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, supported_os, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'user', $15, 0) RETURNING *"
         )
         .bind(id)
         .bind(user_id)
@@ -138,6 +138,7 @@ impl ResourceRepository {
         .bind(&req.usage_guide)
         .bind(&req.precautions)
         .bind(&display_images_array)
+        .bind(&req.supported_os)
         .bind(user_id) // provider_id = user_id for user-created resources
         .fetch_one(&self.pool)
         .await
@@ -146,19 +147,19 @@ impl ResourceRepository {
         Ok(resource)
     }
 
-    /// 更新资源
+    /// 鏇存柊璧勬簮
     pub async fn update(
         &self,
         id: i64,
         req: &UpdateResourceRequest,
     ) -> Result<Resource, RswsError> {
-        // 先获取当前资源
+        // 鍏堣幏鍙栧綋鍓嶈祫婧?
         let mut resource = self
             .get_by_id(id)
             .await?
             .ok_or_else(|| RswsError::internal("Resource not found".to_string()))?;
 
-        // 合并更新字段
+        // 鍚堝苟鏇存柊瀛楁
         if let Some(title) = &req.title {
             resource.title = title.clone();
         }
@@ -197,9 +198,9 @@ impl ResourceRepository {
                 Some(serde_json::to_value(display_images).unwrap_or(serde_json::Value::Null));
         }
 
-        // 更新数据库
+        // 鏇存柊鏁版嵁搴?
         let updated = sqlx::query_as::<_, Resource>(
-            "UPDATE resources SET title = $1, description = $2, price = $3, category_id = $4, file_url = $5, thumbnail_url = $6, is_active = $7, detail_description = $8, specifications = $9, usage_guide = $10, precautions = $11, display_images = $12, updated_at = NOW() WHERE id = $13 RETURNING id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at"
+            "UPDATE resources SET title = $1, description = $2, price = $3, category_id = $4, file_url = $5, thumbnail_url = $6, is_active = $7, detail_description = $8, specifications = $9, usage_guide = $10, precautions = $11, display_images = $12, supported_os = $13, updated_at = NOW() WHERE id = $14 RETURNING *"
         )
         .bind(&resource.title)
         .bind(&resource.description)
@@ -213,6 +214,7 @@ impl ResourceRepository {
         .bind(&resource.usage_guide)
         .bind(&resource.precautions)
         .bind(&resource.display_images)
+        .bind(&resource.supported_os)
         .bind(id)
         .fetch_one(&self.pool)
         .await
@@ -221,7 +223,7 @@ impl ResourceRepository {
         Ok(updated)
     }
 
-    /// 删除资源（软删除，设置 is_active = false）
+    /// 鍒犻櫎璧勬簮锛堣蒋鍒犻櫎锛岃缃?is_active = false锛?
     pub async fn delete(&self, id: i64) -> Result<(), RswsError> {
         sqlx::query("UPDATE resources SET is_active = false, updated_at = NOW() WHERE id = $1")
             .bind(id)
@@ -232,7 +234,7 @@ impl ResourceRepository {
         Ok(())
     }
 
-    /// 获取资源列表（支持关键词搜索）
+    /// 鑾峰彇璧勬簮鍒楄〃锛堟敮鎸佸叧閿瘝鎼滅储锛?
     pub async fn get_list_with_search(
         &self,
         category_id: Option<i64>,
@@ -242,13 +244,13 @@ impl ResourceRepository {
     ) -> Result<(Vec<Resource>, i64), RswsError> {
         let offset = (page - 1) * page_size;
 
-        // 构建 WHERE 条件
+        // 鏋勫缓 WHERE 鏉′欢
         let _base_where = "is_active = true";
         let (resources, total) = match (category_id, search) {
             (Some(cat_id), Some(kw)) => {
                 let kw_pattern = format!("%{}%", kw);
                 let resources = sqlx::query_as::<_, Resource>(
-                    "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE category_id = $1 AND is_active = true AND (title ILIKE $2 OR description ILIKE $2) ORDER BY created_at DESC LIMIT $3 OFFSET $4",
+                    "SELECT * FROM resources WHERE category_id = $1 AND is_active = true AND (title ILIKE $2 OR description ILIKE $2) ORDER BY created_at DESC LIMIT $3 OFFSET $4",
                 )
                 .bind(cat_id)
                 .bind(&kw_pattern)
@@ -271,7 +273,7 @@ impl ResourceRepository {
             }
             (Some(cat_id), None) => {
                 let resources = sqlx::query_as::<_, Resource>(
-                    "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE category_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                    "SELECT * FROM resources WHERE category_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT $2 OFFSET $3",
                 )
                 .bind(cat_id)
                 .bind(page_size)
@@ -293,7 +295,7 @@ impl ResourceRepository {
             (None, Some(kw)) => {
                 let kw_pattern = format!("%{}%", kw);
                 let resources = sqlx::query_as::<_, Resource>(
-                    "SELECT id, user_id, title, description, price, category_id, file_url, thumbnail_url, is_active, detail_description, specifications, usage_guide, precautions, display_images, provider_type, provider_id, commission_rate, created_at, updated_at FROM resources WHERE is_active = true AND (title ILIKE $1 OR description ILIKE $1) ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                    "SELECT * FROM resources WHERE is_active = true AND (title ILIKE $1 OR description ILIKE $1) ORDER BY created_at DESC LIMIT $2 OFFSET $3",
                 )
                 .bind(&kw_pattern)
                 .bind(page_size)
@@ -313,7 +315,7 @@ impl ResourceRepository {
                 (resources, total.0)
             }
             (None, None) => {
-                // 复用原有的无过滤查询
+                // 澶嶇敤鍘熸湁鐨勬棤杩囨护鏌ヨ
                 self.get_list(category_id, page, page_size).await?
             }
         };
@@ -321,7 +323,7 @@ impl ResourceRepository {
         Ok((resources, total))
     }
 
-    /// 递增资源下载计数
+    /// 閫掑璧勬簮涓嬭浇璁℃暟
     pub async fn increment_download_count(&self, resource_id: i64) -> Result<(), RswsError> {
         sqlx::query("UPDATE resources SET download_count = COALESCE(download_count, 0) + 1, updated_at = NOW() WHERE id = $1")
             .bind(resource_id)
@@ -331,7 +333,7 @@ impl ResourceRepository {
         Ok(())
     }
 
-    /// 获取基础统计（资源总数 + 已上线资源数 + 过去30天新增资源数）
+    /// 鑾峰彇鍩虹缁熻锛堣祫婧愭€绘暟 + 宸蹭笂绾胯祫婧愭暟 + 杩囧幓30澶╂柊澧炶祫婧愭暟锛?
     pub async fn get_basic_stats(&self) -> Result<(i64, i64, i64), RswsError> {
         let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM resources")
             .fetch_one(&self.pool)
@@ -357,15 +359,15 @@ impl ResourceRepository {
     }
 }
 
-// ==================== 单元测试 ====================
+// ==================== 鍗曞厓娴嬭瘯 ====================
 
 #[cfg(test)]
 mod tests {
 
     #[test]
     fn test_resource_repository_new() {
-        // 仅测试构造函数
+        // 浠呮祴璇曟瀯閫犲嚱鏁?
     }
 
-    // create, update, delete 方法需要数据库测试，这里省略
+    // create, update, delete 鏂规硶闇€瑕佹暟鎹簱娴嬭瘯锛岃繖閲岀渷鐣?
 }
