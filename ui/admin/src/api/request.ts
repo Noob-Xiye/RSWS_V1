@@ -23,9 +23,12 @@ request.interceptors.request.use(async (config) => {
     // 生成签名参数 (Cregis 方案)
     // 注意：只传 admin_id（后端存为 user_id），不传 api_key
     // 注意：不传 body，后端只读 query params 签名
+    // 提取请求路径（不含 query params）用于签名防篡改
+    const requestPath = config.url || ''
     const signParams = generateSignParams({
       adminId,
       apiKey,
+      path: requestPath,
     })
     
     // 将签名参数添加到查询参数
@@ -47,7 +50,21 @@ request.interceptors.request.use(async (config) => {
 // 响应拦截器
 request.interceptors.response.use(
   (response) => {
-    return response.data
+    const data = response.data
+    // 检查业务层错误码（后端返回 200，但 code !== 0）
+    if (data && data.code !== undefined && data.code !== 0) {
+      // 401 = 未登录 / 认证失败 → 清除本地状态并跳转登录页
+      if (data.code === 401 || (data.msg && data.msg.includes('未登录'))) {
+        removeApiKey()
+        removeAdminId()
+        // 避免重复跳转
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
+      }
+      return Promise.reject(data)
+    }
+    return data
   },
   (error) => {
     const { response } = error
@@ -56,9 +73,17 @@ request.interceptors.response.use(
       if (response.status === 401) {
         removeApiKey()
         removeAdminId()
-        window.location.href = '/login'
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
       }
       return Promise.reject(response.data || { message: '请求失败' })
+    }
+    // 网络错误（后端挂掉）也触发登出
+    removeApiKey()
+    removeAdminId()
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
     }
     return Promise.reject({ message: '网络错误' })
   }

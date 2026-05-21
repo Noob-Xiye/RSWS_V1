@@ -135,6 +135,15 @@ pub async fn api_key_auth(
             }
         }
 
+        // 将请求路径纳入签名（防路径篡改）
+        // 前端传 _path 参数参与签名，后端也用实际路径验证
+        let mut request_path = path.to_string();
+        // 去除尾部斜杠以保持一致
+        if request_path.ends_with('/') && request_path.len() > 1 {
+            request_path = request_path.trim_end_matches('/').to_string();
+        }
+        params.insert("_path".to_string(), request_path);
+
         let state = get_state(depot);
 
         // 用户签名认证

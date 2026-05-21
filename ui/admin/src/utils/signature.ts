@@ -57,6 +57,8 @@ export interface SignParams {
   adminId: string
   /** 签名密钥（不随请求传输） */
   apiKey: string
+  /** 请求路径（不含 query params，用于防路径篡改） */
+  path?: string
 }
 
 /**
@@ -75,11 +77,16 @@ export function generateSignParams(options: SignParams): Record<string, string> 
   const timestamp = getTimestamp()
   const nonce = generateNonce()
   
-  // 构建参数字典（只有 query params，不包含 body）
+  // 构建参数字典（query params + _path 防路径篡改）
   const params: Record<string, string> = {
     user_id: options.adminId,  // 后端统一用 user_id 字段
     timestamp: timestamp.toString(),
     nonce: nonce,
+  }
+  
+  // 包含路径参数（防路径篡改）
+  if (options.path) {
+    params._path = options.path
   }
   
   // 计算签名（使用 apiKey 作为签名密钥）
