@@ -12,6 +12,7 @@ use chrono::{DateTime, Duration, Utc};
 use rsws_common::{error_code::ErrorCode, ResponseExt, RswsError};
 use rsws_db::{order::OrderRepository, resource::ResourceRepository, user::UserRepository};
 use rsws_model::resource::CreateResourceRequest;
+use rsws_model::resource::UpdateResourceRequest;
 use rsws_model::user_models::admin::{AdminLoginResponse, DailyOrderCount, DashboardStats};
 use rsws_service::UpdateLogConfigRequest;
 use salvo::prelude::*;
@@ -1126,6 +1127,51 @@ pub async fn list_users(req: &mut Request, depot: &mut Depot, res: &mut Response
     }));
 }
 
+/// 管理员列出所有资源
+#[endpoint(
+    responses(
+        (status_code = 200, description = "成功"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 403, description = "非管理员"),
+    )
+)]
+pub async fn list_resources(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let _admin_id: i64 = match depot.get("user_id") {
+        Ok(id) => *id,
+        Err(_) => {
+            res.http_error(StatusCode::UNAUTHORIZED, "Not authenticated");
+            return;
+        }
+    };
+
+    let category_id: Option<i64> = req.query("category_id").unwrap_or(None);
+    let search: Option<String> = req.query("search").unwrap_or(None);
+    let page: i64 = req.query("page").unwrap_or(1);
+    let page_size: i64 = req.query("page_size").unwrap_or(20);
+
+    let state = get_state(depot);
+
+    let result = if search.as_ref().map_or(true, |s| s.is_empty()) {
+        state.resource_service.list(category_id, page, page_size).await
+    } else {
+        state.resource_service.search(category_id, search.as_deref(), page, page_size).await
+    };
+
+    match result {
+        Ok((resources, total)) => {
+            let total_pages = if page_size > 0 { (total + page_size - 1) / page_size } else { 1 };
+            res.success(serde_json::json!({
+                "items": resources,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+            }));
+        }
+        Err(e) => res.error(e),
+    }
+}
+
 /// 管理员创建平台资源
 #[endpoint(
     request_body = CreateResourceRequest,
@@ -1175,5 +1221,133 @@ pub async fn create_platform_resource(req: &mut Request, depot: &mut Depot, res:
                 format!("Invalid request: {}", e),
             );
         }
+    }
+}
+
+/// 管理员更新资源（任意资源，跳过归属校验）
+#[endpoint(
+    request_body = UpdateResourceRequest,
+    responses(
+        (status_code = 200, description = "更新成功"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "资源不存在"),
+    )
+)]
+pub async fn update_platform_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let id: i64 = req.param("id").unwrap_or(0);
+    if id <= 0 {
+        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid resource ID");
+        return;
+    }
+
+    let _admin_id: i64 = match depot.get("user_id") {
+        Ok(id) => *id,
+        Err(_) => {
+            res.http_error(StatusCode::UNAUTHORIZED, "Not authenticated");
+            return;
+        }
+    };
+
+    let body = req.parse_json::<UpdateResourceRequest>().await;
+    match body {
+        Ok(data) => {
+            let state = get_state(depot);
+            match state.resource_service.admin_update(id, data).await {
+                Ok(resource) => res.success(resource),
+                Err(e) => res.error(e),
+            }
+        }
+        Err(e) => {
+            res.error_msg(
+                RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
+                format!("Invalid request: {}", e),
+            );
+        }
+    }
+}
+
+/// 管理员删除资源（任意资源，跳过归属校验）
+#[endpoint(
+    responses(
+        (status_code = 200, description = "删除成功"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "资源不存在"),
+    )
+)]
+pub async fn delete_platform_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let id: i64 = req.param("id").unwrap_or(0);
+    if id <= 0 {
+        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid resource ID");
+        return;
+    }
+
+    let _admin_id: i64 = match depot.get("user_id") {
+        Ok(id) => *id,
+        Err(_) => {
+            res.http_error(StatusCode::UNAUTHORIZED, "Not authenticated");
+            return;
+        }
+    };
+
+    let state = get_state(depot);
+    match state.resource_service.admin_delete(id).await {
+        Ok(()) => {
+            res.success(serde_json::json!({
+                "id": id,
+                "message": "Resource deleted successfully by admin"
+            }));
+        }
+        Err(e) => res.error(e),
+    }
+}
+
+/// 管理员切换资源上下架
+#[endpoint(
+    responses(
+        (status_code = 200, description = "切换成功"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 403, description = "非管理员"),
+        (status_code = 404, description = "资源不存在"),
+    )
+)]
+pub async fn toggle_platform_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let id: i64 = req.param("id").unwrap_or(0);
+    if id <= 0 {
+        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid resource ID");
+        return;
+    }
+
+    let _admin_id: i64 = match depot.get("user_id") {
+        Ok(id) => *id,
+        Err(_) => {
+            res.http_error(StatusCode::UNAUTHORIZED, "Not authenticated");
+            return;
+        }
+    };
+
+    let state = get_state(depot);
+    // 先获取当前资源状态
+    let resource = match state.resource_service.get(id).await {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            res.error_msg(RswsError::from(ErrorCode::RESOURCE_NOT_FOUND), "Resource not found");
+            return;
+        }
+        Err(e) => {
+            res.error(e);
+            return;
+        }
+    };
+
+    let data = UpdateResourceRequest {
+        is_active: Some(!resource.is_active),
+        ..Default::default()
+    };
+
+    match state.resource_service.admin_update(id, data).await {
+        Ok(resource) => res.success(resource),
+        Err(e) => res.error(e),
     }
 }

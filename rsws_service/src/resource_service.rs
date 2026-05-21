@@ -119,4 +119,40 @@ impl ResourceService {
 
         Ok(())
     }
+
+    /// 删除资源（管理员，跳过归属校验）
+    pub async fn admin_delete(&self, resource_id: i64) -> Result<(), RswsError> {
+        // 仅检查资源是否存在
+        let _existing = self
+            .resource_repo
+            .get_by_id(resource_id)
+            .await?
+            .ok_or_else(|| RswsError::business(ErrorCode::RESOURCE_NOT_FOUND))?;
+
+        self.resource_repo.delete(resource_id).await?;
+
+        info!("Resource deleted by admin: {}", resource_id);
+
+        Ok(())
+    }
+
+    /// 管理员更新资源（跳过归属校验）
+    pub async fn admin_update(
+        &self,
+        resource_id: i64,
+        req: UpdateResourceRequest,
+    ) -> Result<Resource, RswsError> {
+        // 仅检查资源是否存在
+        let _existing = self
+            .resource_repo
+            .get_by_id(resource_id)
+            .await?
+            .ok_or_else(|| RswsError::business(ErrorCode::RESOURCE_NOT_FOUND))?;
+
+        let updated = self.resource_repo.update(resource_id, &req).await?;
+
+        info!("Resource updated by admin: {}", resource_id);
+
+        Ok(updated)
+    }
 }

@@ -192,7 +192,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Resource } from '@/api/resource'
-import { listResources, deleteResource, toggleResourceActive, getCategoryOptions } from '@/api/resource'
+import { listResources, deleteResource, toggleResourceActive, getCategoryOptions, createPlatformResource, updatePlatformResource, deletePlatformResource, togglePlatformResourceActive, listPlatformResources } from '@/api/resource'
 import type { Category } from '@/api/category'
 
 const loading = ref(false)
@@ -250,7 +250,7 @@ async function fetchResources() {
     if (searchForm.search) params.search = searchForm.search
     if (searchForm.category_id) params.category_id = searchForm.category_id
 
-    const res = await listResources(params)
+    const res = await listPlatformResources(params)
     if (res.code === 0 && res.data) {
       resources.value = res.data.items
       total.value = res.data.total
@@ -327,11 +327,11 @@ async function handleSubmit() {
       price: Math.round(form.price * 100), // 元转分
     }
     if (isEditing.value && form.id) {
-      // await updateResource(form.id, payload)
-      ElMessage.success('更新成功（后端待实现）')
+      await updatePlatformResource(form.id, payload)
+      ElMessage.success('更新成功')
     } else {
-      // await createResource(payload)
-      ElMessage.success('创建成功（后端待实现）')
+      await createPlatformResource(payload)
+      ElMessage.success('创建成功')
     }
     formVisible.value = false
     fetchResources()
@@ -346,7 +346,7 @@ async function handleToggle(row: Resource) {
     await ElMessageBox.confirm(`确定${action}资源「${row.title}」吗？`, `${action}确认`, {
       type: 'warning',
     })
-    const res = await toggleResourceActive(row.id, !row.is_active)
+    const res = await togglePlatformResourceActive(row.id)
     if (res.code === 0) {
       ElMessage.success(`${action}成功`)
       fetchResources()
@@ -363,7 +363,7 @@ async function handleDelete(row: Resource) {
       '删除确认',
       { type: 'danger', confirmButtonText: '确定删除', cancelButtonText: '取消' }
     )
-    const res = await deleteResource(row.id)
+    const res = await deletePlatformResource(row.id)
     if (res.code === 0) {
       ElMessage.success('删除成功')
       fetchResources()

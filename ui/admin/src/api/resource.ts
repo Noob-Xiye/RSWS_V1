@@ -45,6 +45,11 @@ export async function getCategoryOptions(): Promise<Category[]> {
   return []
 }
 
+// 获取资源列表（管理员，全部资源）
+export async function listPlatformResources(params?: ResourceListParams): Promise<ApiResponse<PaginatedResponse<Resource>>> {
+  return request.get('/admin/resources', { params })
+}
+
 // 获取资源列表
 export async function listResources(params?: ResourceListParams): Promise<ApiResponse<PaginatedResponse<Resource>>> {
   return request.get('/resource', { params })
@@ -73,4 +78,24 @@ export async function createResource(data: Partial<CreateResourceRequest>): Prom
 // 更新资源
 export async function updateResource(id: number, data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
   return request.put(`/resource/${id}`, data)
+}
+
+// 管理员创建平台资源
+export async function createPlatformResource(data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
+  return request.post('/admin/resources', data)
+}
+
+// 管理员更新资源
+export async function updatePlatformResource(id: number, data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
+  return request.put(`/admin/resources/${id}`, data)
+}
+
+// 管理员删除资源
+export async function deletePlatformResource(id: number): Promise<ApiResponse<void>> {
+  return request.delete(`/admin/resources/${id}`)
+}
+
+// 管理员切换资源上下架
+export async function togglePlatformResourceActive(id: number): Promise<ApiResponse<Resource>> {
+  return request.put(`/admin/resources/${id}/toggle-active`)
 }

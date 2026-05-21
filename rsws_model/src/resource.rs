@@ -53,7 +53,7 @@ pub struct CreateResourceRequest {
 }
 
 /// 更新资源请求
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct UpdateResourceRequest {
     pub title: Option<String>,
     pub description: Option<String>,
