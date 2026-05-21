@@ -2,7 +2,7 @@
 
 use crate::state::get_state;
 use rsws_common::{ResponseExt, RswsError};
-use rsws_db::category::{CategoryRepository, CategoryTreeNode};
+use rsws_db::category::CategoryRepository;
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
 use serde::Deserialize;

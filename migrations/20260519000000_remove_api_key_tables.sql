@@ -1,4 +1,4 @@
-﻿-- 删除 user_sessions 和 admin_api_keys 表 (API Key 改为纯 Redis 存储)
+-- 删除 user_sessions 和 admin_api_keys 表 (API Key 改为纯 Redis 存储)
 -- 日期: 2026-05-19
 
 -- 删除 user_sessions 表
