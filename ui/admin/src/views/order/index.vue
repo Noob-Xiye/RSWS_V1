@@ -40,7 +40,7 @@
           <template #default="{ row }">{{ row.resource_title || '-' }}</template>
         </el-table-column>
         <el-table-column prop="amount" label="金额 (USDT)" width="120">
-          <template #default="{ row }}">{{ (Number(row.amount) / 100).toFixed(2) }}</template>
+          <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
         </el-table-column>
         <el-table-column prop="payment_method" label="支付方式" width="120">
           <template #default="{ row }">{{ getPaymentMethod(row.payment_method) }}</template>
@@ -84,7 +84,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="支付方式">{{ getPaymentMethod(currentOrder.payment_method) }}</el-descriptions-item>
           <el-descriptions-item label="订单金额">
-            <span class="amount">{{ (Number(currentOrder.amount) / 100).toFixed(2) }} USDT</span>
+            <span class="amount">{{ formatAmount(currentOrder.amount) }} USDT</span>
           </el-descriptions-item>
           <el-descriptions-item label="买家">{{ currentOrder.user_name || '-' }}</el-descriptions-item>
           <el-descriptions-item label="买家邮箱">{{ currentOrder.user_email || '-' }}</el-descriptions-item>
@@ -135,6 +135,10 @@ function getPaymentMethod(method: string | null) {
   if (!method) return '-'
   const map: Record<string, string> = { paypal: 'PayPal', usdt_trc20: 'USDT-TRC20', usdt_erc20: 'USDT-ERC20' }
   return map[method] || method
+}
+
+function formatAmount(amount: number | string) {
+  return (Number(amount) / 100).toFixed(2)
 }
 
 function formatDate(dateStr: string) {
