@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use salvo_oapi::ToSchema;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -13,10 +14,9 @@ pub const OWNER_TYPE_PLATFORM: &str = "platform";
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Resource {
     pub id: i64,
-    pub user_id: i64,
     pub title: String,
     pub description: Option<String>,
-    pub price: i64,
+    pub price: Decimal,
     pub category_id: Option<i64>,
     pub file_url: Option<String>,
     pub thumbnail_url: Option<String>,
@@ -40,7 +40,7 @@ pub struct Resource {
 pub struct CreateResourceRequest {
     pub title: String,
     pub description: Option<String>,
-    pub price: i64,
+    pub price: Decimal,
     pub category_id: Option<i64>,
     pub file_url: Option<String>,
     pub thumbnail_url: Option<String>,
@@ -57,7 +57,7 @@ pub struct CreateResourceRequest {
 pub struct UpdateResourceRequest {
     pub title: Option<String>,
     pub description: Option<String>,
-    pub price: Option<i64>,
+    pub price: Option<Decimal>,
     pub category_id: Option<i64>,
     pub file_url: Option<String>,
     pub thumbnail_url: Option<String>,
@@ -90,7 +90,7 @@ mod tests {
         let req = CreateResourceRequest {
             title: "Test Resource".to_string(),
             description: Some("A test resource".to_string()),
-            price: 1000,
+            price: Decimal::new(1000, 0),
             category_id: None,
             file_url: None,
             thumbnail_url: None,
@@ -99,9 +99,10 @@ mod tests {
             usage_guide: None,
             precautions: None,
             display_images: None,
+            supported_os: None,
         };
 
         assert_eq!(req.title, "Test Resource");
-        assert_eq!(req.price, 1000);
+        assert_eq!(req.price, Decimal::new(1000, 0));
     }
 }

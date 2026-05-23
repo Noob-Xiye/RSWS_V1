@@ -1,6 +1,7 @@
 //! 支付模型
 
 use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
 use salvo_oapi::ToSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -26,7 +27,7 @@ pub struct Order {
     pub id: i64,
     pub user_id: i64,
     pub resource_id: i64,
-    pub amount: i64,
+    pub amount: Decimal,
     pub status: String,
     pub payment_method: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -40,7 +41,7 @@ pub struct OrderDetail {
     pub id: i64,
     pub user_id: i64,
     pub resource_id: i64,
-    pub amount: i64,
+    pub amount: Decimal,
     pub status: String,
     pub payment_method: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -66,7 +67,7 @@ pub struct AdminOrderDetail {
     pub user_email: Option<String>,
     pub resource_id: i64,
     pub resource_title: Option<String>,
-    pub amount: i64,
+    pub amount: Decimal,
     pub status: String,
     pub payment_method: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -95,7 +96,7 @@ pub struct PaymentTransaction {
     pub id: i64,
     pub order_id: i64,
     pub user_id: i64,
-    pub amount: i64,
+    pub amount: Decimal,
     pub currency: String,
     pub payment_method: String,
     pub provider_transaction_id: Option<String>,

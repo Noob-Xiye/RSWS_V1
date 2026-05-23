@@ -1,5 +1,7 @@
 //! 支付服务
 
+use rust_decimal::Decimal;
+
 use rsws_common::error::RswsError;
 use rsws_db::PaymentRepository;
 use std::sync::Arc;
@@ -21,7 +23,7 @@ impl PaymentService {
         &self,
         order_id: i64,
         user_id: i64,
-        amount: i64,
+        amount: Decimal,
         currency: &str,
         payment_method: &str,
     ) -> Result<i64, RswsError> {

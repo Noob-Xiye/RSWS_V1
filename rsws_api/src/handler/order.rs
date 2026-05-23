@@ -2,6 +2,7 @@
 //!
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
+use num_traits::cast::ToPrimitive;
 use crate::state::get_state;
 use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
 use salvo::prelude::*;
@@ -151,7 +152,7 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
                         match state
                             .paypal_service
                             .create_order(
-                                amount as f64 / 100.0, // 分转元
+                                amount.to_f64().unwrap_or(0.0),
                                 "USDT",
                                 &format!("Resource #{}", data.resource_id),
                                 order.id,

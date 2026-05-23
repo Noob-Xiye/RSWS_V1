@@ -1,5 +1,6 @@
 //! 订单仓储层
 
+use rust_decimal::Decimal;
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_common::snowflake;
@@ -22,7 +23,7 @@ impl OrderRepository {
         &self,
         user_id: i64,
         resource_id: i64,
-        amount: i64,
+        amount: Decimal,
         payment_method: &str,
         expire_minutes: i32,
     ) -> Result<Order, RswsError> {

@@ -1205,7 +1205,7 @@ pub async fn create_platform_resource(req: &mut Request, depot: &mut Depot, res:
 
             let state = get_state(depot);
 
-            match state.resource_service.create(data, admin_id, rsws_model::resource::OWNER_TYPE_PLATFORM, admin_id).await {
+            match state.resource_service.create(data, rsws_model::resource::OWNER_TYPE_PLATFORM, admin_id).await {
                 Ok(resource) => {
                     res.status_code(StatusCode::CREATED);
                     res.success(resource);

@@ -130,7 +130,7 @@ pub async fn create_resource(req: &mut Request, depot: &mut Depot, res: &mut Res
 
             let state = get_state(depot);
 
-            match state.resource_service.create(data, user_id, rsws_model::resource::OWNER_TYPE_USER, user_id).await {
+            match state.resource_service.create(data, rsws_model::resource::OWNER_TYPE_USER, user_id).await {
                 Ok(resource) => {
                     res.status_code(StatusCode::CREATED);
                     res.success(resource);

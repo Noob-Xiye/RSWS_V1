@@ -1,5 +1,6 @@
 //! 支付交易仓储层
 
+use rust_decimal::Decimal;
 use chrono::Utc;
 use rsws_common::error::RswsError;
 use rsws_common::snowflake;
@@ -22,7 +23,7 @@ impl PaymentRepository {
         &self,
         order_id: i64,
         user_id: i64,
-        amount: i64,
+        amount: Decimal,
         currency: &str,
         payment_method: &str,
     ) -> Result<PaymentTransaction, RswsError> {

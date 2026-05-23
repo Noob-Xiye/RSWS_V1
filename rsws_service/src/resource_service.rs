@@ -3,7 +3,7 @@
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_db::ResourceRepository;
-use rsws_model::resource::{CreateResourceRequest, Resource, UpdateResourceRequest};
+use rsws_model::resource::{CreateResourceRequest, Resource, UpdateResourceRequest, OWNER_TYPE_USER};
 use std::sync::Arc;
 use tracing::info;
 
@@ -59,18 +59,17 @@ impl ResourceService {
     pub async fn create(
         &self,
         req: CreateResourceRequest,
-        user_id: i64,
         owner_type: &str,
         provider_id: i64,
     ) -> Result<Resource, RswsError> {
         // 验证价格
-        if req.price < 0 {
+        if req.price < rust_decimal::Decimal::ZERO {
             return Err(RswsError::business(ErrorCode::INVALID_PARAMETER));
         }
 
-        let resource = self.resource_repo.create(user_id, &req, owner_type, provider_id).await?;
+        let resource = self.resource_repo.create(&req, owner_type, provider_id).await?;
 
-        info!("Resource created: {} by user {}", resource.id, user_id);
+        info!("Resource created: {} ({}:{})", resource.id, owner_type, provider_id);
 
         Ok(resource)
     }
@@ -89,7 +88,7 @@ impl ResourceService {
             .await?
             .ok_or_else(|| RswsError::business(ErrorCode::RESOURCE_NOT_FOUND))?;
 
-        if existing.user_id != user_id {
+        if existing.provider_id != Some(user_id) || existing.owner_type != OWNER_TYPE_USER {
             return Err(RswsError::business(ErrorCode::AUTH_PERMISSION_DENIED));
         }
 
@@ -109,7 +108,7 @@ impl ResourceService {
             .await?
             .ok_or_else(|| RswsError::business(ErrorCode::RESOURCE_NOT_FOUND))?;
 
-        if existing.user_id != user_id {
+        if existing.provider_id != Some(user_id) || existing.owner_type != OWNER_TYPE_USER {
             return Err(RswsError::business(ErrorCode::AUTH_PERMISSION_DENIED));
         }
 

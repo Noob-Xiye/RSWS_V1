@@ -3162,6 +3162,7 @@ dependencies = [
  "chrono",
  "deadpool-redis",
  "md5",
+ "num-traits",
  "rsws_common",
  "rsws_db",
  "rsws_model",

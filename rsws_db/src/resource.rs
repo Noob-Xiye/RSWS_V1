@@ -82,7 +82,7 @@ impl ResourceRepository {
         Ok((resources, total))
     }
 
-    /// 鑾峰彇鐢ㄦ埛涓婁紶鐨勮祫婧?
+    /// 获取用户上传的资源
     pub async fn get_user_resources(
         &self,
         user_id: i64,
@@ -92,7 +92,7 @@ impl ResourceRepository {
         let offset = (page - 1) * page_size;
 
         let resources = sqlx::query_as::<_, Resource>(
-            "SELECT * FROM resources WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            "SELECT * FROM resources WHERE owner_type = 'user' AND provider_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
         )
         .bind(user_id)
         .bind(page_size)
@@ -101,7 +101,7 @@ impl ResourceRepository {
         .await
         .map_err(|e| RswsError::internal(format!("Failed to get user resources: {}", e)))?;
 
-        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM resources WHERE user_id = $1")
+        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM resources WHERE owner_type = 'user' AND provider_id = $1")
             .bind(user_id)
             .fetch_one(&self.pool)
             .await
@@ -113,7 +113,6 @@ impl ResourceRepository {
     /// 鍒涘缓璧勬簮
     pub async fn create(
         &self,
-        user_id: i64,
         req: &CreateResourceRequest,
         owner_type: &str,
         provider_id: i64,
@@ -124,11 +123,14 @@ impl ResourceRepository {
         // 灏?display_images 浠?Vec<String> 杞崲涓?PostgreSQL 鏁扮粍鏍煎紡
         let display_images_array: Option<Vec<String>> = req.display_images.clone();
 
+        // supported_os: Vec<String> → serde_json::Value for JSONB column
+        let supported_os_json: Option<serde_json::Value> = req.supported_os.as_ref()
+            .map(|v| serde_json::Value::Array(v.iter().map(|s| serde_json::Value::String(s.clone())).collect()));
+
         let resource = sqlx::query_as::<_, Resource>(
-            "INSERT INTO resources (id, user_id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, supported_os, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 0) RETURNING *"
+            "INSERT INTO resources (id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, supported_os, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 0) RETURNING *"
         )
         .bind(id)
-        .bind(user_id)
         .bind(&req.title)
         .bind(&req.description)
         .bind(req.price)
@@ -140,7 +142,7 @@ impl ResourceRepository {
         .bind(&req.usage_guide)
         .bind(&req.precautions)
         .bind(&display_images_array)
-        .bind(&req.supported_os)
+        .bind(&supported_os_json)
         .bind(owner_type)
         .bind(provider_id)
         .fetch_one(&self.pool)

@@ -21,3 +21,4 @@ serde_json = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 md5 = "0.8.0"
+num-traits = "0.2"
