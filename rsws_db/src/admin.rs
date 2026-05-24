@@ -99,51 +99,74 @@ impl AdminRepository {
     /// 更新管理员信息
     pub async fn update_admin(&self, request: &UpdateAdminRequest) -> Result<Admin, RswsError> {
         let mut query_builder = sqlx::QueryBuilder::new("UPDATE admins SET ");
-        let mut separated = query_builder.separated(", ");
+        let mut needs_comma = false;
 
         if let Some(email) = &request.email {
-            separated.push("email = ");
-            separated.push_bind(email);
+            if needs_comma {
+                query_builder.push(", ");
+            }
+            query_builder.push("email = ").push_bind(email);
+            needs_comma = true;
         }
 
         if let Some(password) = &request.password {
+            if needs_comma {
+                query_builder.push(", ");
+            }
             let password_hash = PasswordService::hash(password)?;
-            separated.push("password_hash = ");
-            separated.push_bind(password_hash);
+            query_builder.push("password_hash = ").push_bind(password_hash);
+            needs_comma = true;
         }
 
         if let Some(username) = &request.username {
-            separated.push("username = ");
-            separated.push_bind(username);
+            if needs_comma {
+                query_builder.push(", ");
+            }
+            query_builder.push("username = ").push_bind(username);
+            needs_comma = true;
         }
 
         if let Some(avatar_url) = &request.avatar_url {
-            separated.push("avatar_url = ");
-            separated.push_bind(avatar_url);
+            if needs_comma {
+                query_builder.push(", ");
+            }
+            query_builder.push("avatar_url = ").push_bind(avatar_url);
+            needs_comma = true;
         }
 
         if let Some(is_active) = request.is_active {
-            separated.push("is_active = ");
-            separated.push_bind(is_active);
+            if needs_comma {
+                query_builder.push(", ");
+            }
+            query_builder.push("is_active = ").push_bind(is_active);
+            needs_comma = true;
         }
 
         if let Some(role) = &request.role {
-            separated.push("role = ");
-            separated.push_bind(role);
+            if needs_comma {
+                query_builder.push(", ");
+            }
+            query_builder.push("role = ").push_bind(role);
+            needs_comma = true;
         }
 
         if let Some(permissions) = &request.permissions {
-            separated.push("permissions = ");
-            separated.push_bind(
+            if needs_comma {
+                query_builder.push(", ");
+            }
+            query_builder.push("permissions = ").push_bind(
                 serde_json::to_value(permissions).unwrap_or(serde_json::Value::Array(vec![])),
             );
+            needs_comma = true;
         }
 
-        separated.push("updated_at = ");
-        separated.push_bind(Utc::now());
+        // Always update updated_at
+        if needs_comma {
+            query_builder.push(", ");
+        }
+        query_builder.push("updated_at = ").push_bind(Utc::now());
 
-        query_builder.push(" WHERE id = ");
-        query_builder.push_bind(request.id);
+        query_builder.push(" WHERE id = ").push_bind(request.id);
         query_builder.push(" RETURNING *");
 
         let query = query_builder.build_query_as::<Admin>();
