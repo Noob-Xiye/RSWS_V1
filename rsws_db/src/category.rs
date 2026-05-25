@@ -327,7 +327,7 @@ impl CategoryRepository {
 
         // Attach children to parents
         fn attach_children(
-            nodes: &mut Vec<CategoryTreeNode>,
+            nodes: &mut [CategoryTreeNode],
             children_map: &std::collections::HashMap<i64, Vec<CategoryTreeNode>>,
         ) {
             for node in nodes.iter_mut() {

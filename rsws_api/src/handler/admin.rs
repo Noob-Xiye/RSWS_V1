@@ -1151,7 +1151,7 @@ pub async fn list_resources(req: &mut Request, depot: &mut Depot, res: &mut Resp
 
     let state = get_state(depot);
 
-    let result = if search.as_ref().map_or(true, |s| s.is_empty()) {
+    let result = if search.as_ref().is_none_or(|s| s.is_empty()) {
         state
             .resource_service
             .list(category_id, page, page_size)
