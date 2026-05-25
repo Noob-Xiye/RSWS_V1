@@ -5,6 +5,7 @@ export interface AdminInfo {
   id: number
   email: string
   username: string
+  nickname: string
   avatar_url?: string
   role: string
   permissions: string[]

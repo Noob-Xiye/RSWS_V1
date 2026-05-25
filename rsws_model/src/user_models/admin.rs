@@ -11,6 +11,7 @@ pub struct Admin {
     pub email: String,
     pub password_hash: String,
     pub username: String,
+    pub nickname: String,
     pub avatar_url: Option<String>,
     pub is_active: bool,
     pub role: String,

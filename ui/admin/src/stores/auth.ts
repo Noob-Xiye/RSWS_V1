@@ -12,7 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const adminId = ref<string | null>(getAdminId())
 
   const isLoggedIn = computed(() => !!apiKey.value)
-  const adminName = computed(() => adminInfo.value?.email || (apiKey.value ? 'Admin' : '未登录'))
+  const adminName = computed(() => adminInfo.value?.nickname || adminInfo.value?.username || adminInfo.value?.email || (apiKey.value ? 'Admin' : '未登录'))
 
   async function login(email: string, password: string) {
     try {

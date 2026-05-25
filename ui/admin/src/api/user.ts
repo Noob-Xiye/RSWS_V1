@@ -5,6 +5,7 @@ export interface AdminUser {
   id: number
   email: string
   username: string
+  nickname: string
   avatar_url: string | null
   is_active: boolean
   created_at: string
