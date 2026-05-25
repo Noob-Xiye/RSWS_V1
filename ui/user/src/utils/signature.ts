@@ -84,11 +84,6 @@ export function generateSignParams(options: SignParams): Record<string, string> 
     nonce: nonce,
   }
   
-  // 包含路径参数（防路径篡改）
-  if (options.path) {
-    params._path = options.path
-  }
-  
   // 计算签名（使用 apiKey 作为签名密钥）
   const sign = generateSignature(params, options.apiKey)
   

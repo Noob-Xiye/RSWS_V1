@@ -77,17 +77,19 @@ export function generateSignParams(options: SignParams): Record<string, string> 
   const timestamp = getTimestamp()
   const nonce = generateNonce()
   
-  // 构建参数字典（query params + _path 防路径篡改）
+  // 构建参数字典（query params，不含 _path）
+  // 注意：路径签名暂未启用，与下方注释保持一致
+  // 如需启用，需前后端同步改造
   const params: Record<string, string> = {
     user_id: options.adminId,  // 后端统一用 user_id 字段
     timestamp: timestamp.toString(),
     nonce: nonce,
   }
   
-  // 包含路径参数（防路径篡改）
-  if (options.path) {
-    params._path = options.path
-  }
+  // 路径签名暂未启用（前后端需同步改造）
+  // if (options.path) {
+  //   params._path = options.path
+  // }
   
   // 计算签名（使用 apiKey 作为签名密钥）
   const sign = generateSignature(params, options.apiKey)

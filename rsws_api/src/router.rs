@@ -183,6 +183,12 @@ pub fn create_router(state: AppState) -> Router {
                         .push(Router::with_path("logs").push(
                             Router::with_path("system").get(handler::admin::query_system_logs),
                         ))
+                        // 邮件配置管理（单例，仅一个活跃配置）
+                        .push(
+                            Router::with_path("email-configs")
+                                .get(handler::admin::get_email_config)
+                                .put(handler::admin::update_email_config),
+                        )
                         // USDT 钱包配置
                         .push(
                             Router::with_path("usdt-wallets")
