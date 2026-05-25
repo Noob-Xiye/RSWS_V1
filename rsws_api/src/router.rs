@@ -50,7 +50,7 @@ pub fn create_router(state: AppState) -> Router {
                                     Router::with_path("send-code").post(handler::user::send_code),
                                 ), // POST /api/v1/user/send-code
                         )
-                        .push(Router::with_path("<id>").get(handler::user::get_user)),
+                        .push(Router::with_path("{id}").get(handler::user::get_user)),
                 )
                 // 资源相关（无认证的查询部分）
                 .push(
@@ -61,7 +61,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .post(handler::resource::create_resource),
                         )
                         .push(
-                            Router::with_path("<id>")
+                            Router::with_path("{id}")
                                 .get(handler::resource::get_resource)
                                 .put(handler::resource::update_resource)
                                 .delete(handler::resource::delete_resource)
@@ -86,7 +86,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .post(handler::order::create_order),
                         )
                         .push(
-                            Router::with_path("<id>")
+                            Router::with_path("{id}")
                                 .get(handler::order::get_order)
                                 .push(
                                     Router::with_path("cancel").post(handler::order::cancel_order),
@@ -125,34 +125,33 @@ pub fn create_router(state: AppState) -> Router {
                                 .push(
                                     Router::with_path("create").post(handler::admin::create_admin),
                                 )
+                                // 管理员详情 + 启停用 + 重置密码（{id} 必须在字面量路由之后）
+                                .push(
+                                    Router::with_path("{id}")
+                                        .get(handler::admin::get_admin)
+                                        .push(
+                                            Router::with_path("deactivate")
+                                                .post(handler::admin::deactivate_admin),
+                                        )
+                                        .push(
+                                            Router::with_path("activate")
+                                                .post(handler::admin::activate_admin),
+                                        )
+                                        .push(
+                                            Router::with_path("reset-password")
+                                                .post(handler::admin::reset_admin_password),
+                                        ),
+                                )
+                                // API Key 管理
                                 .push(
                                     Router::with_path("api-keys")
                                         .get(handler::admin::list_api_keys)
-                                        .post(handler::admin::create_api_key),
-                                )
-                                .push(
-                                    Router::with_path("<key_id>/api-keys")
-                                        .delete(handler::admin::delete_api_key),
-                                )
-                                .push(
-                                    Router::with_path("api-keys/<key_id>")
-                                        .put(handler::admin::toggle_api_key_status),
-                                ),
-                        )
-                        .push(
-                            Router::with_path("<id>")
-                                .get(handler::admin::get_admin)
-                                .push(
-                                    Router::with_path("deactivate")
-                                        .post(handler::admin::deactivate_admin),
-                                )
-                                .push(
-                                    Router::with_path("activate")
-                                        .post(handler::admin::activate_admin),
-                                )
-                                .push(
-                                    Router::with_path("reset-password")
-                                        .post(handler::admin::reset_admin_password),
+                                        .post(handler::admin::create_api_key)
+                                        .push(
+                                            Router::with_path("{key_id}")
+                                                .delete(handler::admin::delete_api_key)
+                                                .put(handler::admin::toggle_api_key_status),
+                                        ),
                                 ),
                         )
                         // 用户管理
@@ -160,11 +159,11 @@ pub fn create_router(state: AppState) -> Router {
                             Router::with_path("user")
                                 .get(handler::admin::list_users)
                                 .push(
-                                    Router::with_path("<id>/deactivate")
+                                    Router::with_path("{id}/deactivate")
                                         .post(handler::admin::deactivate_user),
                                 )
                                 .push(
-                                    Router::with_path("<id>/activate")
+                                    Router::with_path("{id}/activate")
                                         .post(handler::admin::activate_user),
                                 ),
                         )
@@ -175,21 +174,24 @@ pub fn create_router(state: AppState) -> Router {
                                 .post(handler::admin::create_log_config),
                         )
                         .push(
-                            Router::with_path("log-configs/<key>")
+                            Router::with_path("log-configs/{key}")
                                 .get(handler::admin::get_log_config)
                                 .put(handler::admin::update_log_config)
                                 .delete(handler::admin::delete_log_config),
                         )
                         // 日志查询
                         .push(
-                            Router::with_path("logs/system").get(handler::admin::query_system_logs),
+                            Router::with_path("logs")
+                                .push(
+                                    Router::with_path("system").get(handler::admin::query_system_logs),
+                                ),
                         )
                         // USDT 钱包配置
                         .push(
                             Router::with_path("usdt-wallets")
                                 .get(handler::admin::list_usdt_wallets)
                                 .push(
-                                    Router::with_path("<network>")
+                                    Router::with_path("{network}")
                                         .put(handler::admin::update_usdt_wallet),
                                 ),
                         )
@@ -200,7 +202,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .post(handler::category::create_category),
                         )
                         .push(
-                            Router::with_path("categories/<id>")
+                            Router::with_path("categories/{id}")
                                 .put(handler::category::update_category)
                                 .delete(handler::category::delete_category),
                         )
@@ -216,7 +218,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .get(handler::admin::list_resources)
                                 .post(handler::admin::create_platform_resource)
                                 .push(
-                                    Router::with_path("<id>")
+                                    Router::with_path("{id}")
                                         .put(handler::admin::update_platform_resource)
                                         .delete(handler::admin::delete_platform_resource)
                                         .push(
@@ -230,11 +232,11 @@ pub fn create_router(state: AppState) -> Router {
                             Router::with_path("paypal-configs")
                                 .get(handler::admin_paypal::list_paypal_configs)
                                 .push(
-                                    Router::with_path("<id>")
+                                    Router::with_path("{id}")
                                         .get(handler::admin_paypal::get_paypal_config)
                                         .put(handler::admin_paypal::update_paypal_config)
                                         .push(
-                                            Router::with_path("active/<active>").post(
+                                            Router::with_path("active/{active}").post(
                                                 handler::admin_paypal::set_paypal_config_active,
                                             ),
                                         ),
@@ -247,7 +249,7 @@ pub fn create_router(state: AppState) -> Router {
         // 支付相关（无需 API Key 认证）
         .push(
             Router::with_path("api/v1/payment")
-                .push(Router::with_path("usdt/<network>").get(handler::payment::get_usdt_address))
+                .push(Router::with_path("usdt/{network}").get(handler::payment::get_usdt_address))
                 .push(Router::with_path("paypal/success").get(handler::payment::paypal_success))
                 .push(Router::with_path("paypal/cancel").get(handler::payment::paypal_cancel)),
         )

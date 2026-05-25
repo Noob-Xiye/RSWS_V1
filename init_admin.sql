@@ -1,1 +1,0 @@
-INSERT INTO admins (email, password_hash, username, role) VALUES ('admin@rsws.com', '$argon2id$v=19$m=65536,t=3,p=4$L+/dXQTIi7veVbO1rQRp2A$lV4cC22TpY2BZStxEIAuUIWtcMLc5GJE33xTfjhQF78', 'admin', 'super_admin');

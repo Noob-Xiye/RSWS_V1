@@ -32,8 +32,24 @@ export function removeAdminId(): void {
   localStorage.removeItem(`${KEY_PREFIX}admin_id`)
 }
 
+// Admin Info（登录后获取的管理员信息，用于显示名称等）
+export function setAdminInfo(info: Record<string, unknown>): void {
+  localStorage.setItem(`${KEY_PREFIX}admin_info`, JSON.stringify(info))
+}
+
+export function getAdminInfo(): Record<string, unknown> | null {
+  const raw = localStorage.getItem(`${KEY_PREFIX}admin_info`)
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch { return null }
+}
+
+export function removeAdminInfo(): void {
+  localStorage.removeItem(`${KEY_PREFIX}admin_info`)
+}
+
 // 清除所有存储
 export function clearAll(): void {
   localStorage.removeItem(`${KEY_PREFIX}api_key`)
   localStorage.removeItem(`${KEY_PREFIX}admin_id`)
+  localStorage.removeItem(`${KEY_PREFIX}admin_info`)
 }

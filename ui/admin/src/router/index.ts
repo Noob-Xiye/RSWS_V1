@@ -13,53 +13,87 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     redirect: '/dashboard'
   },
+  // 数据概览
   {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard.vue'),
     meta: { requiresAuth: true, title: '数据概览' }
   },
+  // 用户管理
   {
-    path: '/user',
-    name: 'UserManagement',
+    path: '/users',
+    name: 'UserAccounts',
     component: () => import('@/views/user/index.vue'),
-    meta: { requiresAuth: true, title: '用户管理' }
+    meta: { requiresAuth: true, title: '用户账号', group: '用户管理' }
   },
   {
-    path: '/resource',
-    name: 'ResourceManagement',
+    path: '/user-api-keys',
+    name: 'UserApiKeys',
+    component: () => import('@/views/user-api-key/index.vue'),
+    meta: { requiresAuth: true, title: '用户 API Key', group: '用户管理' }
+  },
+  {
+    path: '/user-resources',
+    name: 'UserResources',
+    component: () => import('@/views/user-resource/index.vue'),
+    meta: { requiresAuth: true, title: '用户资源', group: '用户管理' }
+  },
+  {
+    path: '/user-orders',
+    name: 'UserOrders',
+    component: () => import('@/views/user-order/index.vue'),
+    meta: { requiresAuth: true, title: '用户订单', group: '用户管理' }
+  },
+  // 管理员管理
+  {
+    path: '/admins',
+    name: 'AdminAccounts',
+    component: () => import('@/views/admin/index.vue'),
+    meta: { requiresAuth: true, title: '管理员账号', group: '管理员管理' }
+  },
+  {
+    path: '/admin-api-keys',
+    name: 'AdminApiKeys',
+    component: () => import('@/views/admin-api-key/index.vue'),
+    meta: { requiresAuth: true, title: '管理员 API Key', group: '管理员管理' }
+  },
+  {
+    path: '/platform-resources',
+    name: 'PlatformResources',
     component: () => import('@/views/resource/index.vue'),
-    meta: { requiresAuth: true, title: '资源管理' }
+    meta: { requiresAuth: true, title: '平台资源', group: '管理员管理' }
   },
   {
-    path: '/order',
-    name: 'OrderManagement',
+    path: '/platform-orders',
+    name: 'PlatformOrders',
     component: () => import('@/views/order/index.vue'),
-    meta: { requiresAuth: true, title: '订单管理' }
+    meta: { requiresAuth: true, title: '平台订单', group: '管理员管理' }
+  },
+  // 系统设置
+  {
+    path: '/email-config',
+    name: 'EmailConfig',
+    component: () => import('@/views/email-config/index.vue'),
+    meta: { requiresAuth: true, title: '邮件配置', group: '系统设置' }
   },
   {
-    path: '/payment',
-    name: 'PaymentConfig',
-    component: () => import('@/views/payment/index.vue'),
-    meta: { requiresAuth: true, title: '支付配置' }
-  },
-  {
-    path: '/log',
+    path: '/logs',
     name: 'LogQuery',
     component: () => import('@/views/log/index.vue'),
-    meta: { requiresAuth: true, title: '日志查询' }
+    meta: { requiresAuth: true, title: '日志管理', group: '系统设置' }
   },
   {
-    path: '/category',
-    name: 'CategoryManagement',
-    component: () => import('@/views/category/index.vue'),
-    meta: { requiresAuth: true, title: '分类管理' }
+    path: '/payment-config',
+    name: 'PaymentConfig',
+    component: () => import('@/views/payment/index.vue'),
+    meta: { requiresAuth: true, title: '支付配置', group: '系统设置' }
   },
   {
-    path: '/admin',
-    name: 'AdminManagement',
-    component: () => import('@/views/admin/index.vue'),
-    meta: { requiresAuth: true, title: '管理员' }
+    path: '/settings',
+    name: 'SystemSettings',
+    component: () => import('@/views/settings/index.vue'),
+    meta: { requiresAuth: true, title: '系统设置', group: '系统设置' }
   },
   {
     path: '/:pathMatch(.*)*',
