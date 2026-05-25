@@ -3,7 +3,9 @@
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_db::ResourceRepository;
-use rsws_model::resource::{CreateResourceRequest, Resource, UpdateResourceRequest, OWNER_TYPE_USER};
+use rsws_model::resource::{
+    CreateResourceRequest, Resource, UpdateResourceRequest, OWNER_TYPE_USER,
+};
 use std::sync::Arc;
 use tracing::info;
 
@@ -67,9 +69,15 @@ impl ResourceService {
             return Err(RswsError::business(ErrorCode::INVALID_PARAMETER));
         }
 
-        let resource = self.resource_repo.create(&req, owner_type, provider_id).await?;
+        let resource = self
+            .resource_repo
+            .create(&req, owner_type, provider_id)
+            .await?;
 
-        info!("Resource created: {} ({}:{})", resource.id, owner_type, provider_id);
+        info!(
+            "Resource created: {} ({}:{})",
+            resource.id, owner_type, provider_id
+        );
 
         Ok(resource)
     }

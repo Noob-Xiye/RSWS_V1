@@ -1,8 +1,8 @@
 //! 资源模型
 
 use chrono::{DateTime, Utc};
-use salvo_oapi::ToSchema;
 use rust_decimal::Decimal;
+use salvo_oapi::ToSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 

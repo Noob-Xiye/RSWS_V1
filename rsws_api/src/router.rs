@@ -180,12 +180,9 @@ pub fn create_router(state: AppState) -> Router {
                                 .delete(handler::admin::delete_log_config),
                         )
                         // 日志查询
-                        .push(
-                            Router::with_path("logs")
-                                .push(
-                                    Router::with_path("system").get(handler::admin::query_system_logs),
-                                ),
-                        )
+                        .push(Router::with_path("logs").push(
+                            Router::with_path("system").get(handler::admin::query_system_logs),
+                        ))
                         // USDT 钱包配置
                         .push(
                             Router::with_path("usdt-wallets")

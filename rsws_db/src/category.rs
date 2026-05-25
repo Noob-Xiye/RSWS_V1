@@ -123,7 +123,9 @@ impl CategoryRepository {
         // Compute path with the actual id
         let actual_path = if let Some(pid) = parent_id {
             let parent = self.find_by_id(pid).await?;
-            let base = parent.and_then(|p| p.path).unwrap_or_else(|| format!("/{}", pid));
+            let base = parent
+                .and_then(|p| p.path)
+                .unwrap_or_else(|| format!("/{}", pid));
             format!("{}{}/", base, category.id)
         } else {
             format!("/{}/", category.id)
@@ -160,7 +162,9 @@ impl CategoryRepository {
         // Resolve new parent_id
         let new_parent_id = match &parent_id {
             Some(Some(pid)) => {
-                if *pid == id { return Err(sqlx::Error::RowNotFound); }
+                if *pid == id {
+                    return Err(sqlx::Error::RowNotFound);
+                }
                 let parent_cat = self.find_by_id(*pid).await?;
                 if let Some(p) = &parent_cat {
                     if let Some(ref p_path) = p.path {
@@ -185,7 +189,9 @@ impl CategoryRepository {
             match new_parent_id {
                 Some(pid) => {
                     let parent = self.find_by_id(pid).await?;
-                    let base = parent.and_then(|p| p.path).unwrap_or_else(|| format!("/{}", pid));
+                    let base = parent
+                        .and_then(|p| p.path)
+                        .unwrap_or_else(|| format!("/{}", pid));
                     format!("{}{}/", base, id)
                 }
                 None => format!("/{}/", id),
@@ -225,7 +231,9 @@ impl CategoryRepository {
             .await?;
         if result.rows_affected() > 0 {
             // Rebuild paths for orphaned children
-            self.rebuild_descendant_paths(id, &format!("/{}/", id)).await.ok();
+            self.rebuild_descendant_paths(id, &format!("/{}/", id))
+                .await
+                .ok();
         }
         Ok(result.rows_affected() > 0)
     }
@@ -254,7 +262,11 @@ impl CategoryRepository {
     }
 
     /// 重建所有后代的 path
-    async fn rebuild_descendant_paths(&self, parent_id: i64, parent_path: &str) -> Result<(), sqlx::Error> {
+    async fn rebuild_descendant_paths(
+        &self,
+        parent_id: i64,
+        parent_path: &str,
+    ) -> Result<(), sqlx::Error> {
         let children: Vec<Category> = sqlx::query_as::<_, Category>(
             r#"SELECT id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at
             FROM categories WHERE parent_id = $1"#,
@@ -279,18 +291,23 @@ impl CategoryRepository {
     /// 构建分类树（从扁平列表）
     pub fn build_tree(categories: &[Category]) -> Vec<CategoryTreeNode> {
         let mut root_nodes: Vec<CategoryTreeNode> = Vec::new();
-        let mut node_map: std::collections::HashMap<i64, CategoryTreeNode> = std::collections::HashMap::new();
+        let mut node_map: std::collections::HashMap<i64, CategoryTreeNode> =
+            std::collections::HashMap::new();
 
         // Create all nodes
         for cat in categories {
-            node_map.insert(cat.id, CategoryTreeNode {
-                category: cat.clone(),
-                children: Vec::new(),
-            });
+            node_map.insert(
+                cat.id,
+                CategoryTreeNode {
+                    category: cat.clone(),
+                    children: Vec::new(),
+                },
+            );
         }
 
         // Build tree
-        let mut children_map: std::collections::HashMap<i64, Vec<CategoryTreeNode>> = std::collections::HashMap::new();
+        let mut children_map: std::collections::HashMap<i64, Vec<CategoryTreeNode>> =
+            std::collections::HashMap::new();
         let mut ids: Vec<i64> = node_map.keys().cloned().collect();
         ids.sort();
 
@@ -326,9 +343,12 @@ impl CategoryRepository {
     }
 
     /// 获取指定父分类下的最大 sort_order
-    pub async fn max_sort_order_under_parent(&self, parent_id: Option<i64>) -> Result<i32, sqlx::Error> {
+    pub async fn max_sort_order_under_parent(
+        &self,
+        parent_id: Option<i64>,
+    ) -> Result<i32, sqlx::Error> {
         let result = sqlx::query_scalar::<_, Option<i32>>(
-            "SELECT MAX(sort_order) FROM categories WHERE parent_id IS NOT DISTINCT FROM $1"
+            "SELECT MAX(sort_order) FROM categories WHERE parent_id IS NOT DISTINCT FROM $1",
         )
         .bind(parent_id)
         .fetch_one(&self.pool)

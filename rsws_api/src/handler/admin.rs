@@ -1152,14 +1152,24 @@ pub async fn list_resources(req: &mut Request, depot: &mut Depot, res: &mut Resp
     let state = get_state(depot);
 
     let result = if search.as_ref().map_or(true, |s| s.is_empty()) {
-        state.resource_service.list(category_id, page, page_size).await
+        state
+            .resource_service
+            .list(category_id, page, page_size)
+            .await
     } else {
-        state.resource_service.search(category_id, search.as_deref(), page, page_size).await
+        state
+            .resource_service
+            .search(category_id, search.as_deref(), page, page_size)
+            .await
     };
 
     match result {
         Ok((resources, total)) => {
-            let total_pages = if page_size > 0 { (total + page_size - 1) / page_size } else { 1 };
+            let total_pages = if page_size > 0 {
+                (total + page_size - 1) / page_size
+            } else {
+                1
+            };
             res.success(serde_json::json!({
                 "items": resources,
                 "total": total,
@@ -1205,7 +1215,11 @@ pub async fn create_platform_resource(req: &mut Request, depot: &mut Depot, res:
 
             let state = get_state(depot);
 
-            match state.resource_service.create(data, rsws_model::resource::OWNER_TYPE_PLATFORM, admin_id).await {
+            match state
+                .resource_service
+                .create(data, rsws_model::resource::OWNER_TYPE_PLATFORM, admin_id)
+                .await
+            {
                 Ok(resource) => {
                     res.status_code(StatusCode::CREATED);
                     res.success(resource);
@@ -1237,7 +1251,10 @@ pub async fn create_platform_resource(req: &mut Request, depot: &mut Depot, res:
 pub async fn update_platform_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid resource ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid resource ID",
+        );
         return;
     }
 
@@ -1279,7 +1296,10 @@ pub async fn update_platform_resource(req: &mut Request, depot: &mut Depot, res:
 pub async fn delete_platform_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid resource ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid resource ID",
+        );
         return;
     }
 
@@ -1315,7 +1335,10 @@ pub async fn delete_platform_resource(req: &mut Request, depot: &mut Depot, res:
 pub async fn toggle_platform_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) {
     let id: i64 = req.param("id").unwrap_or(0);
     if id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid resource ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid resource ID",
+        );
         return;
     }
 
@@ -1332,7 +1355,10 @@ pub async fn toggle_platform_resource(req: &mut Request, depot: &mut Depot, res:
     let resource = match state.resource_service.get(id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            res.error_msg(RswsError::from(ErrorCode::RESOURCE_NOT_FOUND), "Resource not found");
+            res.error_msg(
+                RswsError::from(ErrorCode::RESOURCE_NOT_FOUND),
+                "Resource not found",
+            );
             return;
         }
         Err(e) => {

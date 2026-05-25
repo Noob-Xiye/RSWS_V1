@@ -114,7 +114,9 @@ impl AdminRepository {
                 query_builder.push(", ");
             }
             let password_hash = PasswordService::hash(password)?;
-            query_builder.push("password_hash = ").push_bind(password_hash);
+            query_builder
+                .push("password_hash = ")
+                .push_bind(password_hash);
             needs_comma = true;
         }
 

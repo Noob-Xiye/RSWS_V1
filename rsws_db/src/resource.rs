@@ -101,11 +101,13 @@ impl ResourceRepository {
         .await
         .map_err(|e| RswsError::internal(format!("Failed to get user resources: {}", e)))?;
 
-        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM resources WHERE owner_type = 'user' AND provider_id = $1")
-            .bind(user_id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| RswsError::internal(format!("Failed to count user resources: {}", e)))?;
+        let total: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM resources WHERE owner_type = 'user' AND provider_id = $1",
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to count user resources: {}", e)))?;
 
         Ok((resources, total.0))
     }
@@ -124,8 +126,13 @@ impl ResourceRepository {
         let display_images_array: Option<Vec<String>> = req.display_images.clone();
 
         // supported_os: Vec<String> → serde_json::Value for JSONB column
-        let supported_os_json: Option<serde_json::Value> = req.supported_os.as_ref()
-            .map(|v| serde_json::Value::Array(v.iter().map(|s| serde_json::Value::String(s.clone())).collect()));
+        let supported_os_json: Option<serde_json::Value> = req.supported_os.as_ref().map(|v| {
+            serde_json::Value::Array(
+                v.iter()
+                    .map(|s| serde_json::Value::String(s.clone()))
+                    .collect(),
+            )
+        });
 
         let resource = sqlx::query_as::<_, Resource>(
             "INSERT INTO resources (id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, supported_os, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 0) RETURNING *"

@@ -2,8 +2,8 @@
 //!
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
-use num_traits::cast::ToPrimitive;
 use crate::state::get_state;
+use num_traits::cast::ToPrimitive;
 use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
 use salvo::prelude::*;
 use salvo_oapi::endpoint;

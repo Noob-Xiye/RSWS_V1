@@ -11,11 +11,11 @@ use rsws_api::state::AppState;
 use rsws_common::config::load_config;
 use rsws_common::error::RswsError;
 use rsws_db::RedisPool;
-use salvo::prelude::*;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
-use std::convert::TryInto;
+use salvo::prelude::*;
 use salvo::Server;
 use sqlx::postgres::PgPoolOptions;
+use std::convert::TryInto;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
@@ -306,8 +306,6 @@ async fn main() -> Result<(), RswsError> {
                 })?,
         );
 
-
-
         // HTTP/3 (QuinnListener) - 需要 quinn feature
         if tls_config.http3 {
             use salvo::conn::quinn::QuinnListener;
@@ -326,8 +324,7 @@ async fn main() -> Result<(), RswsError> {
             let quinn_listener = QuinnListener::new(quinn_server_config, http3_addr.clone());
 
             // 先创建 HTTPS listener (未 bind)
-            let https_listener = TcpListener::new(addr.clone())
-                .rustls(rustls_config.clone());
+            let https_listener = TcpListener::new(addr.clone()).rustls(rustls_config.clone());
 
             // 组合两个 listener，然后一起 bind
             let joined = https_listener.join(quinn_listener);

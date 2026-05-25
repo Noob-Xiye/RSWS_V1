@@ -119,11 +119,19 @@ pub async fn create_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         return;
     }
 
-    let max_order = repo.max_sort_order_under_parent(body.parent_id).await.unwrap_or(0);
+    let max_order = repo
+        .max_sort_order_under_parent(body.parent_id)
+        .await
+        .unwrap_or(0);
     let sort_order = body.sort_order.unwrap_or(max_order + 1);
 
     match repo
-        .create(body.name.trim(), body.description.as_deref(), body.parent_id, sort_order)
+        .create(
+            body.name.trim(),
+            body.description.as_deref(),
+            body.parent_id,
+            sort_order,
+        )
         .await
     {
         Ok(category) => res.success(category),
