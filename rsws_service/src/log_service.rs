@@ -12,7 +12,7 @@ use sqlx::PgPool;
 /// 日志配置
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct LogConfig {
-    pub id: i32,
+    pub id: i64,
     pub config_key: String,
     pub config_value: String,
     pub config_type: String,
