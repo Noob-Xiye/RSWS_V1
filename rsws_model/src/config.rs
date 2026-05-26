@@ -9,7 +9,7 @@ use sqlx::FromRow;
 /// 系统配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SystemConfig {
-    pub id: i32,
+    pub id: i64,
     pub config_key: String,
     pub config_value: String,
     pub config_type: String,
@@ -22,7 +22,7 @@ pub struct SystemConfig {
 /// 邮件配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct EmailConfig {
-    pub id: i32,
+    pub id: i64,
     pub provider: String,
     pub host: Option<String>,
     pub port: Option<i32>,
@@ -39,7 +39,7 @@ pub struct EmailConfig {
 /// 区块链插件配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct BlockchainPluginConfig {
-    pub id: i32,
+    pub id: i64,
     pub plugin_name: String,
     pub network: String,
     pub rpc_url: Option<String>,
@@ -54,7 +54,7 @@ pub struct BlockchainPluginConfig {
 /// 下载插件配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct DownloadPluginConfig {
-    pub id: i32,
+    pub id: i64,
     pub plugin_name: String,
     pub storage_type: String,
     pub storage_config: Option<serde_json::Value>,

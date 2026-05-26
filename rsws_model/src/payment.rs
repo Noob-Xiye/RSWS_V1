@@ -182,7 +182,7 @@ pub struct VerifyPaymentResponse {
 /// PayPal 配置
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PayPalConfig {
-    pub id: i32,
+    pub id: i64,
     pub client_id: String,
     pub client_secret_encrypted: String,
     pub sandbox: bool,
