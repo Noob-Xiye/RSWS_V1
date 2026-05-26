@@ -91,7 +91,9 @@ impl AdminService {
             id: admin.id,
             email: admin.email,
             username: admin.username,
+            nickname: admin.nickname,
             avatar_url: admin.avatar_url,
+            is_active: admin.is_active,
             role: admin.role,
             permissions,
         })
@@ -112,7 +114,9 @@ impl AdminService {
             id: admin.id,
             email: admin.email,
             username: admin.username,
+            nickname: admin.nickname,
             avatar_url: admin.avatar_url,
+            is_active: admin.is_active,
             role: admin.role,
             permissions,
         })
@@ -209,7 +213,9 @@ impl AdminService {
                     id: admin.id,
                     email: admin.email,
                     username: admin.username,
+                    nickname: admin.nickname,
                     avatar_url: admin.avatar_url,
+                    is_active: admin.is_active,
                     role: admin.role,
                     permissions,
                 }

@@ -83,7 +83,9 @@ pub struct AdminInfo {
     pub id: i64,
     pub email: String,
     pub username: String,
+    pub nickname: String,
     pub avatar_url: Option<String>,
+    pub is_active: bool,
     pub role: String,
     pub permissions: Vec<String>,
 }

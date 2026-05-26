@@ -80,13 +80,8 @@ request.interceptors.response.use(
       }
       return Promise.reject(response.data || { message: '请求失败' })
     }
-    // 网络错误（后端挂掉）也触发登出
-    removeApiKey()
-    removeAdminId()
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
-    }
-    return Promise.reject({ message: '网络错误' })
+    // 网络错误 - 不清除登录态，不跳转登录页
+    return Promise.reject({ message: '网络错误，请检查网络连接' })
   }
 )
 
