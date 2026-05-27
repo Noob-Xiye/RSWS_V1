@@ -27,31 +27,26 @@ pub fn create_router(state: AppState) -> Router {
                 // 用户相关
                 .push(
                     Router::with_path("user")
+                        .push(Router::new().get(handler::user::get_current_user)) // GET /api/v1/user
+                        .push(Router::with_path("info").get(handler::user::get_current_user)) // GET /api/v1/user/info (前端对齐)
+                        .push(Router::with_path("register").post(handler::user::register)) // POST /api/v1/user/register
+                        .push(Router::with_path("login").post(handler::user::login)) // POST /api/v1/user/login
                         .push(
-                            Router::new()
-                                .get(handler::user::get_current_user) // GET /api/v1/user
-                                .push(
-                                    Router::with_path("info").get(handler::user::get_current_user),
-                                ) // GET /api/v1/user/info (前端对齐)
-                                .push(Router::with_path("register").post(handler::user::register))
-                                .push(Router::with_path("login").post(handler::user::login))
-                                .push(
-                                    Router::with_path("profile").put(handler::user::update_profile),
-                                )
-                                .push(
-                                    Router::with_path("password")
-                                        .put(handler::user::change_password),
-                                ) // PUT /api/v1/user/password
-                                .push(
-                                    Router::with_path("change-password")
-                                        .post(handler::user::change_password),
-                                ) // POST /api/v1/user/change-password (前端对齐)
-                                .push(
-                                    Router::with_path("send-code").post(handler::user::send_code),
-                                ), // POST /api/v1/user/send-code
-                        )
-                        .push(Router::with_path("{id}").get(handler::user::get_user)),
+                            Router::with_path("profile").put(handler::user::update_profile),
+                        ) // PUT /api/v1/user/profile
+                        .push(
+                            Router::with_path("password")
+                                .put(handler::user::change_password),
+                        ) // PUT /api/v1/user/password
+                        .push(
+                            Router::with_path("change-password")
+                                .post(handler::user::change_password),
+                        ) // POST /api/v1/user/change-password (前端对齐)
+                        .push(
+                            Router::with_path("send-code").post(handler::user::send_code),
+                        ), // POST /api/v1/user/send-code
                 )
+                .push(Router::with_path("user/{id}").get(handler::user::get_user))
                 // 资源相关（无认证的查询部分）
                 .push(
                     Router::with_path("resource")
@@ -196,9 +191,9 @@ pub fn create_router(state: AppState) -> Router {
 	                                            ),
 	                                        ),
 	                                ),
-	                        ),
-	                )
-        .push(
+	                        )
+	                        // 管理员管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）
+                        .push(
                             Router::new()
                                 .get(handler::admin::get_current_admin)
                                 .push(Router::with_path("list").get(handler::admin::list_admins))
@@ -247,8 +242,8 @@ pub fn create_router(state: AppState) -> Router {
                                         ),
                                 ),
                         )
-,
-	        )
+                )
+                )
         // 管理员登录（无需 API Key，使用邮箱+密码）
         .push(Router::with_path("api/v1/admin/login").post(handler::admin::login))
         // 支付相关（无需 API Key 认证）
