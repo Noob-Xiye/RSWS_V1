@@ -983,11 +983,11 @@ pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Respo
     // 查询每日收入
     let rows: Vec<(String, i64)> = match sqlx::query_as(
         r#"
-        SELECT DATE(completed_at AT TIME ZONE 'UTC')::text AS date, COALESCE(SUM(amount), 0)::bigint AS revenue
+        SELECT DATE(paid_at AT TIME ZONE 'UTC')::text AS date, COALESCE(SUM(amount), 0)::bigint AS revenue
         FROM orders
-        WHERE status = 'completed'
-          AND completed_at >= NOW() - make_interval(days => $1)
-        GROUP BY DATE(completed_at AT TIME ZONE 'UTC')
+        WHERE status IN ('paid', 'completed')
+          AND paid_at >= NOW() - (($1::text || ' days')::interval)
+        GROUP BY DATE(paid_at AT TIME ZONE 'UTC')
         ORDER BY date ASC
         "#,
     )
@@ -997,6 +997,7 @@ pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Respo
     {
         Ok(v) => v,
         Err(e) => {
+            eprintln!("REVENUE_CHART_ERROR: {}", e);
             res.error(RswsError::internal(format!("Failed to query revenue chart: {}", e)));
             return;
         }
