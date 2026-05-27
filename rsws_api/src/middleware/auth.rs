@@ -120,6 +120,7 @@ pub async fn api_key_auth(
         }
 
         // 收集所有参数用于签名验证（排除 sign 本身）
+        
         let mut params: std::collections::HashMap<String, String> =
             std::collections::HashMap::new();
         params.insert("user_id".to_string(), user_id_str);
@@ -127,10 +128,13 @@ pub async fn api_key_auth(
         params.insert("nonce".to_string(), nonce.clone());
 
         // 从查询参数收集其他业务参数
-        if let Some(query) = req.query::<std::collections::HashMap<String, String>>("") {
-            for (k, v) in query {
-                if k != "sign" && k != "user_id" && k != "timestamp" && k != "nonce" {
-                    params.insert(k, v);
+        // Salvo 正确写法：req.queries() 返回 HashMap<String, Vec<String>>
+        let query = req.queries();
+        for (k, v) in query {
+            if k != "sign" && k != "user_id" && k != "timestamp" && k != "nonce" {
+                // 取第一个值（查询参数通常只有一个值）
+                if let Some(first_value) = v.first() {
+                    params.insert(k.clone(), first_value.clone());
                 }
             }
         }

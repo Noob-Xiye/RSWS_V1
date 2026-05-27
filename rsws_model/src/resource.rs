@@ -29,7 +29,7 @@ pub struct Resource {
     pub owner_type: String,
     pub provider_id: Option<i64>,
     pub supported_os: Option<serde_json::Value>,
-    pub commission_rate: i64,
+    pub commission_rate: Decimal,
     pub download_count: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
