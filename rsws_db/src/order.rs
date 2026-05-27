@@ -303,7 +303,7 @@ impl OrderRepository {
                 })?;
 
         let total_revenue: (i64,) = sqlx::query_as(
-            "SELECT COALESCE(SUM(amount), 0) FROM orders WHERE status IN ('paid', 'completed')",
+            "SELECT COALESCE(SUM(amount), 0)::bigint FROM orders WHERE status IN ('paid', 'completed')",
         )
         .fetch_one(&self.pool)
         .await
@@ -317,7 +317,7 @@ impl OrderRepository {
         .map_err(|e| RswsError::internal(format!("Failed to count recent orders: {}", e)))?;
 
         let revenue_30d: (i64,) = sqlx::query_as(
-            "SELECT COALESCE(SUM(amount), 0) FROM orders WHERE status IN ('paid', 'completed') AND created_at >= NOW() - INTERVAL '30 days'"
+            "SELECT COALESCE(SUM(amount), 0)::bigint FROM orders WHERE status IN ('paid', 'completed') AND created_at >= NOW() - INTERVAL '30 days'"
         )
         .fetch_one(&self.pool)
         .await

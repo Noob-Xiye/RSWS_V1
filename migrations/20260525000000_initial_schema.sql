@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_method VARCHAR(50),
     payment_tx_id VARCHAR(255),
     paid_at TIMESTAMP WITH TIME ZONE,
+    expired_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -162,12 +163,18 @@ CREATE TABLE IF NOT EXISTS system_configs (
 CREATE TABLE IF NOT EXISTS paypal_configs (
     id BIGSERIAL PRIMARY KEY,
     client_id VARCHAR(255) NOT NULL,
-    client_secret VARCHAR(255) NOT NULL,
+    client_secret_encrypted VARCHAR(255) NOT NULL,
     mode VARCHAR(20) DEFAULT 'sandbox',
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+
+
+
+
+
 
 -- ========== menu_items ==========
 CREATE TABLE IF NOT EXISTS menu_items (
@@ -240,4 +247,63 @@ CREATE TABLE IF NOT EXISTS commission_records (
     status VARCHAR(20) DEFAULT 'pending',
     settled_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ========== blockchain_configs ==========
+CREATE TABLE IF NOT EXISTS blockchain_configs (
+    id BIGSERIAL PRIMARY KEY,
+    network VARCHAR(50) NOT NULL UNIQUE,
+    network_name VARCHAR(100) NOT NULL,
+    api_url VARCHAR(500) NOT NULL,
+    api_key_encrypted VARCHAR(500),
+    usdt_contract VARCHAR(255) NOT NULL,
+    min_confirmations INTEGER DEFAULT 3,
+    min_amount NUMERIC(20,6) DEFAULT 0,
+    max_amount NUMERIC(20,6) DEFAULT 1000000,
+    fee_rate NUMERIC(5,4) DEFAULT 0.0000,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ========== usdt_listen_configs ==========
+CREATE TABLE IF NOT EXISTS usdt_listen_configs (
+    id BIGSERIAL PRIMARY KEY,
+    network VARCHAR(50) NOT NULL UNIQUE,
+    api_url VARCHAR(500) NOT NULL,
+    api_key_encrypted VARCHAR(500),
+    usdt_contract VARCHAR(255) NOT NULL,
+    poll_interval_seconds INTEGER DEFAULT 30,
+    min_confirmations INTEGER DEFAULT 3,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ========== email_configs ==========
+CREATE TABLE IF NOT EXISTS email_configs (
+    id BIGSERIAL PRIMARY KEY,
+    provider VARCHAR(50) NOT NULL DEFAULT 'smtp',
+    host VARCHAR(255),
+    port INTEGER,
+    username VARCHAR(255),
+    password_encrypted VARCHAR(500),
+    use_tls BOOLEAN DEFAULT true,
+    from_email VARCHAR(255) NOT NULL,
+    from_name VARCHAR(255),
+    reply_to VARCHAR(255),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ========== paypal_configs ==========
+CREATE TABLE IF NOT EXISTS paypal_configs (
+    id BIGSERIAL PRIMARY KEY,
+    client_id VARCHAR(255) NOT NULL,
+    client_secret_encrypted VARCHAR(255) NOT NULL,
+    mode VARCHAR(20) DEFAULT 'sandbox',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
