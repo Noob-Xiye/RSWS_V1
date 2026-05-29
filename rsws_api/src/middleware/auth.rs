@@ -161,10 +161,29 @@ pub async fn api_key_auth(
             user_validate_result
         );
         match user_validate_result {
-            Ok(Some(api_key_record)) => {
-                depot.insert("user_id", api_key_record.user_id);
-                depot.insert("api_key_id", api_key_record.id);
-                depot.insert("is_admin", false);
+            Ok(Some(_api_key_record)) => {
+                // 用户签名验证通过
+                // 额外检查：是否同时是管理员？（admin login 也存了 CachedApiKey）
+                let admin_key_result = state
+                    .admin_service
+                    .validate_signature_by_admin_id(user_id, &params, &sign)
+                    .await;
+
+                let is_admin = admin_key_result.as_ref().map(|r| r.is_some()).unwrap_or(false);
+
+                depot.insert("user_id", user_id);
+                // Use admin key_id if admin, otherwise use user key_id
+                let key_id: i64 = if is_admin {
+                    if let Ok(Some(kid)) = admin_key_result.as_ref() {
+                        *kid
+                    } else {
+                        _api_key_record.id
+                    }
+                } else {
+                    _api_key_record.id
+                };
+                depot.insert("api_key_id", key_id);
+                depot.insert("is_admin", is_admin);
 
                 // Nonce 去重检查
                 let redis = state.config_service.redis_client();
@@ -179,11 +198,10 @@ pub async fn api_key_auth(
                     return;
                 }
 
-                let svc = state.api_key_service.clone();
-                let record_id = api_key_record.id;
-                tokio::spawn(async move {
-                    let _ = svc.update_last_used(record_id).await;
-                });
+                // 记录到审计日志
+                if is_admin {
+                    tracing::info!("Admin user_id={} passed auth for admin endpoint", user_id);
+                }
 
                 ctrl.call_next(req, depot, res).await;
                 return;

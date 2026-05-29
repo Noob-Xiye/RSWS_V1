@@ -77,6 +77,7 @@ pub async fn admin_list_categories(_req: &mut Request, depot: &mut Depot, res: &
                 categories_with_count.push(serde_json::json!({
                     "id": cat.id,
                     "name": cat.name,
+                    "slug": cat.slug,
                     "description": cat.description,
                     "parent_id": cat.parent_id,
                     "path": cat.path,
