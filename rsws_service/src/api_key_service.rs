@@ -13,14 +13,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// CachedApiKey stored in Redis
+/// CachedApiKey stored in Redis (same shape as CachedAdminApiKey)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedApiKey {
-    pub user_id: i64,
-    pub api_key_id: i64,
+    pub admin_id: i64,
+    pub key_id: i64,
     pub api_key: String,
+    pub role: String,
     pub permissions: Vec<String>,
-    pub rate_limit: i32,
+    pub rate_limit: Option<i32>,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -35,9 +36,9 @@ impl ApiKeyService {
         Self { redis }
     }
 
-    /// Redis key format: apikey:user:{user_id}
+    /// Redis key format: admin_apikey:{admin_id}
     fn redis_key(user_id: i64) -> String {
-        format!("apikey:user:{}", user_id)
+        format!("admin_apikey:{}", user_id)
     }
 
     /// Default session TTL (seconds): 7 days
@@ -57,11 +58,11 @@ impl ApiKeyService {
 
     /// Validate API Key by user_id (for signature verification)
     pub async fn validate_by_user_id(&self, user_id: i64) -> Result<Option<ApiKey>, RswsError> {
-        if let Some(cached) = self
-            .redis
-            .get_json::<CachedApiKey>(&Self::redis_key(user_id))
-            .await?
-        {
+        let key = Self::redis_key(user_id);
+        tracing::info!("validate_by_user_id: looking up key={} user_id={}", key, user_id);
+        let cached_result = self.redis.get_json::<CachedApiKey>(&key).await;
+        tracing::info!("validate_by_user_id: cached_result={:?}", cached_result);
+        if let Some(cached) = cached_result? {
             // Check expiry
             if let Some(expires) = cached.expires_at {
                 if expires < chrono::Utc::now() {
@@ -71,12 +72,12 @@ impl ApiKeyService {
             }
             // Reconstruct ApiKey from Redis cache
             return Ok(Some(ApiKey {
-                id: cached.api_key_id,
-                user_id: cached.user_id,
+                id: cached.key_id,
+                user_id: cached.admin_id,
                 api_key: cached.api_key,
                 name: String::new(),
                 permissions: serde_json::to_value(&cached.permissions).unwrap_or_default(),
-                rate_limit: cached.rate_limit,
+                rate_limit: cached.rate_limit.unwrap_or(1000),
                 last_used_at: None,
                 expires_at: cached.expires_at,
                 is_active: true,
@@ -103,13 +104,15 @@ impl ApiKeyService {
             .expires_in_days
             .map(|days| chrono::Utc::now() + chrono::Duration::days(days as i64));
 
-        // Build CachedApiKey
+        // Build CachedApiKey (same shape as CachedAdminApiKey)
+        let key_id = chrono::Utc::now().timestamp_millis();
         let cached = CachedApiKey {
-            user_id,
-            api_key_id: chrono::Utc::now().timestamp_millis(),
+            admin_id: user_id,
+            key_id,
             api_key: api_key.clone(),
+            role: String::new(),
             permissions: request.permissions.clone(),
-            rate_limit: request.rate_limit.unwrap_or(1000),
+            rate_limit: request.rate_limit,
             expires_at,
         };
 
@@ -120,11 +123,11 @@ impl ApiKeyService {
             .await?;
 
         Ok(ApiKeyResponse {
-            id: cached.api_key_id,
+            id: key_id,
             name: request.name,
             api_key,
             permissions: request.permissions,
-            rate_limit: cached.rate_limit,
+            rate_limit: cached.rate_limit.unwrap_or(1000),
             last_used_at: None,
             expires_at,
             is_active: true,
@@ -140,12 +143,12 @@ impl ApiKeyService {
             .await?
         {
             let api_key = ApiKey {
-                id: cached.api_key_id,
-                user_id: cached.user_id,
+                id: cached.key_id,
+                user_id: cached.admin_id,
                 api_key: cached.api_key,
                 name: String::new(),
                 permissions: serde_json::to_value(&cached.permissions).unwrap_or_default(),
-                rate_limit: cached.rate_limit,
+                rate_limit: cached.rate_limit.unwrap_or(1000),
                 last_used_at: None,
                 expires_at: cached.expires_at,
                 is_active: true,
