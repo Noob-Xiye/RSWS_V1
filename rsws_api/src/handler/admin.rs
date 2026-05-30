@@ -1520,14 +1520,14 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
             "#
         )
         .bind(data.provider.as_deref().unwrap_or("smtp"))
-        .bind(&data.host.as_deref().unwrap_or(""))
+        .bind(data.host.as_deref().unwrap_or(""))
         .bind(data.port.unwrap_or(465))
-        .bind(&data.username.as_deref().unwrap_or(""))
+        .bind(data.username.as_deref().unwrap_or(""))
         .bind(&password_encrypted)
         .bind(data.use_tls.unwrap_or(true))
-        .bind(&data.from_email.as_deref().unwrap_or(""))
-        .bind(&data.from_name.as_deref().unwrap_or(""))
-        .bind(&data.reply_to.as_deref().unwrap_or(""))
+        .bind(data.from_email.as_deref().unwrap_or(""))
+        .bind(data.from_name.as_deref().unwrap_or(""))
+        .bind(data.reply_to.as_deref().unwrap_or(""))
         .execute(&state.pool)
         .await
     };
