@@ -139,6 +139,7 @@ pub fn create_router(state: AppState) -> Router {
 	                        // USDT 钱包配置
 	                        .push(
 	                            Router::with_path("usdt-wallets")
+	                                .post(handler::admin::update_usdt_wallet)
 	                                .get(handler::admin::list_usdt_wallets)
 	                                .push(
 	                                    Router::with_path("{network}")
@@ -180,6 +181,7 @@ pub fn create_router(state: AppState) -> Router {
 	                        // PayPal 配置管理
 	                        .push(
 	                            Router::with_path("paypal-configs")
+	                                .post(handler::admin_paypal::create_paypal_config)
 	                                .get(handler::admin_paypal::list_paypal_configs)
 	                                .push(
 	                                    Router::with_path("{id}")
@@ -190,6 +192,16 @@ pub fn create_router(state: AppState) -> Router {
 	                                                handler::admin_paypal::set_paypal_config_active,
 	                                            ),
 	                                        ),
+	                                ),
+	                        )
+	                        // 支付方式管理
+	                        .push(
+	                            Router::with_path("payment-methods")
+	                                .get(handler::admin::list_payment_methods)
+	                                .post(handler::admin::create_payment_method)
+	                                .push(
+	                                    Router::with_path("{id}")
+	                                        .delete(handler::admin::delete_payment_method),
 	                                ),
 	                        )
 	                        // 管理员管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）

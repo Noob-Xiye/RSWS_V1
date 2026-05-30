@@ -100,8 +100,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listUsers } from '@/api/admin'
-import { listOrders } from '@/api/order'
+import { listUsers } from '@/api/user'
+import { adminListOrders as listOrders } from '@/api/order'
 
 const loading = ref(false)
 const orders = ref<any[]>([])

@@ -297,6 +297,37 @@ impl PayPalConfigRepository {
 
         Ok(())
     }
+
+    /// 创建 PayPal 配置
+    pub async fn create(
+        &self,
+        req: &rsws_model::payment::CreatePayPalConfigRequest,
+    ) -> Result<PayPalConfig, RswsError> {
+        let config = sqlx::query_as::<_, PayPalConfig>(
+            r#"INSERT INTO paypal_configs (
+                client_id, client_secret_encrypted, sandbox,
+                base_url, return_url, cancel_url, brand_name,
+                min_amount, max_amount, fee_rate, is_active
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING *"#,
+        )
+        .bind(&req.client_id)
+        .bind(&req.client_secret_encrypted)
+        .bind(req.sandbox)
+        .bind(&req.base_url)
+        .bind(&req.return_url)
+        .bind(&req.cancel_url)
+        .bind(&req.brand_name)
+        .bind(req.min_amount)
+        .bind(req.max_amount)
+        .bind(req.fee_rate)
+        .bind(req.is_active)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to create paypal config: {}", e)))?;
+
+        Ok(config)
+    }
 }
 
 // ==================== 单元测试 ====================

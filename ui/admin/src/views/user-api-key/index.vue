@@ -95,7 +95,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, View, Hide, CopyDocument } from '@element-plus/icons-vue'
-import { listUsers } from '@/api/admin'
+import { listUsers } from '@/api/user'
 
 const loading = ref(false)
 const creating = ref(false)

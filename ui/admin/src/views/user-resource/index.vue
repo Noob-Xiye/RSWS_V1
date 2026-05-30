@@ -100,7 +100,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listUsers } from '@/api/admin'
+import { listUsers } from '@/api/user'
 import { listResources } from '@/api/resource'
 import { adminListCategories } from '@/api/category'
 

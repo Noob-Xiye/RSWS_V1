@@ -218,6 +218,24 @@ pub struct UpdatePayPalConfigRequest {
     pub is_active: Option<bool>,
 }
 
+/// PayPal 配置创建请求
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreatePayPalConfigRequest {
+    pub client_id: String,
+    pub client_secret_encrypted: String,
+    pub sandbox: bool,
+    pub webhook_id: Option<String>,
+    pub webhook_secret_encrypted: Option<String>,
+    pub base_url: String,
+    pub return_url: String,
+    pub cancel_url: String,
+    pub brand_name: String,
+    pub min_amount: rust_decimal::Decimal,
+    pub max_amount: rust_decimal::Decimal,
+    pub fee_rate: rust_decimal::Decimal,
+    pub is_active: bool,
+}
+
 // ==================== 单元测试 ====================
 
 #[cfg(test)]

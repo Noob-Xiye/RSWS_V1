@@ -25,6 +25,23 @@ export interface Resource {
   updated_at: string
 }
 
+/** 创建/更新资源请求体 */
+export interface CreateResourceRequest {
+  title: string
+  description?: string | null
+  price: number
+  category_id?: number | null
+  file_url?: string | null
+  thumbnail_url?: string | null
+  detail_description?: string | null
+  specifications?: Record<string, any> | null
+  usage_guide?: string | null
+  precautions?: string | null
+  display_images?: string[] | null
+  supported_os?: string[] | null
+  is_active?: boolean
+}
+
 /** 资源列表项（含关联的展示字段） */
 export interface ResourceListItem extends Resource {
   /** category_name 由前端从分类列表关联填充 */
