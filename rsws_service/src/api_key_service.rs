@@ -59,7 +59,11 @@ impl ApiKeyService {
     /// Validate API Key by user_id (for signature verification)
     pub async fn validate_by_user_id(&self, user_id: i64) -> Result<Option<ApiKey>, RswsError> {
         let key = Self::redis_key(user_id);
-        tracing::info!("validate_by_user_id: looking up key={} user_id={}", key, user_id);
+        tracing::info!(
+            "validate_by_user_id: looking up key={} user_id={}",
+            key,
+            user_id
+        );
         let cached_result = self.redis.get_json::<CachedApiKey>(&key).await;
         tracing::info!("validate_by_user_id: cached_result={:?}", cached_result);
         if let Some(cached) = cached_result? {

@@ -1404,7 +1404,7 @@ pub async fn get_email_config(_req: &mut Request, depot: &mut Depot, res: &mut R
                 "reply_to": cfg.reply_to,
             }))
         }
-        Ok(None) => res.success(()),  // 未配置
+        Ok(None) => res.success(()), // 未配置
         Err(e) => res.error(e),
     }
 }
@@ -1442,33 +1442,33 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
     };
 
     let state = get_state(depot);
-    
+
     // 先停用所有现有配置
     let _ = sqlx::query("UPDATE email_configs SET is_active = false")
         .execute(&state.pool)
         .await;
 
     // 检查是否有活跃配置
-    let existing: Option<(i64,)> = sqlx::query_as(
-        "SELECT id FROM email_configs WHERE is_active = true LIMIT 1"
-    )
-    .fetch_optional(&state.pool)
-    .await
-    .ok().flatten();
+    let existing: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM email_configs WHERE is_active = true LIMIT 1")
+            .fetch_optional(&state.pool)
+            .await
+            .ok()
+            .flatten();
 
     let password_encrypted = match &data.password {
-        Some(pwd) => pwd.clone(),  // TODO: 实际应使用加密，暂明文存储
+        Some(pwd) => pwd.clone(), // TODO: 实际应使用加密，暂明文存储
         None => {
             // 保留现有密码
             match &existing {
                 Some((id,)) => {
-                    let row: Option<(String,)> = sqlx::query_as(
-                        "SELECT password_encrypted FROM email_configs WHERE id = "
-                    )
-                    .bind(id)
-                    .fetch_optional(&state.pool)
-                    .await
-                    .ok().flatten();
+                    let row: Option<(String,)> =
+                        sqlx::query_as("SELECT password_encrypted FROM email_configs WHERE id = ")
+                            .bind(id)
+                            .fetch_optional(&state.pool)
+                            .await
+                            .ok()
+                            .flatten();
                     row.map(|r| r.0).unwrap_or_default()
                 }
                 None => String::new(),
@@ -1480,15 +1480,34 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
         // 更新现有
         let mut q = sqlx::QueryBuilder::new("UPDATE email_configs SET ");
         let mut sep = q.separated(", ");
-        if let Some(v) = &data.provider { sep.push("provider = ").push_bind(v); }
-        if let Some(v) = &data.host { sep.push("host = ").push_bind(v); }
-        if let Some(v) = &data.port { sep.push("port = ").push_bind(v); }
-        if let Some(v) = &data.username { sep.push("username = ").push_bind(v); }
-        if data.password.is_some() { sep.push("password_encrypted = ").push_bind(&password_encrypted); }
-        if let Some(v) = &data.use_tls { sep.push("use_tls = ").push_bind(v); }
-        if let Some(v) = &data.from_email { sep.push("from_email = ").push_bind(v); }
-        if let Some(v) = &data.from_name { sep.push("from_name = ").push_bind(v); }
-        if let Some(v) = &data.reply_to { sep.push("reply_to = ").push_bind(v); }
+        if let Some(v) = &data.provider {
+            sep.push("provider = ").push_bind(v);
+        }
+        if let Some(v) = &data.host {
+            sep.push("host = ").push_bind(v);
+        }
+        if let Some(v) = &data.port {
+            sep.push("port = ").push_bind(v);
+        }
+        if let Some(v) = &data.username {
+            sep.push("username = ").push_bind(v);
+        }
+        if data.password.is_some() {
+            sep.push("password_encrypted = ")
+                .push_bind(&password_encrypted);
+        }
+        if let Some(v) = &data.use_tls {
+            sep.push("use_tls = ").push_bind(v);
+        }
+        if let Some(v) = &data.from_email {
+            sep.push("from_email = ").push_bind(v);
+        }
+        if let Some(v) = &data.from_name {
+            sep.push("from_name = ").push_bind(v);
+        }
+        if let Some(v) = &data.reply_to {
+            sep.push("reply_to = ").push_bind(v);
+        }
         sep.push("updated_at = NOW()");
         q.push(" WHERE id = ").push_bind(id);
         q.build().execute(&state.pool).await
@@ -1519,12 +1538,12 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
             let _ = state.config_service.get_email_config().await;
             res.success(serde_json::json!({"success": true}))
         }
-        Err(e) => res.error(RswsError::internal(format!("Failed to update email config: {}", e))),
+        Err(e) => res.error(RswsError::internal(format!(
+            "Failed to update email config: {}",
+            e
+        ))),
     }
 }
-
-
-
 
 // ========== 支付方式管理 ==========
 
@@ -1570,7 +1589,10 @@ pub async fn list_payment_methods(_req: &mut Request, depot: &mut Depot, res: &m
                 .collect();
             res.success(serde_json::json!(list))
         }
-        Err(e) => res.error(RswsError::internal(format!("Failed to list payment methods: {}", e))),
+        Err(e) => res.error(RswsError::internal(format!(
+            "Failed to list payment methods: {}",
+            e
+        ))),
     }
 }
 
@@ -1596,7 +1618,10 @@ pub async fn create_payment_method(req: &mut Request, depot: &mut Depot, res: &m
     let data = match body {
         Ok(d) => d,
         Err(e) => {
-            res.http_error(salvo::http::StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
+            res.http_error(
+                salvo::http::StatusCode::BAD_REQUEST,
+                format!("Invalid request: {}", e),
+            );
             return;
         }
     };
@@ -1614,7 +1639,10 @@ pub async fn create_payment_method(req: &mut Request, depot: &mut Depot, res: &m
     .await;
     match result {
         Ok(_) => res.success(serde_json::json!({"success": true})),
-        Err(e) => res.error(RswsError::internal(format!("Failed to create payment method: {}", e))),
+        Err(e) => res.error(RswsError::internal(format!(
+            "Failed to create payment method: {}",
+            e
+        ))),
     }
 }
 
@@ -1636,13 +1664,18 @@ pub async fn delete_payment_method(req: &mut Request, depot: &mut Depot, res: &m
         }
     };
     // 软删除：设为禁用
-    let result = sqlx::query("UPDATE payment_methods SET is_enabled = false, updated_at = NOW() WHERE id = $1")
-        .bind(id)
-        .execute(&state.pool)
-        .await;
+    let result = sqlx::query(
+        "UPDATE payment_methods SET is_enabled = false, updated_at = NOW() WHERE id = $1",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await;
     match result {
         Ok(r) if r.rows_affected() > 0 => res.success(serde_json::json!({"success": true})),
         Ok(_) => res.error(RswsError::not_found("Payment method not found")),
-        Err(e) => res.error(RswsError::internal(format!("Failed to delete payment method: {}", e))),
+        Err(e) => res.error(RswsError::internal(format!(
+            "Failed to delete payment method: {}",
+            e
+        ))),
     }
 }

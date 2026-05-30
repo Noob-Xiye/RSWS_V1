@@ -133,13 +133,7 @@ pub async fn create_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         .trim()
         .to_lowercase()
         .chars()
-        .map(|c| {
-            if c.is_alphanumeric() {
-                c
-            } else {
-                '-'
-            }
-        })
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())

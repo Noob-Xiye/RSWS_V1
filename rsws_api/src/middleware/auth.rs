@@ -120,7 +120,7 @@ pub async fn api_key_auth(
         }
 
         // 收集所有参数用于签名验证（排除 sign 本身）
-        
+
         let mut params: std::collections::HashMap<String, String> =
             std::collections::HashMap::new();
         params.insert("user_id".to_string(), user_id_str);
@@ -169,7 +169,10 @@ pub async fn api_key_auth(
                     .validate_signature_by_admin_id(user_id, &params, &sign)
                     .await;
 
-                let is_admin = admin_key_result.as_ref().map(|r| r.is_some()).unwrap_or(false);
+                let is_admin = admin_key_result
+                    .as_ref()
+                    .map(|r| r.is_some())
+                    .unwrap_or(false);
 
                 depot.insert("user_id", user_id);
                 // Use admin key_id if admin, otherwise use user key_id

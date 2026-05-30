@@ -31,20 +31,13 @@ pub fn create_router(state: AppState) -> Router {
                         .push(Router::with_path("info").get(handler::user::get_current_user)) // GET /api/v1/user/info (前端对齐)
                         .push(Router::with_path("register").post(handler::user::register)) // POST /api/v1/user/register
                         .push(Router::with_path("login").post(handler::user::login)) // POST /api/v1/user/login
-                        .push(
-                            Router::with_path("profile").put(handler::user::update_profile),
-                        ) // PUT /api/v1/user/profile
-                        .push(
-                            Router::with_path("password")
-                                .put(handler::user::change_password),
-                        ) // PUT /api/v1/user/password
+                        .push(Router::with_path("profile").put(handler::user::update_profile)) // PUT /api/v1/user/profile
+                        .push(Router::with_path("password").put(handler::user::change_password)) // PUT /api/v1/user/password
                         .push(
                             Router::with_path("change-password")
                                 .post(handler::user::change_password),
                         ) // POST /api/v1/user/change-password (前端对齐)
-                        .push(
-                            Router::with_path("send-code").post(handler::user::send_code),
-                        ), // POST /api/v1/user/send-code
+                        .push(Router::with_path("send-code").post(handler::user::send_code)), // POST /api/v1/user/send-code
                 )
                 .push(Router::with_path("user/{id}").get(handler::user::get_user))
                 // 资源相关（无认证的查询部分）
@@ -113,98 +106,97 @@ pub fn create_router(state: AppState) -> Router {
                                 .get(handler::admin::revenue_chart),
                         )
                         // 管理员管理
-                        
                         // 日志配置管理
-	                        .push(
-	                            Router::with_path("log-configs")
-	                                .get(handler::admin::list_log_configs)
-	                                .post(handler::admin::create_log_config),
-	                        )
-	                        .push(
-	                            Router::with_path("log-configs/{key}")
-	                                .get(handler::admin::get_log_config)
-	                                .put(handler::admin::update_log_config)
-	                                .delete(handler::admin::delete_log_config),
-	                        )
-	                        // 日志查询
-	                        .push(Router::with_path("logs").push(
-	                            Router::with_path("system").get(handler::admin::query_system_logs),
-	                        ))
-	                        // 邮件配置管理（单例，仅一个活跃配置）
-	                        .push(
-	                            Router::with_path("email-configs")
-	                                .get(handler::admin::get_email_config)
-	                                .put(handler::admin::update_email_config),
-	                        )
-	                        // USDT 钱包配置
-	                        .push(
-	                            Router::with_path("usdt-wallets")
-	                                .post(handler::admin::update_usdt_wallet)
-	                                .get(handler::admin::list_usdt_wallets)
-	                                .push(
-	                                    Router::with_path("{network}")
-	                                        .put(handler::admin::update_usdt_wallet),
-	                                ),
-	                        )
-	                        // 分类管理
-	                        .push(
-	                            Router::with_path("categories")
-	                                .get(handler::category::admin_list_categories)
-	                                .post(handler::category::create_category),
-	                        )
-	                        .push(
-	                            Router::with_path("categories/{id}")
-	                                .put(handler::category::update_category)
-	                                .delete(handler::category::delete_category),
-	                        )
-	                        .push(
-	                            Router::with_path("categories/sort")
-	                                .put(handler::category::batch_update_sort),
-	                        )
-	                        // 订单管理
-	                        .push(Router::with_path("orders").get(handler::order::admin_list_orders))
-	                        // 平台资源管理
-	                        .push(
-	                            Router::with_path("resources")
-	                                .get(handler::admin::list_resources)
-	                                .post(handler::admin::create_platform_resource)
-	                                .push(
-	                                    Router::with_path("{id}")
-	                                        .put(handler::admin::update_platform_resource)
-	                                        .delete(handler::admin::delete_platform_resource)
-	                                        .push(
-	                                            Router::with_path("toggle-active")
-	                                                .put(handler::admin::toggle_platform_resource),
-	                                        ),
-	                                ),
-	                        )
-	                        // PayPal 配置管理
-	                        .push(
-	                            Router::with_path("paypal-configs")
-	                                .post(handler::admin_paypal::create_paypal_config)
-	                                .get(handler::admin_paypal::list_paypal_configs)
-	                                .push(
-	                                    Router::with_path("{id}")
-	                                        .get(handler::admin_paypal::get_paypal_config)
-	                                        .put(handler::admin_paypal::update_paypal_config)
-	                                        .push(
-	                                            Router::with_path("active/{active}").post(
-	                                                handler::admin_paypal::set_paypal_config_active,
-	                                            ),
-	                                        ),
-	                                ),
-	                        )
-	                        // 支付方式管理
-	                        .push(
-	                            Router::with_path("payment-methods")
-	                                .get(handler::admin::list_payment_methods)
-	                                .post(handler::admin::create_payment_method)
-	                                .push(
-	                                    Router::with_path("{id}")
-	                                        .delete(handler::admin::delete_payment_method),
-	                                ),
-	                        )
-	                        // 管理员管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）
+                        .push(
+                            Router::with_path("log-configs")
+                                .get(handler::admin::list_log_configs)
+                                .post(handler::admin::create_log_config),
+                        )
+                        .push(
+                            Router::with_path("log-configs/{key}")
+                                .get(handler::admin::get_log_config)
+                                .put(handler::admin::update_log_config)
+                                .delete(handler::admin::delete_log_config),
+                        )
+                        // 日志查询
+                        .push(Router::with_path("logs").push(
+                            Router::with_path("system").get(handler::admin::query_system_logs),
+                        ))
+                        // 邮件配置管理（单例，仅一个活跃配置）
+                        .push(
+                            Router::with_path("email-configs")
+                                .get(handler::admin::get_email_config)
+                                .put(handler::admin::update_email_config),
+                        )
+                        // USDT 钱包配置
+                        .push(
+                            Router::with_path("usdt-wallets")
+                                .post(handler::admin::update_usdt_wallet)
+                                .get(handler::admin::list_usdt_wallets)
+                                .push(
+                                    Router::with_path("{network}")
+                                        .put(handler::admin::update_usdt_wallet),
+                                ),
+                        )
+                        // 分类管理
+                        .push(
+                            Router::with_path("categories")
+                                .get(handler::category::admin_list_categories)
+                                .post(handler::category::create_category),
+                        )
+                        .push(
+                            Router::with_path("categories/{id}")
+                                .put(handler::category::update_category)
+                                .delete(handler::category::delete_category),
+                        )
+                        .push(
+                            Router::with_path("categories/sort")
+                                .put(handler::category::batch_update_sort),
+                        )
+                        // 订单管理
+                        .push(Router::with_path("orders").get(handler::order::admin_list_orders))
+                        // 平台资源管理
+                        .push(
+                            Router::with_path("resources")
+                                .get(handler::admin::list_resources)
+                                .post(handler::admin::create_platform_resource)
+                                .push(
+                                    Router::with_path("{id}")
+                                        .put(handler::admin::update_platform_resource)
+                                        .delete(handler::admin::delete_platform_resource)
+                                        .push(
+                                            Router::with_path("toggle-active")
+                                                .put(handler::admin::toggle_platform_resource),
+                                        ),
+                                ),
+                        )
+                        // PayPal 配置管理
+                        .push(
+                            Router::with_path("paypal-configs")
+                                .post(handler::admin_paypal::create_paypal_config)
+                                .get(handler::admin_paypal::list_paypal_configs)
+                                .push(
+                                    Router::with_path("{id}")
+                                        .get(handler::admin_paypal::get_paypal_config)
+                                        .put(handler::admin_paypal::update_paypal_config)
+                                        .push(
+                                            Router::with_path("active/{active}").post(
+                                                handler::admin_paypal::set_paypal_config_active,
+                                            ),
+                                        ),
+                                ),
+                        )
+                        // 支付方式管理
+                        .push(
+                            Router::with_path("payment-methods")
+                                .get(handler::admin::list_payment_methods)
+                                .post(handler::admin::create_payment_method)
+                                .push(
+                                    Router::with_path("{id}")
+                                        .delete(handler::admin::delete_payment_method),
+                                ),
+                        )
+                        // 管理员管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）
                         .push(
                             Router::new()
                                 .get(handler::admin::get_current_admin)
@@ -253,9 +245,9 @@ pub fn create_router(state: AppState) -> Router {
                                                 .post(handler::admin::reset_admin_password),
                                         ),
                                 ),
-                        )
-                )
-                )
+                        ),
+                ),
+        )
         // 管理员登录（无需 API Key，使用邮箱+密码）
         .push(Router::with_path("api/v1/admin/login").post(handler::admin::login))
         // 支付相关（无需 API Key 认证）
