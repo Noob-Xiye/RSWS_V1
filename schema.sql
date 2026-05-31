@@ -1,9 +1,16 @@
-﻿-- RSWS 鏁版嵁搴撳垵濮嬪寲 Schema
--- 鏂囦欢鍚? migrations/001_initial_schema.sql
+-- ========================================
+-- RSWS_V1 统一数据库 Schema
+-- 创建时间: 2026-05-31
+-- 说明: 此为完整数据库结构，不含测试数据和迁移历史
+-- 不包含已废弃字段（如 categories.slug）
+-- ========================================
 
+-- 启用 UUID 扩展
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ========== users ==========
+-- ========================================
+-- 用户表
+-- ========================================
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -26,10 +33,13 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
--- ========== admins ==========
+-- ========================================
+-- 管理员表
+-- ========================================
 CREATE TABLE IF NOT EXISTS admins (
     id BIGINT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -45,9 +55,12 @@ CREATE TABLE IF NOT EXISTS admins (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_admins_email ON admins(email);
 
--- ========== categories ==========
+-- ========================================
+-- 分类表（不含已废弃的 slug 字段）
+-- ========================================
 CREATE TABLE IF NOT EXISTS categories (
     id BIGINT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -59,9 +72,12 @@ CREATE TABLE IF NOT EXISTS categories (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
 
--- ========== resources ==========
+-- ========================================
+-- 资源表
+-- ========================================
 CREATE TABLE IF NOT EXISTS resources (
     id BIGINT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -87,10 +103,13 @@ CREATE TABLE IF NOT EXISTS resources (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_resources_category_id ON resources(category_id);
 CREATE INDEX IF NOT EXISTS idx_resources_is_active ON resources(is_active);
 
--- ========== orders ==========
+-- ========================================
+-- 订单表
+-- ========================================
 CREATE TABLE IF NOT EXISTS orders (
     id BIGINT PRIMARY KEY,
     user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
@@ -104,10 +123,13 @@ CREATE TABLE IF NOT EXISTS orders (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
--- ========== payment_transactions ==========
+-- ========================================
+-- 支付交易表
+-- ========================================
 CREATE TABLE IF NOT EXISTS payment_transactions (
     id BIGINT PRIMARY KEY,
     order_id BIGINT REFERENCES orders(id) ON DELETE CASCADE,
@@ -122,7 +144,9 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== user_payment_configs ==========
+-- ========================================
+-- 用户支付配置表
+-- ========================================
 CREATE TABLE IF NOT EXISTS user_payment_configs (
     id BIGINT PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -137,7 +161,9 @@ CREATE TABLE IF NOT EXISTS user_payment_configs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== resource_payment_configs ==========
+-- ========================================
+-- 资源支付配置关联表
+-- ========================================
 CREATE TABLE IF NOT EXISTS resource_payment_configs (
     resource_id BIGINT NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
     payment_config_id BIGINT NOT NULL REFERENCES user_payment_configs(id) ON DELETE CASCADE,
@@ -146,7 +172,9 @@ CREATE TABLE IF NOT EXISTS resource_payment_configs (
     PRIMARY KEY (resource_id, payment_config_id)
 );
 
--- ========== system_configs ==========
+-- ========================================
+-- 系统配置表
+-- ========================================
 CREATE TABLE IF NOT EXISTS system_configs (
     id BIGINT PRIMARY KEY,
     config_key VARCHAR(100) NOT NULL UNIQUE,
@@ -158,7 +186,9 @@ CREATE TABLE IF NOT EXISTS system_configs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== paypal_configs ==========
+-- ========================================
+-- PayPal 配置表
+-- ========================================
 CREATE TABLE IF NOT EXISTS paypal_configs (
     id BIGINT PRIMARY KEY,
     client_id VARCHAR(255) NOT NULL,
@@ -169,13 +199,9 @@ CREATE TABLE IF NOT EXISTS paypal_configs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-
-
-
-
-
-
--- ========== menu_items ==========
+-- ========================================
+-- 菜单项表
+-- ========================================
 CREATE TABLE IF NOT EXISTS menu_items (
     id BIGINT PRIMARY KEY,
     parent_id BIGINT REFERENCES menu_items(id) ON DELETE CASCADE,
@@ -190,7 +216,9 @@ CREATE TABLE IF NOT EXISTS menu_items (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== admin_operation_logs ==========
+-- ========================================
+-- 管理员操作日志表
+-- ========================================
 CREATE TABLE IF NOT EXISTS admin_operation_logs (
     id BIGINT PRIMARY KEY,
     admin_id BIGINT NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
@@ -203,7 +231,9 @@ CREATE TABLE IF NOT EXISTS admin_operation_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== usdt_transactions ==========
+-- ========================================
+-- USDT 交易表
+-- ========================================
 CREATE TABLE IF NOT EXISTS usdt_transactions (
     id BIGINT PRIMARY KEY,
     order_id BIGINT REFERENCES orders(id) ON DELETE SET NULL,
@@ -220,7 +250,9 @@ CREATE TABLE IF NOT EXISTS usdt_transactions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== commission_rules ==========
+-- ========================================
+-- 佣金规则表
+-- ========================================
 CREATE TABLE IF NOT EXISTS commission_rules (
     id BIGINT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -233,7 +265,9 @@ CREATE TABLE IF NOT EXISTS commission_rules (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== commission_records ==========
+-- ========================================
+-- 佣金记录表
+-- ========================================
 CREATE TABLE IF NOT EXISTS commission_records (
     id BIGINT PRIMARY KEY,
     order_id BIGINT REFERENCES orders(id) ON DELETE SET NULL,
@@ -248,7 +282,9 @@ CREATE TABLE IF NOT EXISTS commission_records (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== blockchain_configs ==========
+-- ========================================
+-- 区块链配置表
+-- ========================================
 CREATE TABLE IF NOT EXISTS blockchain_configs (
     id BIGINT PRIMARY KEY,
     network VARCHAR(50) NOT NULL UNIQUE,
@@ -265,7 +301,9 @@ CREATE TABLE IF NOT EXISTS blockchain_configs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== usdt_listen_configs ==========
+-- ========================================
+-- USDT 监听配置表
+-- ========================================
 CREATE TABLE IF NOT EXISTS usdt_listen_configs (
     id BIGINT PRIMARY KEY,
     network VARCHAR(50) NOT NULL UNIQUE,
@@ -279,7 +317,9 @@ CREATE TABLE IF NOT EXISTS usdt_listen_configs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== email_configs ==========
+-- ========================================
+-- 邮件配置表
+-- ========================================
 CREATE TABLE IF NOT EXISTS email_configs (
     id BIGINT PRIMARY KEY,
     provider VARCHAR(50) NOT NULL DEFAULT 'smtp',
@@ -296,13 +336,39 @@ CREATE TABLE IF NOT EXISTS email_configs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========== paypal_configs ==========
-CREATE TABLE IF NOT EXISTS paypal_configs (
+-- ========================================
+-- 日志配置表（来自 002_log_tables.sql）
+-- ========================================
+CREATE TABLE IF NOT EXISTS log_configs (
     id BIGINT PRIMARY KEY,
-    client_id VARCHAR(255) NOT NULL,
-    client_secret_encrypted VARCHAR(255) NOT NULL,
-    mode VARCHAR(20) DEFAULT 'sandbox',
+    config_key VARCHAR(100) NOT NULL UNIQUE,
+    config_value TEXT,
+    description TEXT,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ========================================
+-- USDT 钱包表（如需）
+-- ========================================
+-- CREATE TABLE IF NOT EXISTS usdt_wallets (
+--     id BIGINT PRIMARY KEY,
+--     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+--     address VARCHAR(255) NOT NULL,
+--     network VARCHAR(50) NOT NULL DEFAULT 'tron',
+--     is_active BOOLEAN DEFAULT true,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+--     UNIQUE(address, network)
+-- );
+
+-- ========================================
+-- 完成提示
+-- ========================================
+-- 注意：
+-- 1. 所有 ID 使用 BIGINT（非 BIGSERIAL），由应用层生成（snowflake::next_id()）
+-- 2. 不含已废弃字段（如 categories.slug）
+-- 3. 使用 UTF-8 编码，LF 换行符
+-- 4. 执行：psql -d rsws_db -f schema.sql
+-- ========================================

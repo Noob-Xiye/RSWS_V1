@@ -4,6 +4,7 @@
 
 use chrono::{DateTime, Utc};
 use rsws_common::error::RswsError;
+use rsws_common::snowflake;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::PgPool;
@@ -91,18 +92,19 @@ impl WalletRepository {
         address: &str,
         name: Option<&str>,
     ) -> Result<UsdtWallet, RswsError> {
+        let new_id = snowflake::next_id();
         let wallet = sqlx::query_as::<_, UsdtWallet>(
             r#"
-            INSERT INTO usdt_wallets (address, network, name, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, true, NOW(), NOW())
-            ON CONFLICT (id) DO UPDATE SET
-                address = EXCLUDED.address,
+            INSERT INTO usdt_wallets (id, address, network, name, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, true, NOW(), NOW())
+            ON CONFLICT (address, network) DO UPDATE SET
                 name = EXCLUDED.name,
                 is_active = true,
                 updated_at = NOW()
             RETURNING id, address, network, name, is_active, total_received, created_at, updated_at
             "#,
         )
+        .bind(new_id)
         .bind(address)
         .bind(network)
         .bind(name)

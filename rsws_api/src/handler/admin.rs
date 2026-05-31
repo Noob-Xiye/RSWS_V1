@@ -981,17 +981,18 @@ pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Respo
     let days: i64 = req.query("days").unwrap_or(30).clamp(1, 365);
 
     // 查询每日收入
+    // 使用 make_interval() 避免字符串拼接（SQL 注入风险）
     let rows: Vec<(String, i64)> = match sqlx::query_as(
         r#"
         SELECT DATE(paid_at AT TIME ZONE 'UTC')::text AS date, COALESCE(SUM(amount), 0)::bigint AS revenue
         FROM orders
         WHERE status IN ('paid', 'completed')
-          AND paid_at >= NOW() - (($1::text || ' days')::interval)
+          AND paid_at >= NOW() - make_interval(days := $1::int)
         GROUP BY DATE(paid_at AT TIME ZONE 'UTC')
         ORDER BY date ASC
         "#,
     )
-    .bind(days)
+    .bind(days as i32)
     .fetch_all(pool)
     .await
     {

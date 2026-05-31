@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use rsws_common::snowflake;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::PgPool;
@@ -7,7 +8,6 @@ use sqlx::PgPool;
 pub struct Category {
     pub id: i64,
     pub name: String,
-    pub slug: String,
     pub description: Option<String>,
     pub parent_id: Option<i64>,
     pub path: Option<String>,
@@ -36,7 +36,7 @@ pub struct CreateCategory {
 #[derive(Debug, Deserialize)]
 pub struct UpdateCategory {
     pub name: Option<String>,
-    pub description: Option<String>,
+    pub description: Option<Option<String>>,
     pub parent_id: Option<Option<i64>>,
     pub sort_order: Option<i32>,
     pub is_active: Option<bool>,
@@ -53,7 +53,7 @@ impl CategoryRepository {
 
     pub async fn find_all(&self) -> Result<Vec<Category>, sqlx::Error> {
         let categories = sqlx::query_as::<_, Category>(
-            r#"SELECT id, name, slug, description, parent_id, path, sort_order, is_active, created_at, updated_at
+            r#"SELECT id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at
             FROM categories WHERE is_active = true ORDER BY sort_order"#,
         )
         .fetch_all(&self.pool)
@@ -64,7 +64,7 @@ impl CategoryRepository {
     /// 查询所有分类（含已停用），管理员用
     pub async fn find_all_with_inactive(&self) -> Result<Vec<Category>, sqlx::Error> {
         let categories = sqlx::query_as::<_, Category>(
-            r#"SELECT id, name, slug, description, parent_id, path, sort_order, is_active, created_at, updated_at
+            r#"SELECT id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at
             FROM categories ORDER BY sort_order"#,
         )
         .fetch_all(&self.pool)
@@ -74,7 +74,7 @@ impl CategoryRepository {
 
     pub async fn find_by_id(&self, id: i64) -> Result<Option<Category>, sqlx::Error> {
         let category = sqlx::query_as::<_, Category>(
-            r#"SELECT id, name, slug, description, parent_id, path, sort_order, is_active, created_at, updated_at
+            r#"SELECT id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at
             FROM categories WHERE id = $1"#,
         )
         .bind(id)
@@ -85,7 +85,7 @@ impl CategoryRepository {
 
     pub async fn find_by_name(&self, name: &str) -> Result<Option<Category>, sqlx::Error> {
         let category = sqlx::query_as::<_, Category>(
-            r#"SELECT id, name, slug, description, parent_id, path, sort_order, is_active, created_at, updated_at
+            r#"SELECT id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at
             FROM categories WHERE name = $1"#,
         )
         .bind(name)
@@ -102,21 +102,21 @@ impl CategoryRepository {
         Ok(result.unwrap_or(0))
     }
 
-    pub async fn create_with_slug(
+    pub async fn create(
         &self,
         name: &str,
-        slug: &str,
         description: Option<&str>,
         parent_id: Option<i64>,
         sort_order: i32,
     ) -> Result<Category, sqlx::Error> {
+        let new_id = snowflake::next_id();
         let category = sqlx::query_as::<_, Category>(
-            r#"INSERT INTO categories (name, slug, description, parent_id, sort_order)
+            r#"INSERT INTO categories (id, name, description, parent_id, sort_order)
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, name, slug, description, parent_id, path, sort_order, is_active, created_at, updated_at"#,
+            RETURNING id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at"#,
         )
+        .bind(new_id)
         .bind(name)
-        .bind(slug)
         .bind(description)
         .bind(parent_id)
         .bind(sort_order)
@@ -137,7 +137,7 @@ impl CategoryRepository {
         // Update path in DB
         let category = sqlx::query_as::<_, Category>(
             r#"UPDATE categories SET path = $1 WHERE id = $2
-            RETURNING id, name, slug, description, parent_id, path, sort_order, is_active, created_at, updated_at"#,
+            RETURNING id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at"#,
         )
         .bind(&actual_path)
         .bind(category.id)
@@ -152,7 +152,6 @@ impl CategoryRepository {
         &self,
         id: i64,
         name: Option<&str>,
-        slug: Option<&str>,
         description: Option<Option<&str>>,
         parent_id: Option<Option<i64>>,
         sort_order: Option<i32>,
@@ -185,7 +184,6 @@ impl CategoryRepository {
         };
 
         let new_name = name.unwrap_or(&cat.name);
-        let new_slug = slug.unwrap_or(&cat.slug);
         let new_description = description.unwrap_or(cat.description.as_deref());
         let new_sort_order = sort_order.unwrap_or(cat.sort_order);
         let new_is_active = is_active.unwrap_or(cat.is_active);
@@ -207,12 +205,11 @@ impl CategoryRepository {
         };
 
         let category = sqlx::query_as::<_, Category>(
-            r#"UPDATE categories SET name = $1, slug = $2, description = $3, parent_id = $4, path = $5, sort_order = $6, is_active = $7, updated_at = NOW()
-            WHERE id = $8
-            RETURNING id, name, slug, description, parent_id, path, sort_order, is_active, created_at, updated_at"#,
+            r#"UPDATE categories SET name = $1, description = $2, parent_id = $3, path = $4, sort_order = $5, is_active = $6, updated_at = NOW()
+            WHERE id = $7
+            RETURNING id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at"#,
         )
         .bind(new_name)
-        .bind(new_slug)
         .bind(new_description)
         .bind(new_parent_id)
         .bind(&new_path)
@@ -275,7 +272,7 @@ impl CategoryRepository {
         parent_path: &str,
     ) -> Result<(), sqlx::Error> {
         let children: Vec<Category> = sqlx::query_as::<_, Category>(
-            r#"SELECT id, name, slug, description, parent_id, path, sort_order, is_active, created_at, updated_at
+            r#"SELECT id, name, description, parent_id, path, sort_order, is_active, created_at, updated_at
             FROM categories WHERE parent_id = $1"#,
         )
         .bind(parent_id)

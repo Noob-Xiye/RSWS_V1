@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+use rand::Rng;
 
 // 雪花ID生成器
 pub struct SnowflakeGenerator {
@@ -44,7 +45,6 @@ impl SnowflakeGenerator {
         if timestamp == self.last_timestamp {
             self.sequence = (self.sequence + 1) & Self::MAX_SEQUENCE;
             if self.sequence == 0 {
-                // 等待下一毫秒
                 timestamp = self.wait_next_millis(self.last_timestamp);
             }
         } else {
@@ -90,6 +90,7 @@ pub fn next_id() -> i64 {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as i64;
-        timestamp * 1000 + (rand::random::<u16>() as i64)
+        let random: u16 = rand::rng().random();
+        timestamp * 1000 + (random as i64)
     })
 }
