@@ -43,18 +43,28 @@ request.interceptors.request.use(async (config) => {
 }, (error) => Promise.reject(error))
 
 // 响应拦截器 - 统一错误处理
+// 只有在用户之前已登录（有 apiKey）的情况下，401 才跳转登录页
+// 游客（无 apiKey）访问需要认证的接口时，不跳转，由组件自行处理
+function shouldRedirectToLogin(): boolean {
+  // 曾经登录过（本地有 apiKey）但现在 401，说明 session 过期
+  return !!getApiKey()
+}
+
 request.interceptors.response.use(
   (response) => {
     const data = response.data
     // 检查业务层错误码（后端返回 200，但 code !== 0）
     if (data && data.code !== undefined && data.code !== 0) {
-      // 401 = 未登录 / 认证失败 → 清除本地状态并跳转登录页
+      // 401 = 未登录 / 认证失败
       if (data.code === 401 || (data.msg && data.msg.includes('未登录'))) {
-        removeApiKey()
-        removeUserId()
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login'
+        if (shouldRedirectToLogin()) {
+          removeApiKey()
+          removeUserId()
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login'
+          }
         }
+        // 游客：不跳转，直接 reject，由组件处理
       }
       return Promise.reject(data)
     }
@@ -62,27 +72,27 @@ request.interceptors.response.use(
   },
   (error) => {
     const { response } = error
-    
-    // 401 未授权，清除登录信息并跳转登录页
+
+    // 401 未授权：仅当曾经登录过才跳转（session 过期）
     if (response?.status === 401) {
-      removeApiKey()
-      removeUserId()
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      if (shouldRedirectToLogin()) {
+        removeApiKey()
+        removeUserId()
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
       }
+      // 游客：不跳转，由组件处理
     }
-    
-    // 网络错误（后端挂掉）也触发登出
+
+    // 网络错误（后端挂掉）：不跳转登录页，游客不应因网络问题被踢出
+    // 仅打印错误，由组件处理 loading/error 状态
     if (!response) {
-      removeApiKey()
-      removeUserId()
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+      console.warn('[request] 网络错误，后端可能未启动:', error.message)
     }
-    
+
     // 返回错误信息
-    return Promise.reject(response?.data || { message: '网络错误' })
+    return Promise.reject(response?.data || { message: '网络错误', code: -1 })
   }
 )
 
