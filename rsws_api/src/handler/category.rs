@@ -44,7 +44,6 @@ pub struct CreateCategoryRequest {
 #[derive(Debug, Deserialize)]
 pub struct UpdateCategoryRequest {
     pub name: Option<String>,
-    pub slug: Option<String>,
     pub description: Option<String>,
     pub parent_id: Option<Option<i64>>,
     pub sort_order: Option<i32>,
@@ -77,7 +76,6 @@ pub async fn admin_list_categories(_req: &mut Request, depot: &mut Depot, res: &
                 categories_with_count.push(serde_json::json!({
                     "id": cat.id,
                     "name": cat.name,
-                    "slug": cat.slug,
                     "description": cat.description,
                     "parent_id": cat.parent_id,
                     "path": cat.path,
@@ -127,23 +125,9 @@ pub async fn create_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         .unwrap_or(0);
     let sort_order = body.sort_order.unwrap_or(max_order + 1);
 
-    // 自动生成 slug（name 转小写 + 替换非字母数字为 -）
-    let slug = body
-        .name
-        .trim()
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-");
-
     match repo
-        .create_with_slug(
+        .create(
             body.name.trim(),
-            &slug,
             body.description.as_deref(),
             body.parent_id,
             sort_order,
@@ -191,17 +175,13 @@ pub async fn update_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         }
     }
 
-    // 将 description 的 Option<String> 转为 Option<Option<&str>>
+    // 将 description 的 Option<String> 转为 Option<&str>
     let desc_ref = body.description.as_deref();
-
-    // slug: 如果前端提供了就用，没有就用 None（保持原值）
-    let slug_ref = body.slug.as_deref();
 
     match repo
         .update(
             id,
             body.name.as_deref().map(|s| s.trim()),
-            slug_ref,
             Some(desc_ref),
             body.parent_id,
             body.sort_order,
