@@ -117,7 +117,3 @@ export async function deletePlatformResource(id: number): Promise<ApiResponse<vo
   return request.delete(`/admin/resources/${id}`)
 }
 
-// 管理员切换资源上下架
-export async function togglePlatformResourceActive(id: number): Promise<ApiResponse<Resource>> {
-  return request.put(`/admin/resources/${id}/toggle-active`)
-}
