@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
+use rand::Rng;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
-use rand::Rng;
 
 // 雪花ID生成器
 pub struct SnowflakeGenerator {
@@ -53,11 +53,9 @@ impl SnowflakeGenerator {
 
         self.last_timestamp = timestamp;
 
-        let id = ((timestamp - Self::EPOCH) << Self::TIMESTAMP_SHIFT)
+        Ok(((timestamp - Self::EPOCH) << Self::TIMESTAMP_SHIFT)
             | (self.machine_id << Self::MACHINE_ID_SHIFT)
-            | self.sequence;
-
-        Ok(id)
+            | self.sequence)
     }
 
     fn current_timestamp(&self) -> u64 {
@@ -76,21 +74,36 @@ impl SnowflakeGenerator {
     }
 }
 
-// 全局ID生成函数
-pub fn generate_id() -> Result<i64, String> {
+pub fn next_id() -> i64 {
     let mut generator = SNOWFLAKE_GENERATOR.lock().unwrap();
-    generator.next_id().map(|id| id as i64)
+    generator.next_id().unwrap() as i64
 }
 
-// 便捷函数
-pub fn next_id() -> i64 {
-    generate_id().unwrap_or_else(|_| {
-        // 如果雪花ID生成失败，使用时间戳 + 随机数作为备选
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
-        let random: u16 = rand::rng().random();
-        timestamp * 1000 + (random as i64)
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_snowflake_generator() {
+        let mut generator = SnowflakeGenerator::new(1);
+        let id1 = generator.next_id().unwrap();
+        let id2 = generator.next_id().unwrap();
+        assert_ne!(id1, id2);
+        assert!(id2 > id1);
+    }
+
+    #[test]
+    fn test_next_id() {
+        let id1 = next_id();
+        let id2 = next_id();
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_ids_are_positive() {
+        for _ in 0..100 {
+            let id = next_id();
+            assert!(id > 0);
+        }
+    }
 }
