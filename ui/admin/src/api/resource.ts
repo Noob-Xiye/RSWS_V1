@@ -82,9 +82,14 @@ export async function deleteResource(id: number): Promise<ApiResponse<void>> {
   return request.delete(`/resource/${id}`)
 }
 
-// 切换资源上下架状态
+// 切换资源上下架状态（用户端，更新资源自身）
 export async function toggleResourceActive(id: number, is_active: boolean): Promise<ApiResponse<Resource>> {
   return request.put(`/resource/${id}`, { is_active })
+}
+
+// 管理员切换资源上下架状态
+export async function togglePlatformResourceActive(id: number): Promise<ApiResponse<Resource>> {
+  return request.put(`/admin/resources/${id}/toggle-active`)
 }
 
 // 创建资源

@@ -101,7 +101,7 @@ export async function createApiKey(data: { name: string; permissions?: string[];
 }
 
 export async function deleteApiKey(keyId: number): Promise<ApiResponse<{ deleted: boolean }>> {
-  return request.delete(`/admin/${keyId}/api-keys`)
+  return request.delete(`/admin/api-keys/${keyId}`)
 }
 
 export async function toggleApiKey(keyId: number, isActive: boolean): Promise<ApiResponse<void>> {
