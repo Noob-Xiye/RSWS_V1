@@ -3,7 +3,10 @@
 //! 持有所有 service 实例，通过 Salvo Depot 注入到 handler
 
 use rsws_common::config::AppConfig;
-use rsws_db::CategoryRepository;
+use rsws_db::{
+    CategoryRepository,
+    user_api_key::UserApiKeyRepository,
+};
 use rsws_service::{
     AdminRepository, AdminService, ApiKeyService, BlockchainService, ConfigService,
     CrossPlatformService, LogService, OrderService, PayPalService, PaymentService, ResourceService,
@@ -32,6 +35,7 @@ pub struct AppState {
     pub log_service: Arc<LogService>,
     admin_repo: Arc<AdminRepository>,
     pub category_service: Arc<CategoryRepository>,
+    pub user_api_key_repo: Arc<UserApiKeyRepository>,
 }
 
 impl AppState {
@@ -53,6 +57,7 @@ impl AppState {
         log_service: LogService,
         admin_repo: AdminRepository,
         category_service: CategoryRepository,
+        user_api_key_repo: UserApiKeyRepository,
     ) -> Self {
         Self {
             pool: pool.clone(),
@@ -71,6 +76,7 @@ impl AppState {
             log_service: Arc::new(log_service),
             admin_repo: Arc::new(admin_repo),
             category_service: Arc::new(category_service),
+            user_api_key_repo: Arc::new(user_api_key_repo),
         }
     }
 

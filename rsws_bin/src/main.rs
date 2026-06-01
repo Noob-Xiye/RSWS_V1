@@ -212,6 +212,7 @@ async fn main() -> Result<(), RswsError> {
     // Admin 服务
     let admin_repo = rsws_db::AdminRepository::new(pool.clone());
     let category_repo = rsws_db::CategoryRepository::new(pool.clone());
+    let user_api_key_repo = rsws_db::UserApiKeyRepository::new(pool.clone());
     let admin_service = rsws_service::create_admin_service(pool.clone(), Some(redis_pool.clone()));
     let log_service = rsws_service::LogService::new(pool.clone());
 
@@ -235,6 +236,7 @@ async fn main() -> Result<(), RswsError> {
         log_service,
         admin_repo,
         category_repo,
+        user_api_key_repo,
     );
 
     // ========== 5. 启动 USDT 监听服务（配置来自数据库） ==========

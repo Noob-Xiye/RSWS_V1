@@ -221,6 +221,20 @@ pub fn create_router(state: AppState) -> Router {
                                                 .post(handler::admin::activate_user),
                                         ),
                                 )
+                                // 用户 API Key 管理
+                                .push(
+                                    Router::with_path("users")
+                                        .push(
+                                            Router::with_path("{user_id}/api-keys")
+                                                .get(handler::admin::list_user_api_keys)
+                                                .post(handler::admin::create_user_api_key)
+                                                .push(
+                                                    Router::with_path("{key_id}")
+                                                        .delete(handler::admin::delete_user_api_key)
+                                                        .put(handler::admin::toggle_user_api_key),
+                                                ),
+                                        ),
+                                )
                                 // API Key 管理
                                 .push(
                                     Router::with_path("api-keys")

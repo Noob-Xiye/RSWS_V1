@@ -11,6 +11,7 @@ pub mod payment;
 pub mod redis;
 pub mod resource;
 pub mod user;
+pub mod user_api_key;
 pub mod wallet;
 
 pub use admin::AdminRepository;
@@ -22,6 +23,7 @@ pub use payment::PaymentRepository;
 pub use redis::RedisService;
 pub use resource::ResourceRepository;
 pub use user::UserRepository;
+pub use user_api_key::UserApiKeyRepository;
 pub use wallet::WalletRepository;
 
 /// Redis connection pool alias

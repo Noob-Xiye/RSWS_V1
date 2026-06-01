@@ -364,6 +364,26 @@ CREATE TABLE IF NOT EXISTS log_configs (
 -- );
 
 -- ========================================
+-- 用户 API Key 表
+-- ========================================
+CREATE TABLE IF NOT EXISTS user_api_keys (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    api_key VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    permissions JSONB DEFAULT '["read"]'::jsonb,
+    rate_limit INT DEFAULT 100,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_api_keys_user_id ON user_api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_api_keys_api_key ON user_api_keys(api_key);
+
+-- ========================================
 -- 完成提示
 -- ========================================
 -- 注意：

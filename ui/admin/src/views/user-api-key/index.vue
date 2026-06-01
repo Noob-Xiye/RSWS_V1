@@ -1,8 +1,5 @@
 <template>
   <div class="page-container">
-    <el-alert type="info" :closable="false" class="mb-16">
-      用户 API Key 管理由后端统一提供，前端功能开发中…
-    </el-alert>
 
     <el-card>
       <template #header>
@@ -60,8 +57,11 @@
             <el-tag v-else type="success" size="small">永不过期</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
+            <el-button type="primary" size="small" link @click="handleToggle(row)">
+              {{ row.is_active ? '停用' : '启用' }}
+            </el-button>
             <el-button type="danger" size="small" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -95,14 +95,14 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, View, Hide, CopyDocument } from '@element-plus/icons-vue'
-import { listUsers } from '@/api/user'
+import { listUsers, listUserApiKeys, createUserApiKey, deleteUserApiKey, toggleUserApiKey, type UserApiKey } from '@/api/user'
 
 const loading = ref(false)
 const creating = ref(false)
 const selectedUserId = ref<number | null>(null)
 const showCreateDialog = ref(false)
 const users = ref<any[]>([])
-const keys = ref<any[]>([])
+const keys = ref<UserApiKey[]>([])
 
 const createForm = reactive({ name: '', permissions: [] as string[], rate_limit: 100 })
 
@@ -124,11 +124,23 @@ async function fetchUsers() {
   } catch { /* ignore */ }
 }
 
-function fetchUserKeys() {
+async function fetchUserKeys() {
   if (!selectedUserId.value) { keys.value = []; return }
-  // TODO: 后端需提供 GET /admin/users/{id}/api-keys
-  ElMessage.warning('后端 API 待实现：GET /admin/users/{id}/api-keys')
-  keys.value = []
+  loading.value = true
+  try {
+    const res = await listUserApiKeys(selectedUserId.value)
+    if (res.code === 0) {
+      keys.value = (res.data?.items || []).map(k => ({ ...k, _masked: true }))
+    } else {
+      ElMessage.error(res.msg || '获取 API Key 列表失败')
+      keys.value = []
+    }
+  } catch {
+    ElMessage.error('获取 API Key 列表失败')
+    keys.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
 function copyKey(key: string) {
@@ -136,19 +148,60 @@ function copyKey(key: string) {
 }
 
 async function handleCreate() {
+  if (!createForm.name.trim()) { ElMessage.warning('请输入名称'); return }
   creating.value = true
   try {
-    // TODO: 后端需提供 POST /admin/users/{id}/api-keys
-    ElMessage.warning('后端 API 待实现：POST /admin/users/{id}/api-keys')
-    showCreateDialog.value = false
+    const res = await createUserApiKey(selectedUserId.value!, {
+      name: createForm.name,
+      permissions: createForm.permissions.length ? createForm.permissions : ['read'],
+      rate_limit: createForm.rate_limit,
+    })
+    if (res.code === 0) {
+      ElMessage.success('API Key 创建成功')
+      showCreateDialog.value = false
+      createForm.name = ''
+      createForm.permissions = []
+      createForm.rate_limit = 100
+      await fetchUserKeys()
+    } else {
+      ElMessage.error(res.msg || '创建失败')
+    }
+  } catch {
+    ElMessage.error('创建失败')
   } finally {
     creating.value = false
   }
 }
 
-async function handleDelete(row: any) {
-  // TODO: 后端需提供 DELETE /admin/users/{userId}/api-keys/{keyId}
-  ElMessage.warning('后端 API 待实现：DELETE /admin/users/{id}/api-keys/{keyId}')
+async function handleDelete(row: UserApiKey) {
+  try {
+    await ElMessageBox.confirm(`确定要删除 API Key「${row.name}」吗？此操作不可恢复。`, '确认删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    const res = await deleteUserApiKey(selectedUserId.value!, row.id)
+    if (res.code === 0) {
+      ElMessage.success('删除成功')
+      await fetchUserKeys()
+    } else {
+      ElMessage.error(res.msg || '删除失败')
+    }
+  } catch { /* cancelled */ }
+}
+
+async function handleToggle(row: UserApiKey) {
+  try {
+    const res = await toggleUserApiKey(selectedUserId.value!, row.id)
+    if (res.code === 0) {
+      row.is_active = res.data?.is_active ?? !row.is_active
+      ElMessage.success(row.is_active ? '已启用' : '已停用')
+    } else {
+      ElMessage.error(res.msg || '切换失败')
+    }
+  } catch {
+    ElMessage.error('切换失败')
+  }
 }
 
 onMounted(() => fetchUsers())
