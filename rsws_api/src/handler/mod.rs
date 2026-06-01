@@ -6,6 +6,7 @@ pub mod category;
 pub mod order;
 pub mod payment;
 pub mod resource;
+pub mod upload;
 pub mod user;
 
 use salvo::prelude::*;

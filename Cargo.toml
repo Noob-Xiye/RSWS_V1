@@ -23,7 +23,7 @@ salvo-oapi = { git = "https://github.com/salvo-rs/salvo", default-features = fal
 salvo-otel = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-proxy = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 salvo-rate-limiter = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
-salvo-serve-static = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
+salvo-serve-static = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["embed", "full"] }
 salvo-session = { git = "https://github.com/salvo-rs/salvo", default-features = false, features = ["rustls"] }
 
 # 异步运行时

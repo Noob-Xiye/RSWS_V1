@@ -10,6 +10,7 @@ rsws_service = { path = "../rsws_service" }
 rsws_db = { path = "../rsws_db" }
 
 salvo = { workspace = true }
+salvo-serve-static = { workspace = true }
 salvo-cors = { workspace = true }
 salvo-oapi = { workspace = true }
 sqlx = { workspace = true }

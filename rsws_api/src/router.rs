@@ -279,6 +279,13 @@ pub fn create_router(state: AppState) -> Router {
             Router::with_path("api/v1/webhook")
                 .push(Router::with_path("paypal").post(handler::payment::paypal_webhook))
                 .push(Router::with_path("usdt").post(handler::payment::usdt_webhook)),
+        )
+        // 文件上传（分块上传，需认证）
+        .push(
+            Router::with_path("api/v1/upload")
+                .push(Router::with_path("init").post(handler::upload::init_upload))
+                .push(Router::with_path("chunk").post(handler::upload::upload_chunk))
+                .push(Router::with_path("complete").post(handler::upload::complete_upload)),
         );
 
     // OpenAPI 文档生成
