@@ -357,10 +357,7 @@ pub async fn complete_upload(req: &mut Request, depot: &mut Depot, res: &mut Res
 }
 
 fn sanitize_filename(filename: &str) -> String {
-    let name = filename
-        .rsplit(['/', '\\', ':'])
-        .next()
-        .unwrap_or(filename);
+    let name = filename.rsplit(['/', '\\', ':']).next().unwrap_or(filename);
     name.chars()
         .filter(|c| !c.is_control() && *c != '\0')
         .collect()
