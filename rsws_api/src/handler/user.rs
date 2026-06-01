@@ -3,6 +3,7 @@
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
 use crate::state::get_state;
+use base64::Engine as _;
 use chrono::{Duration, Utc};
 use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
 use rsws_model::user_models::user::{
@@ -298,6 +299,115 @@ pub async fn change_password(req: &mut Request, depot: &mut Depot, res: &mut Res
         }
         Err(e) => {
             res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
+        }
+    }
+}
+
+/// 上传头像（base64 编码）
+#[derive(Debug, Deserialize)]
+pub struct UploadAvatarRequest {
+    /// data:image/png;base64,xxxxx
+    pub avatar_data: String,
+}
+
+#[endpoint(
+    responses(
+        (status_code = 200, description = "上传成功，返回 avatar_url"),
+        (status_code = 401, description = "未认证"),
+        (status_code = 400, description = "文件无效或过大"),
+    )
+)]
+pub async fn upload_avatar(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let user_id = match res.auth_require_user_id(depot) {
+        Some(id) => id,
+        None => return,
+    };
+
+    let state = get_state(depot);
+    let config = &state.config;
+
+    let body = match req.parse_json::<UploadAvatarRequest>().await {
+        Ok(b) => b,
+        Err(e) => {
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
+            return;
+        }
+    };
+
+    // 解析 data URI: data:image/png;base64,xxxxx
+    let data_uri = &body.avatar_data;
+    let (mime_type, b64_content) = match data_uri.split_once(',') {
+        Some((prefix, content)) => {
+            let mime = prefix.strip_prefix("data:").unwrap_or("");
+            (mime.to_string(), content.to_string())
+        }
+        None => {
+            res.http_error(StatusCode::BAD_REQUEST, "Invalid data URI format");
+            return;
+        }
+    };
+
+    // 校验文件类型
+    let allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if !allowed.contains(&mime_type.as_str()) {
+        res.http_error(
+            StatusCode::BAD_REQUEST,
+            "Invalid file type, only JPEG/PNG/GIF/WebP allowed",
+        );
+        return;
+    }
+
+    // 解码 base64
+    let file_bytes = match base64::engine::general_purpose::STANDARD.decode(&b64_content) {
+        Ok(b) => b,
+        Err(e) => {
+            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid base64: {}", e));
+            return;
+        }
+    };
+
+    // 校验文件大小（2MB）
+    if file_bytes.len() > 2 * 1024 * 1024 {
+        res.http_error(StatusCode::BAD_REQUEST, "File too large, max 2MB");
+        return;
+    }
+
+    // 确保目录存在
+    let avatar_dir = format!("{}/avatars", config.server.upload_dir);
+    std::fs::create_dir_all(&avatar_dir).ok();
+
+    // 生成唯一文件名
+    let ext = match mime_type.as_str() {
+        "image/jpeg" => "jpg",
+        "image/png" => "png",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        _ => "bin",
+    };
+    let filename = format!("{}_{}.{}", user_id, chrono::Utc::now().timestamp(), ext);
+    let filepath = format!("{}/{}", avatar_dir, filename);
+
+    // 保存文件
+    match tokio::fs::write(&filepath, file_bytes).await {
+        Ok(()) => {}
+        Err(e) => {
+            tracing::error!("Failed to save avatar: {}", e);
+            res.http_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to save file");
+            return;
+        }
+    }
+
+    let avatar_url = format!("/uploads/avatars/{}", filename);
+
+    // 更新数据库
+    match state.user_service.update_avatar(user_id, &avatar_url).await {
+        Ok(user) => {
+            res.success(serde_json::json!({
+                "avatar_url": user.avatar_url,
+            }));
+        }
+        Err(e) => {
+            res.error(e);
         }
     }
 }

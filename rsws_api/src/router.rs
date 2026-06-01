@@ -37,7 +37,8 @@ pub fn create_router(state: AppState) -> Router {
                             Router::with_path("change-password")
                                 .post(handler::user::change_password),
                         ) // POST /api/v1/user/change-password (前端对齐)
-                        .push(Router::with_path("send-code").post(handler::user::send_code)), // POST /api/v1/user/send-code
+                        .push(Router::with_path("send-code").post(handler::user::send_code)) // POST /api/v1/user/send-code
+                        .push(Router::with_path("avatar").post(handler::user::upload_avatar)), // POST /api/v1/user/avatar
                 )
                 .push(Router::with_path("user/{id}").get(handler::user::get_user))
                 // 资源相关（无认证的查询部分）
@@ -328,6 +329,8 @@ pub fn create_router(state: AppState) -> Router {
             .max_age(3600)
     };
 
+    let upload_dir = state.config.server.upload_dir.clone();
+
     Router::new()
         // Request ID 追踪（所有请求）
         .hoop(request_id_middleware)
@@ -338,4 +341,9 @@ pub fn create_router(state: AppState) -> Router {
         .push(SwaggerUi::new("/swagger-ui").into_router("/api-doc/openapi.json"))
         // 业务路由
         .push(api_routes)
+        // 静态文件（上传目录）
+        .push(
+            Router::with_path("uploads/<**path>")
+                .get(salvo::serve_static::StaticDir::new([upload_dir])),
+        )
 }

@@ -122,7 +122,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { updateProfile, changePassword } from '@/api/user'
+import { updateProfile, changePassword, uploadAvatar } from '@/api/user'
 import { listOrders, type Order } from '@/api/order'
 import ModernLayout from '@/components/ModernLayout.vue'
 
@@ -165,10 +165,36 @@ const passwordRules: FormRules = {
 }
 
 function handleAvatarChange(file: UploadFile) {
-  if (file.raw) {
-    profileForm.avatar_url = URL.createObjectURL(file.raw)
-    ElMessage.info('头像上传功能开发中')
+  if (!file.raw) return
+  // 校验文件类型
+  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowed.includes(file.raw.type)) {
+    ElMessage.error('仅支持 JPEG/PNG/GIF/WebP 格式')
+    return
   }
+  // 校验文件大小 2MB
+  if (file.raw.size > 2 * 1024 * 1024) {
+    ElMessage.error('图片大小不能超过 2MB')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = async () => {
+    const dataUri = reader.result as string
+    try {
+      const res = await uploadAvatar(dataUri)
+      if (res.code === 0 && res.data) {
+        profileForm.avatar_url = res.data.avatar_url
+        await userStore.fetchUserInfo()
+        ElMessage.success('头像上传成功')
+      } else {
+        ElMessage.error(res.msg || '上传失败')
+      }
+    } catch {
+      ElMessage.error('上传失败')
+    }
+  }
+  reader.readAsDataURL(file.raw)
 }
 
 async function handleSaveProfile() {

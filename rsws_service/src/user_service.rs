@@ -344,6 +344,22 @@ impl UserService {
         Ok(user)
     }
 
+    /// 更新用户头像
+    pub async fn update_avatar(&self, user_id: i64, avatar_url: &str) -> Result<User, RswsError> {
+        let user = self
+            .user_repo
+            .update_user_avatar(user_id, avatar_url)
+            .await?;
+
+        // 清除缓存
+        if let Some(ref redis) = self.redis {
+            let _ = redis.clear_user_cache(user_id).await;
+        }
+
+        info!("User {} avatar updated", user_id);
+        Ok(user)
+    }
+
     /// 修改密码
     pub async fn change_password(
         &self,

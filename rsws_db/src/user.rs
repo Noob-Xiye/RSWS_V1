@@ -175,6 +175,23 @@ impl UserRepository {
         }
     }
 
+    /// 更新用户头像
+    pub async fn update_user_avatar(
+        &self,
+        user_id: i64,
+        avatar_url: &str,
+    ) -> Result<User, RswsError> {
+        let user = sqlx::query_as::<_, User>(
+            "UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
+        )
+        .bind(avatar_url)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| RswsError::internal(format!("Failed to update avatar: {}", e)))?;
+        Ok(user)
+    }
+
     /// 分页获取用户列表（管理员用）
     pub async fn get_users(
         &self,

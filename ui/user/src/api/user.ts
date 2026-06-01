@@ -85,6 +85,11 @@ export async function updateProfile(data: UpdateProfileRequest): Promise<ApiResp
   return request.put('/user/profile', data)
 }
 
+/** 上传头像（base64 data URI） */
+export async function uploadAvatar(avatarData: string): Promise<ApiResponse<{ avatar_url: string }>> {
+  return request.post('/user/avatar', { avatar_data: avatarData })
+}
+
 /** 修改密码 */
 export async function changePassword(data: ChangePasswordRequest): Promise<ApiResponse<{ message: string }>> {
   return request.post('/user/change-password', data)

@@ -44,6 +44,13 @@ pub struct ServerConfig {
     /// TLS 配置（可选）
     #[serde(default)]
     pub tls: TlsConfig,
+    /// 文件上传目录（默认 uploads）
+    #[serde(default = "default_upload_dir")]
+    pub upload_dir: String,
+}
+
+fn default_upload_dir() -> String {
+    "uploads".to_string()
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -87,6 +94,7 @@ trusted_proxies = []
 [server.tls]
 enabled = false
 http3 = false
+upload_dir = "uploads"
 
 [database]
 url = ""
