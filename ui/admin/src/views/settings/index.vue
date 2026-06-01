@@ -71,6 +71,49 @@
             <el-descriptions-item label="登录时间">{{ formatDate(currentLoginTime) }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
+
+        <el-card>
+          <template #header><span>存储配置</span></template>
+          <el-form :model="storageForm" label-width="120px">
+            <el-form-item label="存储方式">
+              <el-radio-group v-model="storageForm.provider">
+                <el-radio value="local">本地存储</el-radio>
+                <el-radio value="s3">AWS S3</el-radio>
+                <el-radio value="minio">MinIO</el-radio>
+                <el-radio value="aliyun-oss">阿里云 OSS</el-radio>
+                <el-radio value="tencent-cos">腾讯云 COS</el-radio>
+              </el-radio-group>
+            </el-form-item>
+            <template v-if="storageForm.provider !== 'local'">
+              <el-form-item label="Endpoint" required>
+                <el-input v-model="storageForm.endpoint" placeholder="https://oss-cn-hangzhou.aliyuncs.com" />
+              </el-form-item>
+              <el-form-item label="Bucket" required>
+                <el-input v-model="storageForm.bucket" placeholder="my-bucket" />
+              </el-form-item>
+              <el-form-item label="Access Key" required>
+                <el-input v-model="storageForm.access_key" placeholder="Access Key ID" />
+              </el-form-item>
+              <el-form-item label="Secret Key" required>
+                <el-input v-model="storageForm.secret_key" type="password" placeholder="Secret Access Key" show-password />
+              </el-form-item>
+              <el-form-item label="Region">
+                <el-input v-model="storageForm.region" placeholder="oss-cn-hangzhou" />
+              </el-form-item>
+              <el-form-item label="存储前缀">
+                <el-input v-model="storageForm.prefix" placeholder="resources/" />
+              </el-form-item>
+              <el-form-item label="CDN 域名">
+                <el-input v-model="storageForm.custom_domain" placeholder="https://cdn.example.com (可选)" />
+              </el-form-item>
+            </template>
+            <el-form-item>
+              <el-button type="primary" :loading="storageSaving" @click="handleSaveStorage">
+                保存配置
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
       </el-col>
     </el-row>
   </div>
@@ -81,12 +124,27 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { getAdminInfo } from '@/api/admin'
 import { resetAdminPassword } from '@/api/admin'
+import { getStorageConfig, updateStorageConfig, type StorageConfig } from '@/api/admin'
 
 const adminInfo = ref<Record<string, any>>({})
 const pwdLoading = ref(false)
 const pwdFormRef = ref<FormInstance>()
 const currentLoginTime = ref(new Date().toISOString())
 const runtimeEnv = import.meta.env.MODE || 'development'
+
+// 存储配置
+const storageForm = reactive<StorageConfig>({
+  provider: 'local',
+  enabled: false,
+  endpoint: '',
+  bucket: '',
+  access_key: '',
+  secret_key: '',
+  region: '',
+  prefix: 'resources/',
+  custom_domain: null,
+})
+const storageSaving = ref(false)
 
 const pwdForm = reactive({
   old_password: '',
@@ -155,7 +213,38 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
-onMounted(() => fetchAdminInfo())
+onMounted(() => {
+  fetchAdminInfo()
+  fetchStorageConfig()
+})
+
+async function fetchStorageConfig() {
+  try {
+    const res = await getStorageConfig()
+    if (res.code === 0 && res.data) {
+      Object.assign(storageForm, res.data)
+    }
+  } catch {
+    // 没有配置时使用默认值
+  }
+}
+
+async function handleSaveStorage() {
+  storageSaving.value = true
+  try {
+    storageForm.enabled = storageForm.provider !== 'local'
+    const res = await updateStorageConfig(storageForm)
+    if (res.code === 0) {
+      ElMessage.success('存储配置已保存')
+    } else {
+      ElMessage.error(res.msg || '保存失败')
+    }
+  } catch {
+    ElMessage.error('保存失败')
+  } finally {
+    storageSaving.value = false
+  }
+}
 </script>
 
 <style scoped>

@@ -119,6 +119,60 @@ type EmailConfigRow = (
 #[allow(clippy::type_complexity)]
 type UsdtListenConfigRow = (String, String, Option<String>, String, i32, i32, bool);
 
+/// OSS 存储配置
+#[derive(Debug, Clone)]
+pub struct OssStorageConfig {
+    pub provider: String, // "local" | "s3" | "minio" | "aliyun-oss" | "tencent-cos"
+    pub endpoint: String, // S3/MinIO endpoint 或 OSS endpoint
+    pub bucket: String,   // bucket 名称
+    pub access_key: String, // Access Key ID
+    pub secret_key: String, // Secret Access Key
+    pub region: String,   // region（可选）
+    pub prefix: String,   // 存储路径前缀，默认 "resources/"
+    pub custom_domain: Option<String>, // 自定义 CDN 域名（可选）
+    pub is_active: bool,  // 是否启用
+}
+
+impl OssStorageConfig {
+    /// 从 system_configs 构建配置（前缀 storage.）
+    pub fn from_map(pairs: &[(String, String, String)]) -> Self {
+        let get = |key: &str, pairs: &[(String, String, String)]| -> String {
+            pairs
+                .iter()
+                .find(|(k, _, _)| k == key)
+                .map(|(_, v, _)| v.clone())
+                .unwrap_or_default()
+        };
+        let get_bool = |key: &str, pairs: &[(String, String, String)]| -> bool {
+            pairs
+                .iter()
+                .find(|(k, _, _)| k == key)
+                .map(|(_, v, _)| v.parse().unwrap_or(false))
+                .unwrap_or(false)
+        };
+        Self {
+            provider: get("storage.provider", pairs),
+            endpoint: get("storage.endpoint", pairs),
+            bucket: get("storage.bucket", pairs),
+            access_key: get("storage.access_key", pairs),
+            secret_key: get("storage.secret_key", pairs),
+            region: get("storage.region", pairs),
+            prefix: get("storage.prefix", pairs),
+            custom_domain: pairs
+                .iter()
+                .find(|(k, _, _)| k == "storage.custom_domain")
+                .map(|(_, v, _)| Some(v.clone()))
+                .unwrap_or(None),
+            is_active: get_bool("storage.enabled", pairs),
+        }
+    }
+
+    /// 是否为本地存储
+    pub fn is_local(&self) -> bool {
+        self.provider == "local" || self.provider.is_empty()
+    }
+}
+
 /// 配置服务
 pub struct ConfigService {
     pool: PgPool,
@@ -451,5 +505,40 @@ impl ConfigService {
         .map_err(|e| RswsError::internal(format!("Failed to get configs by prefix: {}", e)))?;
 
         Ok(rows)
+    }
+
+    // ==================== OSS 存储配置 ====================
+
+    /// 获取 OSS 存储配置
+    pub async fn get_storage_config(&self) -> Result<OssStorageConfig, RswsError> {
+        let pairs = self.get_configs_by_prefix("storage").await?;
+        Ok(OssStorageConfig::from_map(&pairs))
+    }
+
+    /// 批量保存 OSS 存储配置
+    pub async fn save_storage_config(&self, config: &OssStorageConfig) -> Result<(), RswsError> {
+        let mut pairs: Vec<(&str, String)> = vec![
+            ("storage.provider", config.provider.clone()),
+            ("storage.enabled", config.is_active.to_string()),
+            ("storage.endpoint", config.endpoint.clone()),
+            ("storage.bucket", config.bucket.clone()),
+            ("storage.access_key", config.access_key.clone()),
+            ("storage.secret_key", config.secret_key.clone()),
+            ("storage.region", config.region.clone()),
+            ("storage.prefix", {
+                if config.prefix.is_empty() {
+                    "resources/".to_string()
+                } else {
+                    config.prefix.clone()
+                }
+            }),
+        ];
+        if let Some(ref domain) = config.custom_domain {
+            pairs.push(("storage.custom_domain", domain.clone()));
+        }
+        for (key, value) in pairs {
+            self.set(key, &value).await?;
+        }
+        Ok(())
     }
 }

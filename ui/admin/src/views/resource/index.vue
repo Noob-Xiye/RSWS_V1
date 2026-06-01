@@ -179,7 +179,37 @@
         <el-form-item label="详细介绍">
           <el-input v-model="form.detail_description" type="textarea" :rows="5" />
         </el-form-item>
-      </el-form>
+        <el-divider content-position="left">资源文件</el-divider>
+        <el-form-item label="资源文件">
+          <div class="upload-area">
+            <el-input
+              v-model="form.file_url"
+              placeholder="文件URL（手动填写或通过上传自动填充）"
+              clearable
+              style="margin-bottom: 8px"
+            >
+              <template #prepend>URL</template>
+            </el-input>
+            <el-upload
+              :auto-upload="false"
+              :show-file-list="true"
+              :limit="1"
+              :on-change="handleFileChange"
+              :on-exceed="() => ElMessage.warning('只能上传一个文件')"
+              drag
+              style="width: 100%"
+            >
+              <el-progress v-if="uploadLoading" :percentage="uploadProgress" :stroke-width="18" style="margin-bottom: 8px" :text-inside="true" :status="uploadProgress >= 100 ? 'success' : undefined" />
+              <el-icon v-else class="el-icon--upload"><UploadFilled /></el-icon>
+              <div class="el-upload__text">
+                {{ uploadLoading ? `正在上传 ${uploadingFileName}...` : '拖拽文件到此处或点击选择' }}
+              </div>
+              <template #tip>
+                <div class="el-upload__tip">支持大文件上传（最大5GB），上传完成后将自动填充文件URL</div>
+              </template>
+            </el-upload>
+          </div>
+        </el-form-item>      </el-form>
       <template #footer>
         <el-button @click="formVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
@@ -191,8 +221,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Refresh, UploadFilled } from '@element-plus/icons-vue'
 import type { Resource } from '@/api/resource'
 import { listResources, deleteResource, toggleResourceActive, getCategoryOptions, createPlatformResource, updatePlatformResource, deletePlatformResource, togglePlatformResourceActive, listPlatformResources } from '@/api/resource'
+import { uploadLargeFile } from '@/api/resource'
 import type { Category } from '@/api/category'
 
 const loading = ref(false)
@@ -212,6 +244,9 @@ const detailVisible = ref(false)
 const formVisible = ref(false)
 const isEditing = ref(false)
 const currentResource = ref<Resource | null>(null)
+const uploadProgress = ref(0)
+const uploadLoading = ref(false)
+const uploadingFileName = ref('')
 const form = reactive({
   id: undefined as number | undefined,
   title: '',
@@ -222,6 +257,7 @@ const form = reactive({
   detail_description: '',
   usage_guide: '',
   precautions: '',
+  file_url: '',
 })
 
 /** 前端本地根据 is_active 过滤（后端列表不传 active 参数时返回全部） */
@@ -296,6 +332,7 @@ function handleCreate() {
     detail_description: '',
     usage_guide: '',
     precautions: '',
+    file_url: '',
   })
   formVisible.value = true
 }
@@ -312,6 +349,7 @@ function handleEdit(row: Resource) {
     detail_description: row.detail_description || '',
     usage_guide: row.usage_guide || '',
     precautions: row.precautions || '',
+    file_url: (row as any).file_url || '',
   })
   formVisible.value = true
 }
@@ -337,6 +375,34 @@ async function handleSubmit() {
     fetchResources()
   } catch (err) {
     ElMessage.error('操作失败')
+  }
+}
+
+async function handleFileChange(uploadFile: any) {
+  const file = uploadFile.raw
+  if (!file) return
+
+  if (file.size > 5 * 1024 * 1024 * 1024) {
+    ElMessage.warning('文件大小不能超过5GB')
+    return
+  }
+
+  uploadLoading.value = true
+  uploadProgress.value = 0
+  uploadingFileName.value = file.name
+
+  try {
+    const fileUrl = await uploadLargeFile(file, (percent) => {
+      uploadProgress.value = percent
+    })
+    form.file_url = fileUrl
+    ElMessage.success(`文件上传成功：${file.name}`)
+  } catch (err: any) {
+    ElMessage.error(err.message || '文件上传失败')
+  } finally {
+    uploadLoading.value = false
+    uploadProgress.value = 0
+    uploadingFileName.value = ''
   }
 }
 
@@ -387,5 +453,11 @@ onMounted(() => {
 
 :deep(.inactive-row) {
   opacity: 0.5;
+}
+.upload-area {
+  width: 100%;
+}
+:deep(.el-upload-dragger) {
+  width: 100%;
 }
 </style>

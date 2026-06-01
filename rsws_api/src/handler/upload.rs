@@ -343,11 +343,34 @@ pub async fn complete_upload(req: &mut Request, depot: &mut Depot, res: &mut Res
 
     let _ = fs::remove_dir_all(&chunk_dir);
 
-    let file_url = format!("/uploads/{}", relative_path);
+    // 根据存储配置决定文件 URL
+    let file_url = match state.config_service.get_storage_config().await {
+        Ok(storage_config) if storage_config.is_active && !storage_config.is_local() => {
+            if let Some(ref domain) = storage_config.custom_domain {
+                format!(
+                    "https://{}/{}{}",
+                    domain, storage_config.prefix, relative_path
+                )
+            } else {
+                format!(
+                    "https://{}.s3.{}.amazonaws.com/{}{}",
+                    storage_config.bucket,
+                    storage_config.region,
+                    storage_config.prefix,
+                    relative_path
+                )
+            }
+        }
+        Ok(_) => format!("/uploads/{}", relative_path),
+        Err(e) => {
+            tracing::warn!("Failed to get storage config, using local: {}", e);
+            format!("/uploads/{}", relative_path)
+        }
+    };
 
     info!(
-        "Upload completed: {} file={} size={}",
-        body.upload_id, relative_path, total_written
+        "Upload completed: {} file={} size={} url={}",
+        body.upload_id, relative_path, total_written, file_url
     );
 
     res.success(CompleteUploadResponse {

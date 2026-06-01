@@ -1812,3 +1812,70 @@ pub async fn toggle_user_api_key(req: &mut Request, depot: &mut Depot, res: &mut
         Err(e) => res.error(e),
     }
 }
+
+// ==================== 存储配置管理 ====================
+
+/// 获取存储配置
+/// GET /admin/storage-config
+#[endpoint]
+pub async fn get_storage_config(depot: &mut Depot, res: &mut Response) {
+    let state = get_state(depot);
+    let config = match state.config_service.get_storage_config().await {
+        Ok(c) => c,
+        Err(e) => {
+            res.error(RswsError::internal(format!(
+                "Failed to get storage config: {}",
+                e
+            )));
+            return;
+        }
+    };
+    res.success(serde_json::json!({
+        "provider": config.provider,
+        "enabled": config.is_active,
+        "endpoint": config.endpoint,
+        "bucket": config.bucket,
+        "access_key": config.access_key,
+        "secret_key": config.secret_key,
+        "region": config.region,
+        "prefix": config.prefix,
+        "custom_domain": config.custom_domain,
+    }));
+}
+
+/// 更新存储配置
+/// PUT /admin/storage-config
+#[endpoint]
+pub async fn update_storage_config(req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    use rsws_service::config_service::OssStorageConfig;
+    let body = match req.parse_json::<serde_json::Value>().await {
+        Ok(b) => b,
+        Err(e) => {
+            res.error_msg(
+                RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
+                format!("Invalid request: {}", e),
+            );
+            return;
+        }
+    };
+    let config = OssStorageConfig {
+        provider: body["provider"].as_str().unwrap_or("local").to_string(),
+        endpoint: body["endpoint"].as_str().unwrap_or("").to_string(),
+        bucket: body["bucket"].as_str().unwrap_or("").to_string(),
+        access_key: body["access_key"].as_str().unwrap_or("").to_string(),
+        secret_key: body["secret_key"].as_str().unwrap_or("").to_string(),
+        region: body["region"].as_str().unwrap_or("").to_string(),
+        prefix: body["prefix"].as_str().unwrap_or("resources/").to_string(),
+        custom_domain: body["custom_domain"].as_str().map(|s| s.to_string()),
+        is_active: body["enabled"].as_bool().unwrap_or(false),
+    };
+    let state = get_state(depot);
+    if let Err(e) = state.config_service.save_storage_config(&config).await {
+        res.error(RswsError::internal(format!(
+            "Failed to save storage config: {}",
+            e
+        )));
+        return;
+    }
+    res.success(serde_json::json!({"message": "Storage config updated"}));
+}

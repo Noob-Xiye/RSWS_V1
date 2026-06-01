@@ -200,6 +200,12 @@ pub fn create_router(state: AppState) -> Router {
                                         .delete(handler::admin::delete_payment_method),
                                 ),
                         )
+                        // 存储配置管理
+                        .push(
+                            Router::with_path("storage-config")
+                                .get(handler::admin::get_storage_config)
+                                .put(handler::admin::update_storage_config),
+                        )
                         // 管理员管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）
                         .push(
                             Router::new()

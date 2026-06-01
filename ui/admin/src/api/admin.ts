@@ -124,3 +124,24 @@ export async function listUsdtWallets(): Promise<ApiResponse<UsdtWallet[]>> {
 export async function updateUsdtWallet(network: string, address: string): Promise<ApiResponse<UsdtWallet>> {
   return request.put(`/admin/usdt-wallets/${network}`, { address })
 }
+
+// ========== 存储配置管理 ==========
+export interface StorageConfig {
+  provider: string        // "local" | "s3" | "minio" | "aliyun-oss" | "tencent-cos"
+  enabled: boolean
+  endpoint: string
+  bucket: string
+  access_key: string
+  secret_key: string
+  region: string
+  prefix: string
+  custom_domain: string | null
+}
+
+export async function getStorageConfig(): Promise<ApiResponse<StorageConfig>> {
+  return request.get('/admin/storage-config')
+}
+
+export async function updateStorageConfig(data: StorageConfig): Promise<ApiResponse<{ message: string }>> {
+  return request.put('/admin/storage-config', data)
+}
