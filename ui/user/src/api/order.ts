@@ -73,3 +73,19 @@ export interface UsdtAddressResponse {
 export async function getUsdtAddress(network: 'tron' | 'ethereum' = 'tron'): Promise<ApiResponse<UsdtAddressResponse>> {
   return request.get(`/payment/usdt/${network}`)
 }
+
+// 发起订单支付（获取支付链接）
+export interface InitiatePaymentResponse {
+  payment_method: string
+  // PayPal
+  paypal_order_id?: string
+  approve_url?: string
+  // USDT
+  network?: string
+  address?: string
+  amount?: string
+}
+
+export async function initiatePayment(orderId: number): Promise<ApiResponse<InitiatePaymentResponse>> {
+  return request.post(`/order/${orderId}/pay`)
+}

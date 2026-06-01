@@ -77,6 +77,10 @@ pub fn create_router(state: AppState) -> Router {
                             Router::with_path("{id}")
                                 .get(handler::order::get_order)
                                 .push(
+                                    Router::with_path("pay")
+                                        .post(handler::order::initiate_payment),
+                                )
+                                .push(
                                     Router::with_path("cancel").post(handler::order::cancel_order),
                                 )
                                 .push(

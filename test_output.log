@@ -1,0 +1,17 @@
+﻿powershell : At F:\GitRepo\RSWS_V1\test_all_routes.ps1:34 char:21
+所在位置 行:1 字符: 114
++ ... o\RSWS_V1"; powershell -ExecutionPolicy Bypass -File "test_all_routes ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (At F:\GitRepo\R....ps1:34 char:21:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
++         Write-Host "鈿狅笍  [$method] $path ($desc) 鈥?HTTP $code" -Foreg ...
++                     ~~~
+Unexpected token '鈿狅笍' in expression or statement.
+At F:\GitRepo\RSWS_V1\test_all_routes.ps1:34 char:21
++         Write-Host "鈿狅笍  [$method] $path ($desc) 鈥?HTTP $code" -Foreg ...
++                     ~
+The hash literal was incomplete.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+ 

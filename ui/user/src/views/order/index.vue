@@ -184,7 +184,19 @@ async function fetchOrders() {
 
 async function handlePay(order: Order) {
   currentOrder.value = order
-  if (order.payment_method === 'paypal') { ElMessage.info('PayPal 支付功能开发中'); return }
+  if (order.payment_method === 'paypal') {
+    try {
+      const res = await initiatePayment(order.id)
+      if (res.code === 0 && res.data?.approve_url) {
+        window.location.href = res.data.approve_url
+      } else {
+        ElMessage.error(res.msg || '获取支付链接失败，请稍后重试')
+      }
+    } catch (e) {
+      ElMessage.error('PayPal 支付暂不可用，请尝试 USDT 支付')
+    }
+    return
+  }
   const network = order.payment_method === 'usdt_trc20' ? 'tron' : 'ethereum'
   try {
     const res = await getUsdtAddress(network)
