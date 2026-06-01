@@ -32,12 +32,13 @@ impl UserApiKeyRepository {
             general_purpose::URL_SAFE_NO_PAD.encode(key_bytes)
         );
 
-        let permissions_json =
-            serde_json::to_value(&req.permissions)
-                .map_err(|e| RswsError::internal(format!("Failed to serialize permissions: {}", e)))?;
+        let permissions_json = serde_json::to_value(&req.permissions)
+            .map_err(|e| RswsError::internal(format!("Failed to serialize permissions: {}", e)))?;
 
         let rate_limit = req.rate_limit.unwrap_or(100);
-        let expires_at = req.expires_in_days.map(|d| Utc::now() + Duration::days(d as i64));
+        let expires_at = req
+            .expires_in_days
+            .map(|d| Utc::now() + Duration::days(d as i64));
 
         let record = sqlx::query_as::<_, ApiKey>(
             r#"

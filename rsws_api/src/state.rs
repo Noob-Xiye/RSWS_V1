@@ -3,10 +3,7 @@
 //! 持有所有 service 实例，通过 Salvo Depot 注入到 handler
 
 use rsws_common::config::AppConfig;
-use rsws_db::{
-    CategoryRepository,
-    user_api_key::UserApiKeyRepository,
-};
+use rsws_db::{user_api_key::UserApiKeyRepository, CategoryRepository};
 use rsws_service::{
     AdminRepository, AdminService, ApiKeyService, BlockchainService, ConfigService,
     CrossPlatformService, LogService, OrderService, PayPalService, PaymentService, ResourceService,

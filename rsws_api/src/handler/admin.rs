@@ -1701,7 +1701,10 @@ pub async fn list_user_api_keys(req: &mut Request, depot: &mut Depot, res: &mut 
 
     let user_id: i64 = req.param("user_id").unwrap_or(0);
     if user_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid user ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid user ID",
+        );
         return;
     }
 
@@ -1731,11 +1734,16 @@ pub async fn create_user_api_key(req: &mut Request, depot: &mut Depot, res: &mut
 
     let user_id: i64 = req.param("user_id").unwrap_or(0);
     if user_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid user ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid user ID",
+        );
         return;
     }
 
-    let body = req.parse_json::<rsws_model::api_key::CreateApiKeyRequest>().await;
+    let body = req
+        .parse_json::<rsws_model::api_key::CreateApiKeyRequest>()
+        .await;
     let data = match body {
         Ok(d) => d,
         Err(e) => {

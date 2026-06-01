@@ -77,8 +77,7 @@ pub fn create_router(state: AppState) -> Router {
                             Router::with_path("{id}")
                                 .get(handler::order::get_order)
                                 .push(
-                                    Router::with_path("pay")
-                                        .post(handler::order::initiate_payment),
+                                    Router::with_path("pay").post(handler::order::initiate_payment),
                                 )
                                 .push(
                                     Router::with_path("cancel").post(handler::order::cancel_order),
@@ -223,17 +222,16 @@ pub fn create_router(state: AppState) -> Router {
                                 )
                                 // 用户 API Key 管理
                                 .push(
-                                    Router::with_path("users")
-                                        .push(
-                                            Router::with_path("{user_id}/api-keys")
-                                                .get(handler::admin::list_user_api_keys)
-                                                .post(handler::admin::create_user_api_key)
-                                                .push(
-                                                    Router::with_path("{key_id}")
-                                                        .delete(handler::admin::delete_user_api_key)
-                                                        .put(handler::admin::toggle_user_api_key),
-                                                ),
-                                        ),
+                                    Router::with_path("users").push(
+                                        Router::with_path("{user_id}/api-keys")
+                                            .get(handler::admin::list_user_api_keys)
+                                            .post(handler::admin::create_user_api_key)
+                                            .push(
+                                                Router::with_path("{key_id}")
+                                                    .delete(handler::admin::delete_user_api_key)
+                                                    .put(handler::admin::toggle_user_api_key),
+                                            ),
+                                    ),
                                 )
                                 // API Key 管理
                                 .push(

@@ -506,7 +506,10 @@ pub async fn initiate_payment(req: &mut Request, depot: &mut Depot, res: &mut Re
 
     let order_id: i64 = req.param("id").unwrap_or(0);
     if order_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid order ID");
+        res.error_msg(
+            RswsError::from(ErrorCode::INVALID_PARAMETER),
+            "Invalid order ID",
+        );
         return;
     }
 
@@ -527,7 +530,10 @@ pub async fn initiate_payment(req: &mut Request, depot: &mut Depot, res: &mut Re
 
     // 验证订单属于当前用户
     if order.user_id != user_id {
-        res.error_msg(RswsError::from(ErrorCode::AUTH_PERMISSION_DENIED), "Not your order");
+        res.error_msg(
+            RswsError::from(ErrorCode::AUTH_PERMISSION_DENIED),
+            "Not your order",
+        );
         return;
     };
 
@@ -585,8 +591,12 @@ pub async fn initiate_payment(req: &mut Request, depot: &mut Depot, res: &mut Re
             }
         }
         "usdt_trc20" | "usdt_erc20" => {
-            let network = if payment_method == "usdt_trc20" { "tron" } else { "ethereum" };
-            
+            let network = if payment_method == "usdt_trc20" {
+                "tron"
+            } else {
+                "ethereum"
+            };
+
             let address = match network {
                 "tron" => state.blockchain_service.get_trc20_address().await,
                 "ethereum" => state.blockchain_service.get_erc20_address().await,
