@@ -110,7 +110,7 @@ pub async fn init_upload(req: &mut Request, depot: &mut Depot, res: &mut Respons
     }
 
     let upload_id = uuid::Uuid::new_v4().to_string();
-    let total_chunks = ((body.total_size as usize + CHUNK_SIZE - 1) / CHUNK_SIZE) as u32;
+    let total_chunks = (body.total_size as usize).div_ceil(CHUNK_SIZE) as u32;
 
     let chunk_dir = get_chunk_dir(&upload_id);
     if let Err(e) = fs::create_dir_all(&chunk_dir) {
@@ -358,7 +358,7 @@ pub async fn complete_upload(req: &mut Request, depot: &mut Depot, res: &mut Res
 
 fn sanitize_filename(filename: &str) -> String {
     let name = filename
-        .rsplit(|c| c == '/' || c == '\\' || c == ':')
+        .rsplit(['/', '\\', ':'])
         .next()
         .unwrap_or(filename);
     name.chars()
