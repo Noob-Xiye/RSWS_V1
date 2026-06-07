@@ -108,6 +108,7 @@ async fn main() -> Result<(), RswsError> {
 
     // ========== 3. 初始化 ConfigService 并从 DB 读取动态配置 ==========
     let config_service = rsws_service::create_config_service(pool.clone(), redis_pool.clone());
+    let config_service = std::sync::Arc::new(config_service);
 
     // 读取 PayPal 配置
     let paypal_db_config = match config_service.get_paypal_config().await {
@@ -196,7 +197,7 @@ async fn main() -> Result<(), RswsError> {
         None => rsws_service::create_user_service(pool.clone(), Some(redis_pool.clone())),
     };
     let order_service = rsws_service::create_order_service(pool.clone());
-    let resource_service = rsws_service::create_resource_service(pool.clone());
+    let resource_service = rsws_service::create_resource_service(pool.clone(), Some(config_service.as_ref().clone()));
     let api_key_service = rsws_service::ApiKeyService::new(std::sync::Arc::new(redis_pool.clone()));
     let wallet_repo = rsws_db::WalletRepository::new(pool.clone());
 
@@ -212,7 +213,6 @@ async fn main() -> Result<(), RswsError> {
     // Admin 服务
     let admin_repo = rsws_db::AdminRepository::new(pool.clone());
     let category_repo = rsws_db::CategoryRepository::new(pool.clone());
-    let user_api_key_repo = rsws_db::UserApiKeyRepository::new(pool.clone());
     let admin_service = rsws_service::create_admin_service(pool.clone(), Some(redis_pool.clone()));
     let log_service = rsws_service::LogService::new(pool.clone());
 
@@ -231,12 +231,11 @@ async fn main() -> Result<(), RswsError> {
         blockchain_service,
         webhook_service,
         cross_platform_service,
-        config_service,
+        config_service.clone(),
         admin_service,
         log_service,
         admin_repo,
         category_repo,
-        user_api_key_repo,
     );
 
     // ========== 5. 启动 USDT 监听服务（配置来自数据库） ==========

@@ -447,3 +447,232 @@ MIT License
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request。
+
+---
+
+## 架构要点与核心理念
+
+> **重要**: 本节记录项目的关键架构决策和实现细节，确保后续接手的开发者能快速理解项目设计。
+
+### 1. 数据库配置管理模式
+
+**核心理念**: 配置存储在数据库中，而非配置文件，实现动态配置更新无需重启服务。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ConfigService                            │
+│  (rsws_service/src/config_service.rs)                          │
+├─────────────────────────────────────────────────────────────────┤
+│  职责: 从数据库读取各类配置（PayPal、Blockchain、Email 等）       │
+│  存储: PostgreSQL + Redis 缓存                                  │
+│  特点: 支持热更新，无需重启服务                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**配置表结构**:
+- `paypal_configs` - PayPal 支付配置
+- `blockchain_configs` - 区块链监听配置
+- `email_configs` - 邮件服务配置
+- `usdt_listen_configs` - USDT 监听地址配置
+- `encryption_configs` - 加密配置（预留）
+
+**配置安全方案** (2026-06-05 决策):
+- 采用 **方案B: 明文存储 + 数据库权限保护**
+- `encrypted` 字段为历史遗留，数据库实际存储明文
+- 生产环境通过 Docker 内部网络隔离数据库
+- `encryption.rs` 和 `encryption_configs` 表保留待 v1.0.0 清理
+
+### 2. API Key 存储架构
+
+**核心理念**: API Key 采用 **纯 Redis 存储**，不落库。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      API Key 架构                               │
+├─────────────────────────────────────────────────────────────────┤
+│  存储位置: Redis Only (标记: "API Key Only Redis")              │
+│  键格式:   rsws:api_key:{key_id}                                │
+│  原因:    高频访问、无需持久化、安全隔离                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**已删除的废弃代码** (2026-06-07):
+- `rsws_db/src/user_api_key.rs` - 删除
+- `rsws_db/src/admin.rs` 中的 8 个 `admin_api_keys` DB 函数 - 删除
+- `rsws_api/src/handler/admin.rs` 中的 4 个用户 API Key 管理函数 - 删除
+- 对应路由 - 删除
+
+**保留代码**:
+- `list_api_keys` 等纯 Redis API Key 管理函数
+
+### 3. 应用状态管理
+
+**核心理念**: 通过 `AppState` 统一管理所有服务实例，使用 `Arc` 实现线程安全共享。
+
+```rust
+// 位置: rsws_api/src/state.rs
+pub struct AppState {
+    pub pool: PgPool,                                    // 数据库连接池
+    pub config: AppConfig,                               // 应用配置
+    pub user_service: Arc<UserService>,                  // 用户服务
+    pub order_service: Arc<OrderService>,                // 订单服务
+    pub resource_service: Arc<ResourceService>,          // 资源服务
+    pub api_key_service: Arc<ApiKeyService>,             // API Key 服务 (Redis)
+    pub paypal_service: Arc<PayPalService>,              // PayPal 服务
+    pub payment_service: Arc<PaymentService>,            // 支付服务
+    pub blockchain_service: Arc<BlockchainService>,      // 区块链服务
+    pub webhook_service: Arc<WebhookService>,            // Webhook 服务
+    pub config_service: Arc<ConfigService>,              // 配置服务
+    pub admin_service: Arc<AdminService>,                // 管理服务
+    pub log_service: Arc<LogService>,                    // 日志服务
+    pub category_service: Arc<CategoryRepository>,       // 分类服务
+}
+```
+
+**依赖关系**:
+- `ConfigService` 需要 `Clone` trait，用于多处共享
+- 所有服务通过 `Arc` 包装，支持跨线程共享
+- `AppState::new()` 接收各服务实例，统一初始化
+
+### 4. 错误处理体系
+
+**核心理念**: 分层错误处理，领域错误独立定义，统一转换为 `RswsError`。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      错误处理层次                               │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 1: 领域错误 (UploadError, etc.)                          │
+│           - 使用 thiserror 派生                                 │
+│           - 中文错误信息，符合项目风格                           │
+│                                                                 │
+│  Layer 2: 通用错误 RswsError (rsws_common)                      │
+│           - BadRequest, Unauthorized, Forbidden, NotFound, etc. │
+│           - 提供 bad_request(), unauthorized() 等便捷方法        │
+│                                                                 │
+│  Layer 3: HTTP 响应 (handler 层)                               │
+│           - res.error(RswsError::xxx())                         │
+│           - 自动转换为 HTTP 状态码和 JSON 响应                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**UploadError 设计** (2026-06-07 实现):
+```rust
+// 位置: rsws_api/src/handler/upload.rs
+#[derive(Error, Debug)]
+pub enum UploadError {
+    #[error("缺少 content-type 头")]
+    MissingContentType,
+    
+    #[error("Multipart boundary 解析失败: {0}")]
+    BoundaryParseFailed(String),
+    
+    #[error("请求体读取失败: {0}")]
+    BodyReadFailed(String),
+    
+    #[error("文件大小超过限制: {0}")]
+    FileSizeExceeded(String),
+    
+    // ... 更多变体
+}
+
+// multer::Error → UploadError 转换
+impl From<multer::Error> for UploadError { ... }
+```
+
+**注意事项**:
+- `RswsError` 有 blanket 实现 `impl<T: Into<String>> From<T>`，避免冲突
+- 领域错误调用时显式转换: `e.to_string()` 或 `RswsError::bad_request(e.to_string())`
+
+### 5. 文件上传架构
+
+**核心理念**: 支持 OSS 分块上传和单文件上传，使用 `multer` 解析 multipart 请求。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      文件上传流程                               │
+├─────────────────────────────────────────────────────────────────┤
+│  1. 客户端发起 multipart/form-data 请求                         │
+│  2. Salvo ReqBody → http_body_util::BodyStream                 │
+│  3. BodyStream → multer::Multipart 解析                        │
+│  4. 提取文件字段 → 上传到 OSS                                   │
+│  5. 返回文件 URL                                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**关键技术点**:
+- 使用 `http_body_util::BodyStream` 转换 Salvo 请求体
+- `multer::Multipart::new()` 需要 `Stream<Item = Result<Bytes, multer::Error>>`
+- 错误处理统一到 `UploadError`
+
+**依赖**:
+- `multer` - multipart 解析
+- `http-body-util` - Body 流转换
+- `futures-util` - Stream 扩展
+- `thiserror` - 错误派生
+
+### 6. USDT 支付监听服务
+
+**核心理念**: 后台服务自动轮询链上交易，支付到账后自动确认订单。
+
+```
+用户下单 → 生成收款地址 → 展示支付二维码
+                                    ↓
+用户转账 USDT ← ← ← ← ← ← ← ← ← ← ←
+                                    ↓
+USDT 监听服务检测交易 → 匹配订单 → 确认支付
+                                    ↓
+开放下载权限 ← ← ← ← ← ← ← ← ← ← ←
+```
+
+**监听服务**:
+- Tron 监听: 使用 TronGrid API
+- ERC20 监听: 使用 Etherscan API
+- 配置来源: 数据库 `usdt_listen_configs` 表
+
+### 7. 分层架构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ rsws_bin/        启动入口，组装所有依赖                          │
+│                  - 读取配置                                     │
+│                  - 初始化数据库和 Redis                          │
+│                  - 创建所有 Service 实例                         │
+│                  - 启动 USDT 监听服务                           │
+├─────────────────────────────────────────────────────────────────┤
+│ rsws_api/        HTTP API 层，路由和 Handler                     │
+│                  - 请求解析                                     │
+│                  - 响应序列化                                   │
+│                  - 认证中间件                                   │
+│                  - 错误处理                                     │
+├─────────────────────────────────────────────────────────────────┤
+│ rsws_service/    业务逻辑层                                       │
+│                  - 领域服务                                     │
+│                  - 业务规则验证                                 │
+│                  - 跨服务协调                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ rsws_db/         数据库访问层                                     │
+│                  - Repository 模式                              │
+│                  - SQL 查询封装                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ rsws_model/      数据模型层                                       │
+│                  - 实体定义                                     │
+│                  - DTO                                         │
+├─────────────────────────────────────────────────────────────────┤
+│ rsws_common/     公共工具                                         │
+│                  - 配置结构                                     │
+│                  - 错误类型                                     │
+│                  - 响应扩展                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 8. 关键依赖版本
+
+| Crate | 版本 | 用途 |
+|-------|------|------|
+| salvo | 0.93 | Web 框架 |
+| sqlx | 0.8 | 数据库 |
+| multer | 3.1 | Multipart 解析 |
+| thiserror | 2.0 | 错误派生 |
+| http-body-util | 0.1 | Body 流转换 |
+| tokio | 1.x | 异步运行时 |

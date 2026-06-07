@@ -120,7 +120,7 @@ type EmailConfigRow = (
 type UsdtListenConfigRow = (String, String, Option<String>, String, i32, i32, bool);
 
 /// OSS 存储配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, salvo_oapi::ToSchema)]
 pub struct OssStorageConfig {
     pub provider: String, // "local" | "s3" | "minio" | "aliyun-oss" | "tencent-cos"
     pub endpoint: String, // S3/MinIO endpoint 或 OSS endpoint
@@ -174,6 +174,7 @@ impl OssStorageConfig {
 }
 
 /// 配置服务
+#[derive(Clone)]
 pub struct ConfigService {
     pool: PgPool,
     redis: RedisService,
@@ -213,8 +214,8 @@ impl ConfigService {
     pub async fn set(&self, key: &str, value: &str) -> Result<(), RswsError> {
         sqlx::query(
             r#"
-            INSERT INTO system_configs (config_key, config_value, config_type, is_encrypted, created_at, updated_at)
-            VALUES ($1, $2, 'string', false, NOW(), NOW())
+            INSERT INTO system_configs (config_key, config_value, config_type, created_at, updated_at)
+            VALUES ($1, $2, 'string', NOW(), NOW())
             ON CONFLICT (config_key) DO UPDATE SET config_value = $2, updated_at = NOW()
             "#,
         )
@@ -251,8 +252,8 @@ impl ConfigService {
     pub async fn get_paypal_config(&self) -> Result<Option<PayPalDbConfig>, RswsError> {
         let row: Option<PayPalConfigRow> = sqlx::query_as(
             r#"
-                SELECT id, client_id, client_secret_encrypted, sandbox,
-                       webhook_id, webhook_secret_encrypted,
+                SELECT id, client_id, client_secret, sandbox,
+                       webhook_id, webhook_secret,
                        base_url, return_url, cancel_url, brand_name,
                        min_amount, max_amount, fee_rate
                 FROM paypal_configs
@@ -305,7 +306,7 @@ impl ConfigService {
     pub async fn get_blockchain_configs(&self) -> Result<Vec<BlockchainDbConfig>, RswsError> {
         let rows: Vec<BlockchainConfigRow> = sqlx::query_as(
             r#"
-                SELECT network, network_name, api_url, api_key_encrypted,
+                SELECT network, network_name, api_url, api_key,
                        usdt_contract, min_confirmations,
                        min_amount, max_amount, fee_rate, is_active
                 FROM blockchain_configs
@@ -367,7 +368,7 @@ impl ConfigService {
     pub async fn get_email_config(&self) -> Result<Option<EmailDbConfig>, RswsError> {
         let row: Option<EmailConfigRow> = sqlx::query_as(
             r#"
-                SELECT provider, host, port, username, password_encrypted,
+                SELECT provider, host, port, username, password,
                        use_tls, from_email, from_name, reply_to
                 FROM email_configs
                 WHERE is_active = true
@@ -414,7 +415,7 @@ impl ConfigService {
     pub async fn get_usdt_listen_configs(&self) -> Result<Vec<UsdtListenDbConfig>, RswsError> {
         let rows: Vec<UsdtListenConfigRow> = sqlx::query_as(
             r#"
-                SELECT network, api_url, api_key_encrypted,
+                SELECT network, api_url, api_key,
                        usdt_contract, poll_interval_seconds,
                        min_confirmations, is_active
                 FROM usdt_listen_configs
@@ -464,25 +465,9 @@ impl ConfigService {
             .find(|c| c.network == network))
     }
 
-    // ==================== 加密配置 ====================
-
-    /// 从 encryption_configs 表获取活跃的加密密钥
-    pub async fn get_encryption_key(&self) -> Result<Option<String>, RswsError> {
-        let row: Option<(String,)> = sqlx::query_as(
-            r#"
-            SELECT encryption_key_encrypted
-            FROM encryption_configs
-            WHERE is_active = true
-            ORDER BY key_version DESC
-            LIMIT 1
-            "#,
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| RswsError::internal(format!("Failed to get encryption key: {}", e)))?;
-
-        Ok(row.map(|r| r.0))
-    }
+    // ==================== 加密配置（已弃用） ====================
+    // 注意: encryption_configs 表及相关字段已移除
+    // 敏感配置直接存储，依赖环境变量和数据库权限保护
 
     // ==================== 批量获取配置 ====================
 

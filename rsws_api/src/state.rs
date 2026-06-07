@@ -3,7 +3,7 @@
 //! 持有所有 service 实例，通过 Salvo Depot 注入到 handler
 
 use rsws_common::config::AppConfig;
-use rsws_db::{user_api_key::UserApiKeyRepository, CategoryRepository};
+use rsws_db::CategoryRepository;
 use rsws_service::{
     AdminRepository, AdminService, ApiKeyService, BlockchainService, ConfigService,
     CrossPlatformService, LogService, OrderService, PayPalService, PaymentService, ResourceService,
@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 /// 应用全局状态
 #[derive(Clone)]
+/// 应用全局状态
 pub struct AppState {
     pub pool: PgPool,
     pub config: AppConfig,
@@ -32,7 +33,6 @@ pub struct AppState {
     pub log_service: Arc<LogService>,
     admin_repo: Arc<AdminRepository>,
     pub category_service: Arc<CategoryRepository>,
-    pub user_api_key_repo: Arc<UserApiKeyRepository>,
 }
 
 impl AppState {
@@ -49,12 +49,11 @@ impl AppState {
         blockchain_service: BlockchainService,
         webhook_service: WebhookService,
         cross_platform_service: CrossPlatformService,
-        config_service: ConfigService,
+        config_service: Arc<ConfigService>,
         admin_service: AdminService,
         log_service: LogService,
         admin_repo: AdminRepository,
         category_service: CategoryRepository,
-        user_api_key_repo: UserApiKeyRepository,
     ) -> Self {
         Self {
             pool: pool.clone(),
@@ -68,12 +67,11 @@ impl AppState {
             blockchain_service: Arc::new(blockchain_service),
             webhook_service: Arc::new(webhook_service),
             cross_platform_service: Arc::new(cross_platform_service),
-            config_service: Arc::new(config_service),
+            config_service,
             admin_service: Arc::new(admin_service),
             log_service: Arc::new(log_service),
             admin_repo: Arc::new(admin_repo),
             category_service: Arc::new(category_service),
-            user_api_key_repo: Arc::new(user_api_key_repo),
         }
     }
 

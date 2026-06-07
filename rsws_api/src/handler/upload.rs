@@ -1,387 +1,492 @@
-//! 分块文件上传处理器
-//!
-//! 支持大文件分块上传（几十MB到几GB），流程：
-//! 1. POST /api/v1/upload/init — 初始化上传（返回 upload_id）
-//! 2. POST /api/v1/upload/chunk — 上传单个分块（JSON body: base64 data）
-//! 3. POST /api/v1/upload/complete — 合并所有分块，返回文件路径
+//! 文件上传 Handler（支持 OSS 分块上传 + 单文件上传）
 
 use crate::state::get_state;
-use base64::Engine;
-use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
+use bytes::Bytes;
+use futures_util::StreamExt;
+use http_body_util::BodyStream;
+use multer::Multipart;
+use rand::Rng;
+use rsws_common::{ResponseExt, RswsError};
+use salvo::oapi::extract::JsonBody;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
-use tokio::io::AsyncWriteExt;
+use thiserror::Error;
 use tracing::{error, info};
 
-/// 分块大小：8MB
-pub const CHUNK_SIZE: usize = 8 * 1024 * 1024;
+// ==================== 统一错误类型 ====================
+
+/// 上传相关错误（统一错误处理）
+#[derive(Error, Debug)]
+pub enum UploadError {
+    #[error("缺少 content-type 头")]
+    MissingContentType,
+    
+    #[error("无效的 content-type")]
+    InvalidContentType,
+    
+    #[error("Multipart boundary 解析失败: {0}")]
+    BoundaryParseFailed(String),
+    
+    #[error("Content-Type 不是 multipart/form-data")]
+    NoMultipart,
+    
+    #[error("请求体读取失败: {0}")]
+    BodyReadFailed(String),
+    
+    #[error("Multipart 解析错误: {0}")]
+    MultipartParseError(String),
+    
+    #[error("读取文件数据失败: {0}")]
+    FileReadError(String),
+    
+    #[error("未找到上传文件")]
+    FileNotFound,
+    
+    #[error("文件大小超过限制: {0}")]
+    FileSizeExceeded(String),
+    
+    #[error("未知上传错误: {0}")]
+    Unknown(String),
+}
+
+impl From<multer::Error> for UploadError {
+    fn from(err: multer::Error) -> Self {
+        match err {
+            multer::Error::NoMultipart => UploadError::NoMultipart,
+            multer::Error::NoBoundary => UploadError::BoundaryParseFailed("未找到 boundary".to_string()),
+            multer::Error::StreamReadFailed(e) => UploadError::BodyReadFailed(e.to_string()),
+            multer::Error::FieldSizeExceeded { limit, field_name } => {
+                let name = field_name.unwrap_or_else(|| "<unknown>".to_string());
+                UploadError::FileSizeExceeded(format!("字段 {} 超过大小限制: {} bytes", name, limit))
+            }
+            multer::Error::StreamSizeExceeded { limit } => {
+                UploadError::FileSizeExceeded(format!("流大小超过限制: {} bytes", limit))
+            }
+            multer::Error::IncompleteStream => UploadError::MultipartParseError("不完整的 multipart 流".to_string()),
+            multer::Error::IncompleteHeaders => UploadError::MultipartParseError("不完整的字段头".to_string()),
+            multer::Error::UnknownField { field_name } => {
+                let name = field_name.unwrap_or_else(|| "<unknown>".to_string());
+                UploadError::MultipartParseError(format!("未知字段: {}", name))
+            }
+            multer::Error::IncompleteFieldData { field_name } => {
+                let name = field_name.unwrap_or_else(|| "<unknown>".to_string());
+                UploadError::FileReadError(format!("字段 {} 数据不完整", name))
+            }
+            multer::Error::ReadHeaderFailed(e) => UploadError::MultipartParseError(format!("读取头失败: {:?}", e)),
+            multer::Error::DecodeHeaderName { name, .. } => UploadError::MultipartParseError(format!("解码头名失败: {:?}", name)),
+            multer::Error::DecodeHeaderValue { .. } => UploadError::MultipartParseError("解码头值失败".to_string()),
+            multer::Error::DecodeContentType(_) => UploadError::InvalidContentType,
+            multer::Error::LockFailure => UploadError::MultipartParseError("锁定 multipart 状态失败".to_string()),
+            // 处理未来可能添加的变体和 json feature
+            _ => UploadError::Unknown(err.to_string()),
+        }
+    }
+}
+
+impl From<UploadError> for RswsError {
+    fn from(err: UploadError) -> Self {
+        RswsError::BadRequest(err.to_string())
+    }
+}
 
 /// 初始化上传请求
-#[derive(Debug, Deserialize, Serialize, salvo_oapi::ToSchema)]
+#[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
 pub struct InitUploadRequest {
     pub filename: String,
-    pub total_size: u64,
-    pub file_md5: Option<String>,
+    pub file_size: i64,
+    pub chunk_size: Option<i64>,
+    pub content_type: Option<String>,
 }
 
 /// 初始化上传响应
 #[derive(Debug, Serialize, salvo_oapi::ToSchema)]
 pub struct InitUploadResponse {
     pub upload_id: String,
-    pub chunk_size: usize,
-    pub total_chunks: u32,
-}
-
-/// 上传分块请求
-#[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
-pub struct ChunkUploadRequest {
-    pub upload_id: String,
-    pub chunk_index: u32,
-    /// Base64 编码的分块数据
-    pub data: String,
+    pub chunk_size: i64,
+    pub total_chunks: i32,
+    pub file_key: String,
 }
 
 /// 完成上传请求
-#[derive(Debug, Deserialize, Serialize, salvo_oapi::ToSchema)]
+#[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
 pub struct CompleteUploadRequest {
     pub upload_id: String,
-    pub filename: String,
+    pub file_key: String,
 }
 
 /// 完成上传响应
 #[derive(Debug, Serialize, salvo_oapi::ToSchema)]
 pub struct CompleteUploadResponse {
     pub file_url: String,
-    pub file_size: u64,
+    pub file_size: i64,
+    pub etag: Option<String>,
 }
 
-/// 获取分块临时目录
-fn get_chunk_dir(upload_id: &str) -> PathBuf {
-    std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("uploads")
-        .join("_chunks")
-        .join(upload_id)
+/// 单文件上传响应
+#[derive(Debug, Serialize, salvo_oapi::ToSchema)]
+pub struct SingleUploadResponse {
+    pub file_url: String,
+    pub file_key: String,
+    pub file_size: i64,
+    pub content_type: Option<String>,
 }
+
+/// 上传会话（存储在 Redis）
+#[derive(Debug, Serialize, Deserialize)]
+struct UploadSession {
+    file_key: String,
+    filename: String,
+    file_size: i64,
+    chunk_size: i64,
+    total_chunks: i32,
+    content_type: Option<String>,
+    uploaded_chunks: Vec<i32>,
+    created_at: i64,
+}
+
+// ==================== Handler ====================
 
 /// 初始化上传
-#[salvo_oapi::endpoint(
-    request_body = InitUploadRequest,
-    responses(
-        (status_code = 200, description = "初始化成功"),
-        (status_code = 401, description = "未认证"),
-    )
-)]
-pub async fn init_upload(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let _user_id = match res.auth_require_user_id(depot) {
-        Some(id) => id,
-        None => return,
+#[endpoint]
+pub async fn init_upload(
+    _req: &mut Request,
+    depot: &mut Depot,
+    body: JsonBody<InitUploadRequest>,
+    res: &mut Response,
+) {
+    let req = body.into_inner();
+    let state = get_state(depot);
+
+    if req.file_size <= 0 {
+        return res.http_error(StatusCode::BAD_REQUEST, "文件大小必须大于 0");
+    }
+    if req.filename.is_empty() {
+        return res.http_error(StatusCode::BAD_REQUEST, "文件名不能为空");
+    }
+
+    let upload_id = chrono::Utc::now().timestamp_millis().to_string();
+    let file_key = generate_file_key(&req.filename);
+    let chunk_size = req.chunk_size.unwrap_or(5 * 1024 * 1024);
+    let total_chunks = ((req.file_size + chunk_size - 1) / chunk_size) as i32;
+
+    let session = UploadSession {
+        file_key: file_key.clone(),
+        filename: req.filename,
+        file_size: req.file_size,
+        chunk_size,
+        total_chunks,
+        content_type: req.content_type,
+        uploaded_chunks: Vec::new(),
+        created_at: chrono::Utc::now().timestamp(),
     };
 
-    let body = match req.parse_json::<InitUploadRequest>().await {
-        Ok(b) => b,
-        Err(e) => {
-            res.error_msg(
-                RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
-                format!("Invalid request: {}", e),
-            );
-            return;
-        }
-    };
-
-    let filename = body.filename.trim();
-    if filename.is_empty() {
-        res.error_msg(
-            RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Filename cannot be empty",
-        );
-        return;
+    let session_key = format!("upload_session:{}", upload_id);
+    if let Err(e) = state.config_service.redis_client()
+        .set_json(&session_key, &session, 3600)
+        .await
+    {
+        error!("Failed to save session: {}", e);
+        return res.error(RswsError::internal("保存上传会话失败"));
     }
 
-    const MAX_SIZE: u64 = 5 * 1024 * 1024 * 1024;
-    if body.total_size == 0 || body.total_size > MAX_SIZE {
-        res.error_msg(
-            RswsError::from(ErrorCode::INVALID_PARAMETER),
-            format!("File size must be between 1 and {} bytes", MAX_SIZE),
-        );
-        return;
-    }
-
-    let upload_id = uuid::Uuid::new_v4().to_string();
-    let total_chunks = (body.total_size as usize).div_ceil(CHUNK_SIZE) as u32;
-
-    let chunk_dir = get_chunk_dir(&upload_id);
-    if let Err(e) = fs::create_dir_all(&chunk_dir) {
-        error!("Failed to create chunk dir: {}", e);
-        res.error(RswsError::internal("Failed to initialize upload"));
-        return;
-    }
-
-    let meta = serde_json::json!({
-        "filename": body.filename,
-        "total_size": body.total_size,
-        "file_md5": body.file_md5,
-        "total_chunks": total_chunks,
-    });
-    let meta_path = chunk_dir.join("_meta.json");
-    if let Err(e) = fs::write(&meta_path, serde_json::to_string(&meta).unwrap()) {
-        error!("Failed to write chunk meta: {}", e);
-        let _ = fs::remove_dir_all(&chunk_dir);
-        res.error(RswsError::internal("Failed to initialize upload"));
-        return;
-    }
-
-    info!(
-        "Upload initialized: {} file={} size={} chunks={}",
-        upload_id, body.filename, body.total_size, total_chunks
-    );
+    info!("Upload initialized: upload_id={}, file_key={}, chunks={}",
+          upload_id, file_key, total_chunks);
 
     res.success(InitUploadResponse {
         upload_id,
-        chunk_size: CHUNK_SIZE,
+        chunk_size,
         total_chunks,
+        file_key,
     });
 }
 
-/// 上传分块（base64 JSON body）
-#[salvo_oapi::endpoint(
-    request_body = ChunkUploadRequest,
-    responses(
-        (status_code = 200, description = "分块上传成功"),
-        (status_code = 401, description = "未认证"),
-    )
-)]
-pub async fn upload_chunk(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let _user_id = match res.auth_require_user_id(depot) {
-        Some(id) => id,
-        None => return,
-    };
+/// 上传分块（POST multipart/form-data，upload_id 和 chunk_index 通过查询参数传入）
+#[endpoint]
+pub async fn upload_chunk(
+    req: &mut Request,
+    depot: &mut Depot,
+    res: &mut Response,
+) {
+    let state = get_state(depot);
 
-    let body = match req.parse_json::<ChunkUploadRequest>().await {
-        Ok(b) => b,
+    // 解析查询参数
+    let upload_id: String = req.parse_queries()
+        .map_err(|_| StatusCode::BAD_REQUEST)
+        .and_then(|p: UploadChunkQuery| Ok(p.upload_id))
+        .unwrap_or_default();
+    let chunk_index: i32 = req.parse_queries()
+        .map_err(|_| StatusCode::BAD_REQUEST)
+        .and_then(|p: UploadChunkQuery| Ok(p.chunk_index))
+        .unwrap_or(-1);
+
+    if upload_id.is_empty() {
+        return res.http_error(StatusCode::BAD_REQUEST, "缺少 upload_id");
+    }
+    if chunk_index < 0 {
+        return res.http_error(StatusCode::BAD_REQUEST, "缺少 chunk_index");
+    }
+
+    let session_key = format!("upload_session:{}", upload_id);
+    let mut session: UploadSession = match state.config_service.redis_client()
+        .get_json(&session_key)
+        .await
+    {
+        Ok(Some(s)) => s,
+        Ok(None) => return res.http_error(StatusCode::NOT_FOUND, "上传会话不存在或已过期"),
         Err(e) => {
-            res.error_msg(
-                RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
-                format!("Invalid request: {}", e),
-            );
-            return;
+            error!("Redis get error: {}", e);
+            return res.error(RswsError::internal("读取上传会话失败"));
         }
     };
 
-    if body.upload_id.is_empty() {
-        res.error_msg(
-            RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Missing upload_id",
-        );
-        return;
+    if chunk_index < 0 || chunk_index >= session.total_chunks {
+        return res.http_error(StatusCode::BAD_REQUEST, "无效的分块索引");
     }
 
-    let chunk_dir = get_chunk_dir(&body.upload_id);
-    if !chunk_dir.exists() {
-        res.error_msg(
-            RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid or expired upload_id",
-        );
-        return;
-    }
+    // 读取分块数据（只取 Bytes 部分）
+    let chunk_data = match read_multipart_file(req).await {
+        Ok((data, _, _)) => data,
+        Err(e) => return res.http_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
 
-    // 解码 base64
-    let chunk_data = match base64::engine::general_purpose::STANDARD.decode(&body.data) {
-        Ok(d) => d,
+    // 获取 OSS 配置并上传
+    let oss_config = match state.config_service.get_storage_config().await {
+        Ok(c) => c,
         Err(e) => {
-            res.error_msg(
-                RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
-                format!("Invalid base64 data: {}", e),
-            );
-            return;
+            error!("Failed to get storage config: {}", e);
+            return res.error(RswsError::internal("获取存储配置失败"));
         }
     };
 
-    let received = chunk_data.len();
-    let chunk_path = chunk_dir.join(format!("chunk_{:06}", body.chunk_index));
-    let mut f = match tokio::fs::File::create(&chunk_path).await {
-        Ok(f) => f,
-        Err(e) => {
-            error!("Failed to create chunk file: {}", e);
-            res.error(RswsError::internal("Failed to save chunk"));
-            return;
-        }
-    };
-
-    if let Err(e) = f.write_all(&chunk_data).await {
-        error!("Failed to write chunk: {}", e);
-        res.error(RswsError::internal("Failed to save chunk"));
-        return;
-    }
-
-    info!(
-        "Chunk uploaded: {} index={} size={}",
-        body.upload_id, body.chunk_index, received
-    );
-
-    res.success(serde_json::json!({
-        "chunk_index": body.chunk_index,
-        "received": received,
-        "message": "Chunk uploaded"
-    }));
-}
-
-/// 完成上传（合并分块）
-#[salvo_oapi::endpoint(
-    request_body = CompleteUploadRequest,
-    responses(
-        (status_code = 200, description = "合并完成"),
-        (status_code = 401, description = "未认证"),
-    )
-)]
-pub async fn complete_upload(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let _user_id = match res.auth_require_user_id(depot) {
-        Some(id) => id,
-        None => return,
-    };
-
-    let body = match req.parse_json::<CompleteUploadRequest>().await {
-        Ok(b) => b,
-        Err(e) => {
-            res.error_msg(
-                RswsError::from(ErrorCode::INVALID_REQUEST_FORMAT),
-                format!("Invalid request: {}", e),
-            );
-            return;
-        }
-    };
-
-    let chunk_dir = get_chunk_dir(&body.upload_id);
-    if !chunk_dir.exists() {
-        res.error_msg(
-            RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid or expired upload_id",
-        );
-        return;
-    }
-
-    let meta_path = chunk_dir.join("_meta.json");
-    let meta_str = match fs::read_to_string(&meta_path) {
+    let storage_service = match rsws_service::oss_service::StorageService::new(&oss_config).await {
         Ok(s) => s,
         Err(e) => {
-            error!("Failed to read meta: {}", e);
-            res.error(RswsError::internal("Upload metadata lost"));
-            return;
+            error!("Failed to create storage service: {}", e);
+            return res.error(RswsError::internal("创建存储服务失败"));
         }
     };
-    let meta: serde_json::Value = match serde_json::from_str(&meta_str) {
-        Ok(m) => m,
-        Err(_) => {
-            res.error(RswsError::internal("Upload metadata corrupted"));
-            return;
-        }
-    };
-    let total_chunks: u32 = meta["total_chunks"].as_u64().unwrap_or(0) as u32;
-    let original_filename = meta["filename"].as_str().unwrap_or(&body.filename);
 
-    let chunk_files: Vec<_> = (0..total_chunks)
-        .map(|i| chunk_dir.join(format!("chunk_{:06}", i)))
-        .collect();
-    for cf in &chunk_files {
-        if !cf.exists() {
-            res.error_msg(
-                RswsError::from(ErrorCode::INVALID_PARAMETER),
-                format!("Missing chunk {}", cf.display()),
-            );
-            return;
-        }
+    let chunk_key = format!("{}.chunk_{}", session.file_key, chunk_index);
+    if let Err(e) = storage_service.upload(&chunk_key, chunk_data, session.content_type.as_deref()).await {
+        error!("Failed to upload chunk: {}", e);
+        return res.error(RswsError::internal("上传分块失败"));
     }
 
+    session.uploaded_chunks.push(chunk_index);
+    session.uploaded_chunks.sort();
+
+    if let Err(e) = state.config_service.redis_client()
+        .set_json(&session_key, &session, 3600)
+        .await
+    {
+        error!("Failed to save session: {}", e);
+        return res.error(RswsError::internal("保存上传会话失败"));
+    }
+
+    info!("Chunk uploaded: upload_id={}, chunk={}/{}",
+          upload_id, chunk_index + 1, session.total_chunks);
+
+    res.success_msg((), format!("分块 {}/{} 上传成功", chunk_index + 1, session.total_chunks));
+}
+
+/// 完成上传
+#[endpoint]
+pub async fn complete_upload(
+    _req: &mut Request,
+    depot: &mut Depot,
+    body: JsonBody<CompleteUploadRequest>,
+    res: &mut Response,
+) {
+    let req = body.into_inner();
     let state = get_state(depot);
-    let now = chrono::Utc::now();
-    let relative_path = format!(
-        "resources/{}/{}/{}-{}",
-        now.format("%Y"),
-        now.format("%m"),
-        uuid::Uuid::new_v4(),
-        sanitize_filename(original_filename)
-    );
-    let dest_path = PathBuf::from(&state.config.server.upload_dir).join(&relative_path);
 
-    if let Err(e) = fs::create_dir_all(dest_path.parent().unwrap()) {
-        error!("Failed to create dest dir: {}", e);
-        res.error(RswsError::internal("Failed to complete upload"));
-        return;
-    }
-
-    let mut dest_file = match tokio::fs::File::create(&dest_path).await {
-        Ok(f) => f,
+    let session_key = format!("upload_session:{}", req.upload_id);
+    let session: UploadSession = match state.config_service.redis_client()
+        .get_json(&session_key)
+        .await
+    {
+        Ok(Some(s)) => s,
+        Ok(None) => return res.http_error(StatusCode::NOT_FOUND, "上传会话不存在或已过期"),
         Err(e) => {
-            error!("Failed to create dest file: {}", e);
-            res.error(RswsError::internal("Failed to complete upload"));
-            return;
+            error!("Redis get error: {}", e);
+            return res.error(RswsError::internal("读取上传会话失败"));
         }
     };
 
-    let mut total_written: u64 = 0;
-    for cf in &chunk_files {
-        let data = match fs::read(cf) {
+    if session.uploaded_chunks.len() != session.total_chunks as usize {
+        return res.http_error(StatusCode::BAD_REQUEST, format!(
+            "还有 {} 个分块未上传",
+            session.total_chunks - session.uploaded_chunks.len() as i32
+        ));
+    }
+
+    let oss_config = match state.config_service.get_storage_config().await {
+        Ok(c) => c,
+        Err(_e) => return res.error(RswsError::internal("获取存储配置失败")),
+    };
+
+    let storage_service = match rsws_service::oss_service::StorageService::new(&oss_config).await {
+        Ok(s) => s,
+        Err(_e) => return res.error(RswsError::internal("创建存储服务失败")),
+    };
+
+    let file_url = if session.total_chunks == 1 {
+        let chunk_key = format!("{}.chunk_0", session.file_key);
+        let data = match storage_service.download(&chunk_key).await {
             Ok(d) => d,
-            Err(e) => {
-                error!("Failed to read chunk {}: {}", cf.display(), e);
-                let _ = tokio::fs::remove_file(&dest_path).await;
-                res.error(RswsError::internal("Failed to merge chunks"));
-                return;
-            }
+            Err(e) => return res.error(RswsError::internal(format!("下载分块失败: {}", e))),
         };
-        if let Err(e) = dest_file.write_all(&data).await {
-            error!("Failed to write chunk to dest: {}", e);
-            let _ = tokio::fs::remove_file(&dest_path).await;
-            res.error(RswsError::internal("Failed to merge chunks"));
-            return;
+        let result = match storage_service.upload(&session.file_key, data, session.content_type.as_deref()).await {
+            Ok(r) => r,
+            Err(e) => return res.error(RswsError::internal(format!("上传最终文件失败: {}", e))),
+        };
+        let _ = storage_service.delete(&chunk_key).await;
+        result.url
+    } else {
+        let mut complete_data = Vec::new();
+        for i in 0..session.total_chunks {
+            let chunk_key = format!("{}.chunk_{}", session.file_key, i);
+            let chunk_data = match storage_service.download(&chunk_key).await {
+                Ok(d) => d,
+                Err(e) => return res.error(RswsError::internal(format!("下载分块 {} 失败: {}", i, e))),
+            };
+            complete_data.extend_from_slice(&chunk_data);
+            let _ = storage_service.delete(&chunk_key).await;
         }
-        total_written += data.len() as u64;
-    }
-    dest_file.flush().await.ok();
-
-    let _ = fs::remove_dir_all(&chunk_dir);
-
-    // 根据存储配置决定文件 URL
-    let file_url = match state.config_service.get_storage_config().await {
-        Ok(storage_config) if storage_config.is_active && !storage_config.is_local() => {
-            if let Some(ref domain) = storage_config.custom_domain {
-                format!(
-                    "https://{}/{}{}",
-                    domain, storage_config.prefix, relative_path
-                )
-            } else {
-                format!(
-                    "https://{}.s3.{}.amazonaws.com/{}{}",
-                    storage_config.bucket,
-                    storage_config.region,
-                    storage_config.prefix,
-                    relative_path
-                )
-            }
-        }
-        Ok(_) => format!("/uploads/{}", relative_path),
-        Err(e) => {
-            tracing::warn!("Failed to get storage config, using local: {}", e);
-            format!("/uploads/{}", relative_path)
-        }
+        let result = match storage_service.upload(&session.file_key, Bytes::from(complete_data), session.content_type.as_deref()).await {
+            Ok(r) => r,
+            Err(e) => return res.error(RswsError::internal(format!("上传最终文件失败: {}", e))),
+        };
+        result.url
     };
 
-    info!(
-        "Upload completed: {} file={} size={} url={}",
-        body.upload_id, relative_path, total_written, file_url
-    );
+    if let Err(e) = state.config_service.redis_client().del(&session_key).await {
+        error!("Failed to delete session: {}", e);
+    }
+
+    info!("Upload completed: upload_id={}, file_url={}", req.upload_id, file_url);
 
     res.success(CompleteUploadResponse {
         file_url,
-        file_size: total_written,
+        file_size: session.file_size,
+        etag: None,
     });
 }
 
-fn sanitize_filename(filename: &str) -> String {
-    let name = filename.rsplit(['/', '\\', ':']).next().unwrap_or(filename);
-    name.chars()
-        .filter(|c| !c.is_control() && *c != '\0')
-        .collect()
+/// 单文件上传
+#[endpoint]
+pub async fn upload_single(
+    req: &mut Request,
+    depot: &mut Depot,
+    res: &mut Response,
+) {
+    let state = get_state(depot);
+
+    let (file_data, filename, content_type) = match read_multipart_file(req).await {
+        Ok((data, name, ct)) => (data, name, ct),
+        Err(e) => return res.error(RswsError::from(e)),
+    };
+
+    let file_key = generate_file_key(&filename);
+
+    let oss_config = match state.config_service.get_storage_config().await {
+        Ok(c) => c,
+        Err(_e) => return res.error(RswsError::internal("获取存储配置失败")),
+    };
+
+    let storage_service = match rsws_service::oss_service::StorageService::new(&oss_config).await {
+        Ok(s) => s,
+        Err(_e) => return res.error(RswsError::internal("创建存储服务失败")),
+    };
+
+    let result = match storage_service.upload(&file_key, file_data.clone(), content_type.as_deref()).await {
+        Ok(r) => r,
+        Err(e) => return res.error(RswsError::internal(format!("上传文件失败: {}", e))),
+    };
+
+    info!("Single file uploaded: file_key={}, url={}", file_key, result.url);
+
+    res.success(SingleUploadResponse {
+        file_url: result.url,
+        file_key,
+        file_size: file_data.len() as i64,
+        content_type,
+    });
+}
+
+// ==================== 辅助函数 ====================
+
+/// 解析查询参数
+#[derive(Debug, Deserialize, Default)]
+struct UploadChunkQuery {
+    upload_id: String,
+    chunk_index: i32,
+}
+
+/// 从 multipart 中读取第一个文件字段
+async fn read_multipart_file(req: &mut Request) -> Result<(Bytes, String, Option<String>), UploadError> {
+    // 获取 content-type 头
+    let content_type = req.headers().get("content-type")
+        .ok_or(UploadError::MissingContentType)?
+        .to_str()
+        .map_err(|_| UploadError::InvalidContentType)?;
+    
+    // 解析 boundary
+    let boundary = multer::parse_boundary(content_type)
+        .map_err(|e| UploadError::BoundaryParseFailed(e.to_string()))?;
+    
+    // 获取请求体并转换为 multer 所需的流类型
+    let body = req.take_body();
+    let body_stream = BodyStream::new(body);
+    
+    // 转换 Stream<Item = Result<Frame<Bytes>, salvo::Error>> 
+    // 到 Stream<Item = Result<Bytes, multer::Error>>
+    let stream = body_stream.map(|result| {
+        match result {
+            Ok(frame) => {
+                let bytes = frame.into_data().unwrap_or_default();
+                Ok(bytes)
+            }
+            Err(err) => {
+                // 将 salvo::Error 转换为 multer::Error
+                Err(multer::Error::StreamReadFailed(
+                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, err.to_string()))
+                ))
+            }
+        }
+    });
+    
+    // 创建 multipart 解析器
+    let mut multipart = Multipart::new(stream, &boundary);
+    
+    // 查找文件字段
+    while let Some(field) = multipart.next_field().await.map_err(UploadError::from)? {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "file" {
+            let filename = field.file_name().map(|f| f.to_string());
+            let content_type = field.content_type().map(|ct| ct.to_string());
+            let data = field.bytes().await.map_err(UploadError::from)?;
+            return Ok((data, filename.unwrap_or_else(|| "unknown".to_string()), content_type));
+        }
+    }
+    
+    Err(UploadError::FileNotFound)
+}
+
+fn generate_file_key(filename: &str) -> String {
+    let path_buf = PathBuf::from(filename);
+    let ext = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let timestamp = chrono::Utc::now().timestamp();
+    let random: String = rand::rng()
+        .sample_iter(rand::distr::Alphanumeric)
+        .take(8)
+        .map(char::from)
+        .collect();
+
+    if ext.is_empty() {
+        format!("resources/{}/{}_{}", chrono::Utc::now().format("%Y%m%d"), timestamp, random)
+    } else {
+        format!("resources/{}/{}_{}.{}", chrono::Utc::now().format("%Y%m%d"), timestamp, random, ext)
+    }
 }
