@@ -231,12 +231,12 @@ pub async fn upload_chunk(req: &mut Request, depot: &mut Depot, res: &mut Respon
     let upload_id: String = req
         .parse_queries()
         .map_err(|_| StatusCode::BAD_REQUEST)
-        .and_then(|p: UploadChunkQuery| Ok(p.upload_id))
+        .map(|p: UploadChunkQuery| p.upload_id)
         .unwrap_or_default();
     let chunk_index: i32 = req
         .parse_queries()
         .map_err(|_| StatusCode::BAD_REQUEST)
-        .and_then(|p: UploadChunkQuery| Ok(p.chunk_index))
+        .map(|p: UploadChunkQuery| p.chunk_index)
         .unwrap_or(-1);
 
     if upload_id.is_empty() {
@@ -510,7 +510,7 @@ async fn read_multipart_file(
             Err(err) => {
                 // 将 salvo::Error 转换为 multer::Error
                 Err(multer::Error::StreamReadFailed(Box::new(
-                    std::io::Error::new(std::io::ErrorKind::Other, err.to_string()),
+                    std::io::Error::other(err.to_string()),
                 )))
             }
         }

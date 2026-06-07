@@ -1,7 +1,7 @@
 //! 管理员 OSS 配置 Handler
 
 use crate::state::get_state;
-use rsws_common::{ResponseExt, RswsError};
+use rsws_common::ResponseExt;
 use rsws_service::config_service::OssStorageConfig;
 use salvo::oapi::extract::JsonBody;
 use salvo::prelude::*;
@@ -16,7 +16,7 @@ pub async fn get_storage_config(_req: &mut Request, depot: &mut Depot, res: &mut
         Ok(config) => res.success(config),
         Err(e) => {
             error!("Failed to get storage config: {}", e);
-            res.error(RswsError::from(e));
+            res.error(e);
         }
     }
 }
@@ -55,7 +55,7 @@ pub async fn update_storage_config(
         Ok(_) => res.success_msg((), "OSS 配置保存成功"),
         Err(e) => {
             error!("Failed to save storage config: {}", e);
-            res.error(RswsError::from(e));
+            res.error(e);
         }
     }
 }
