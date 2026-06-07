@@ -31,7 +31,7 @@ pub struct AdminLoginBody {
 ///
 /// 流程：
 /// 1. 验证邮箱+密码
-/// 2. 创建 admin_api_key（持久化到 admin_api_keys 表）
+/// 2. 创建 admin_api_key（Redis 存储）
 /// 3. 返回 admin 信息 + api_key
 #[endpoint(
     request_body = AdminLoginBody,
@@ -58,7 +58,7 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
                 .await
             {
                 Ok(info) => {
-                    // 为管理员创建 admin_api_key（Cregis 双密钥方案）
+                    // 为管理员创建 admin_api_key
                     match state
                         .admin_service
                         .create_api_key(
@@ -1678,138 +1678,6 @@ pub async fn delete_payment_method(req: &mut Request, depot: &mut Depot, res: &m
             "Failed to delete payment method: {}",
             e
         ))),
-    }
-}
-
-// ==================== 用户 API Key 管理 ====================
-
-/// 获取指定用户的 API Key 列表
-/// GET /admin/users/{user_id}/api-keys
-#[endpoint(
-    responses(
-        (status_code = 200, description = "成功"),
-        (status_code = 403, description = "非管理员"),
-        (status_code = 404, description = "用户不存在"),
-    )
-)]
-pub async fn list_user_api_keys(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let _is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !_is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
-    let user_id: i64 = req.param("user_id").unwrap_or(0);
-    if user_id <= 0 {
-        res.error_msg(
-            RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid user ID",
-        );
-        return;
-    }
-
-    let state = get_state(depot);
-
-    match state.user_api_key_repo.get_by_user(user_id).await {
-        Ok(keys) => res.success(serde_json::json!({ "items": keys })),
-        Err(e) => res.error(e),
-    }
-}
-
-/// 为指定用户创建 API Key
-/// POST /admin/users/{user_id}/api-keys
-#[endpoint(
-    request_body = rsws_model::api_key::CreateApiKeyRequest,
-    responses(
-        (status_code = 201, description = "创建成功"),
-        (status_code = 403, description = "非管理员"),
-    )
-)]
-pub async fn create_user_api_key(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let _is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !_is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
-    let user_id: i64 = req.param("user_id").unwrap_or(0);
-    if user_id <= 0 {
-        res.error_msg(
-            RswsError::from(ErrorCode::INVALID_PARAMETER),
-            "Invalid user ID",
-        );
-        return;
-    }
-
-    let body = req
-        .parse_json::<rsws_model::api_key::CreateApiKeyRequest>()
-        .await;
-    let data = match body {
-        Ok(d) => d,
-        Err(e) => {
-            res.http_error(StatusCode::BAD_REQUEST, format!("Invalid request: {}", e));
-            return;
-        }
-    };
-
-    let state = get_state(depot);
-    match state.user_api_key_repo.create(user_id, &data).await {
-        Ok(key) => {
-            res.status_code(StatusCode::CREATED);
-            res.success(key)
-        }
-        Err(e) => res.error(e),
-    }
-}
-
-/// 删除用户的 API Key
-/// DELETE /admin/users/{user_id}/api-keys/{key_id}
-#[endpoint]
-pub async fn delete_user_api_key(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let _is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !_is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
-    let user_id: i64 = req.param("user_id").unwrap_or(0);
-    let key_id: i64 = req.param("key_id").unwrap_or(0);
-
-    if user_id <= 0 || key_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid ID");
-        return;
-    }
-
-    let state = get_state(depot);
-    match state.user_api_key_repo.delete(key_id, user_id).await {
-        Ok(true) => res.success(serde_json::json!({"deleted": true})),
-        Ok(false) => res.http_error(StatusCode::NOT_FOUND, "API key not found"),
-        Err(e) => res.error(e),
-    }
-}
-
-/// 切换用户 API Key 启用/停用状态
-/// PUT /admin/users/{user_id}/api-keys/{key_id}
-#[endpoint]
-pub async fn toggle_user_api_key(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let _is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !_is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
-    let user_id: i64 = req.param("user_id").unwrap_or(0);
-    let key_id: i64 = req.param("key_id").unwrap_or(0);
-
-    if user_id <= 0 || key_id <= 0 {
-        res.error_msg(RswsError::from(ErrorCode::INVALID_PARAMETER), "Invalid ID");
-        return;
-    }
-
-    let state = get_state(depot);
-    match state.user_api_key_repo.toggle_active(key_id, user_id).await {
-        Ok(is_active) => res.success(serde_json::json!({"is_active": is_active})),
-        Err(e) => res.error(e),
     }
 }
 

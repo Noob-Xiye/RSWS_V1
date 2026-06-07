@@ -200,11 +200,15 @@ pub fn create_router(state: AppState) -> Router {
                                         .delete(handler::admin::delete_payment_method),
                                 ),
                         )
-                        // 存储配置管理
+                        // OSS 存储配置管理
                         .push(
-                            Router::with_path("storage-config")
-                                .get(handler::admin::get_storage_config)
-                                .put(handler::admin::update_storage_config),
+                            Router::with_path("oss-config")
+                                .get(handler::admin_oss::get_storage_config)
+                                .post(handler::admin_oss::update_storage_config),
+                        )
+                        .push(
+                            Router::with_path("oss-config/test")
+                                .post(handler::admin_oss::test_storage_connection),
                         )
                         // 管理员管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）
                         .push(
@@ -226,19 +230,6 @@ pub fn create_router(state: AppState) -> Router {
                                             Router::with_path("{id}/activate")
                                                 .post(handler::admin::activate_user),
                                         ),
-                                )
-                                // 用户 API Key 管理
-                                .push(
-                                    Router::with_path("users").push(
-                                        Router::with_path("{user_id}/api-keys")
-                                            .get(handler::admin::list_user_api_keys)
-                                            .post(handler::admin::create_user_api_key)
-                                            .push(
-                                                Router::with_path("{key_id}")
-                                                    .delete(handler::admin::delete_user_api_key)
-                                                    .put(handler::admin::toggle_user_api_key),
-                                            ),
-                                    ),
                                 )
                                 // API Key 管理
                                 .push(
@@ -292,7 +283,9 @@ pub fn create_router(state: AppState) -> Router {
                 .push(Router::with_path("init").post(handler::upload::init_upload))
                 .push(Router::with_path("chunk").post(handler::upload::upload_chunk))
                 .push(Router::with_path("complete").post(handler::upload::complete_upload)),
-        );
+        )
+        // 文件上传（单文件上传，需认证）
+        .push(Router::with_path("api/v1/upload/single").post(handler::upload::upload_single));
 
     // OpenAPI 文档生成
     let doc = OpenApi::new("RSWS API", "0.1.0").merge_router(&api_routes);

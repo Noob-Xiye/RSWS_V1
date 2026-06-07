@@ -1,6 +1,7 @@
 //! 处理器
 
 pub mod admin;
+pub mod admin_oss;
 pub mod admin_paypal;
 pub mod category;
 pub mod order;

@@ -197,7 +197,8 @@ async fn main() -> Result<(), RswsError> {
         None => rsws_service::create_user_service(pool.clone(), Some(redis_pool.clone())),
     };
     let order_service = rsws_service::create_order_service(pool.clone());
-    let resource_service = rsws_service::create_resource_service(pool.clone(), Some(config_service.as_ref().clone()));
+    let resource_service =
+        rsws_service::create_resource_service(pool.clone(), Some(config_service.as_ref().clone()));
     let api_key_service = rsws_service::ApiKeyService::new(std::sync::Arc::new(redis_pool.clone()));
     let wallet_repo = rsws_db::WalletRepository::new(pool.clone());
 

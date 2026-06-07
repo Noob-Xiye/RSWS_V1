@@ -78,6 +78,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '邮件配置', group: '系统设置' }
   },
   {
+    path: '/oss-config',
+    name: 'OssConfig',
+    component: () => import('@/views/oss-config/index.vue'),
+    meta: { requiresAuth: true, title: 'OSS 存储配置', group: '系统设置' }
+  },
+  {
     path: '/logs',
     name: 'LogQuery',
     component: () => import('@/views/log/index.vue'),

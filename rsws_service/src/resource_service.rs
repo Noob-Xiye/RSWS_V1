@@ -1,5 +1,6 @@
 //! 资源服务
 
+use crate::oss_service::StorageService;
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_db::ResourceRepository;
@@ -8,7 +9,6 @@ use rsws_model::resource::{
 };
 use std::sync::Arc;
 use tracing::{info, warn};
-use crate::oss_service::StorageService;
 
 /// 资源服务
 pub struct ResourceService {
@@ -62,7 +62,7 @@ impl ResourceService {
         // 本地：http://host:port/uploads/resources/20240601/12345678.zip
         // S3：https://bucket.s3.region.amazonaws.com/resources/20240601/12345678.zip
         // 自定义域名：https://cdn.example.com/resources/20240601/12345678.zip
-        
+
         // 简单处理：取最后一个 "/" 之后的路径作为 key 的前缀
         // 实际应该根据配置的 endpoint 和 custom_domain 来解析
         if let Some(pos) = url.rfind("/resources/") {
@@ -220,7 +220,9 @@ impl ResourceService {
                 if let Some(key) = self.extract_key_from_url(thumbnail_url) {
                     match storage_service.delete(&key).await {
                         Ok(_) => info!("Deleted thumbnail from OSS: {}", key),
-                        Err(e) => warn!("Failed to delete thumbnail from OSS: {} (key: {})", e, key),
+                        Err(e) => {
+                            warn!("Failed to delete thumbnail from OSS: {} (key: {})", e, key)
+                        }
                     }
                 }
             }

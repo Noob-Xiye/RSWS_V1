@@ -81,3 +81,14 @@ sha2 = "0.10"
 bcrypt = "0.17.0"
 # 仅用于生成nonce
 uuid = { version = "1.6.1", features = ["v4", "fast-rng"] }
+
+# OSS 对象存储（AWS SDK）
+aws-config = "1.5.3"
+aws-sdk-s3 = "1.56.1"
+aws-credential-types = "1.2.2"
+
+# 异步 trait 支持
+async-trait = "0.1.83"
+
+# Bytes 处理
+bytes = "1.10.0"

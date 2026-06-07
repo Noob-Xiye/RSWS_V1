@@ -11,6 +11,7 @@ pub mod config_service;
 pub mod cross_platform_service;
 pub mod log_service;
 pub mod order_service;
+pub mod oss_service;
 pub mod payment_service;
 pub mod paypal_service;
 pub mod request_service;
@@ -31,6 +32,7 @@ pub use cross_platform_service::CrossPlatformService;
 pub use log_service::LogService;
 pub use log_service::{LogConfig, UpdateLogConfigRequest};
 pub use order_service::OrderService;
+pub use oss_service::{FileMetadata, StorageBackend, StorageError, StorageService, UploadResult};
 pub use payment_service::PaymentService;
 pub use paypal_service::PayPalService;
 pub use request_service::RequestService;
@@ -105,8 +107,15 @@ pub fn create_order_service(pool: sqlx::PgPool) -> OrderService {
 }
 
 /// 创建资源服务
-pub fn create_resource_service(pool: sqlx::PgPool) -> ResourceService {
-    ResourceService::new(Arc::new(ResourceRepository::new(pool)))
+pub fn create_resource_service(
+    pool: sqlx::PgPool,
+    config_service: Option<ConfigService>,
+) -> ResourceService {
+    if let Some(cfg) = config_service {
+        ResourceService::with_oss(Arc::new(ResourceRepository::new(pool)), cfg)
+    } else {
+        ResourceService::new(Arc::new(ResourceRepository::new(pool)))
+    }
 }
 
 /// 创建配置服务
