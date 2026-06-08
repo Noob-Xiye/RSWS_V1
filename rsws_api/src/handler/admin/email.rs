@@ -90,14 +90,13 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
             // 保留现有密码
             match &existing {
                 Some((id,)) => {
-                    let row: Option<(String,)> = sqlx::query_as(
-                        "SELECT password FROM email_configs WHERE id = $1",
-                    )
-                    .bind(id)
-                    .fetch_optional(&state.pool)
-                    .await
-                    .ok()
-                    .flatten();
+                    let row: Option<(String,)> =
+                        sqlx::query_as("SELECT password FROM email_configs WHERE id = $1")
+                            .bind(id)
+                            .fetch_optional(&state.pool)
+                            .await
+                            .ok()
+                            .flatten();
                     row.map(|r| r.0).unwrap_or_default()
                 }
                 None => String::new(),
@@ -122,8 +121,7 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
             sep.push("username = ").push_bind(v);
         }
         if data.password.is_some() {
-            sep.push("password = ")
-                .push_bind(&password);
+            sep.push("password = ").push_bind(&password);
         }
         if let Some(v) = &data.use_tls {
             sep.push("use_tls = ").push_bind(v);
