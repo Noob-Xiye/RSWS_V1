@@ -129,6 +129,7 @@ pub struct InitUploadResponse {
 #[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
 pub struct CompleteUploadRequest {
     pub upload_id: String,
+    #[allow(dead_code)]
     pub file_key: String,
 }
 

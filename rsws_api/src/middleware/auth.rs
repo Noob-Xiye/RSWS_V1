@@ -181,33 +181,30 @@ pub async fn api_key_auth(
             }
             Ok(None) => {
                 // 用户验签失败，尝试 admin 验签
-                match state
+                if let Ok(Some(api_key_record)) = state
                     .admin_api_key_manager
                     .validate_signature(user_id, &params, &sign)
                     .await
                 {
-                    Ok(Some(api_key_record)) => {
-                        depot.insert("user_id", user_id);
-                        depot.insert("api_key_id", api_key_record.id);
-                        depot.insert("is_admin", true);
+                    depot.insert("user_id", user_id);
+                    depot.insert("api_key_id", api_key_record.id);
+                    depot.insert("is_admin", true);
 
-                        // Nonce 去重检查
-                        let redis = state.config_service.redis_client();
-                        if let Ok(false) = check_nonce_once(redis, &nonce).await {
-                            res.status_code(StatusCode::UNAUTHORIZED);
-                            res.render(Json(
-                                rsws_common::response::ApiResponse::<()>::error_with_message(
-                                    rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
-                                    "Nonce already used (replay detected)",
-                                ),
-                            ));
-                            return;
-                        }
-
-                        ctrl.call_next(req, depot, res).await;
+                    // Nonce 去重检查
+                    let redis = state.config_service.redis_client();
+                    if let Ok(false) = check_nonce_once(redis, &nonce).await {
+                        res.status_code(StatusCode::UNAUTHORIZED);
+                        res.render(Json(
+                            rsws_common::response::ApiResponse::<()>::error_with_message(
+                                rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
+                                "Nonce already used (replay detected)",
+                            ),
+                        ));
                         return;
                     }
-                    Ok(None) | Err(_) => {}
+
+                    ctrl.call_next(req, depot, res).await;
+                    return;
                 }
             }
             Err(e) => {
