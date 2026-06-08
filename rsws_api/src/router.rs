@@ -78,7 +78,8 @@ pub fn create_router(state: AppState) -> Router {
                             Router::with_path("{id}")
                                 .get(handler::custom::get_order)
                                 .push(
-                                    Router::with_path("pay").post(handler::custom::initiate_payment),
+                                    Router::with_path("pay")
+                                        .post(handler::custom::initiate_payment),
                                 )
                                 .push(
                                     Router::with_path("cancel").post(handler::custom::cancel_order),
@@ -184,9 +185,8 @@ pub fn create_router(state: AppState) -> Router {
                                         .get(handler::admin::get_paypal_config)
                                         .put(handler::admin::update_paypal_config)
                                         .push(
-                                            Router::with_path("active/{active}").post(
-                                                handler::admin::set_paypal_config_active,
-                                            ),
+                                            Router::with_path("active/{active}")
+                                                .post(handler::admin::set_paypal_config_active),
                                         ),
                                 ),
                         )

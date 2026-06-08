@@ -1,4 +1,4 @@
-﻿//! 鐢ㄦ埛绔垎绫诲鐞嗗櫒
+//! 鐢ㄦ埛绔垎绫诲鐞嗗櫒
 
 use crate::state::get_state;
 use rsws_common::{ResponseExt, RswsError};

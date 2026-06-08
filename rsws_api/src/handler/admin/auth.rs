@@ -55,7 +55,10 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
                         rate_limit: Some(1000),
                         expires_in_days: Some(30),
                     };
-                    match state.admin_api_key_manager.create(info.id, create_req).await
+                    match state
+                        .admin_api_key_manager
+                        .create(info.id, create_req)
+                        .await
                     {
                         Ok(api_key_resp) => {
                             let login_resp = AdminLoginResponse {

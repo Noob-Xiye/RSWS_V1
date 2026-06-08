@@ -14,10 +14,10 @@ use std::sync::Arc;
 /// Redis 缓存的 API Key 会话
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedApiKey {
-    pub owner_id: i64,      // admin_id 或 user_id
+    pub owner_id: i64, // admin_id 或 user_id
     pub key_id: i64,
     pub api_key: String,
-    pub role: String,        // "admin" 或 "user"
+    pub role: String, // "admin" 或 "user"
     pub permissions: Vec<String>,
     pub rate_limit: Option<i32>,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -26,7 +26,7 @@ pub struct CachedApiKey {
 /// 统一 API Key 管理器
 pub struct ApiKeyManager {
     redis: Arc<RedisService>,
-    key_prefix: String,     // "admin_apikey" 或 "user_apikey"
+    key_prefix: String, // "admin_apikey" 或 "user_apikey"
 }
 
 impl ApiKeyManager {
@@ -106,7 +106,8 @@ impl ApiKeyManager {
 
     /// 获取 API Key（从 Redis）
     pub async fn get(&self, owner_id: i64) -> Result<Option<ApiKey>, RswsError> {
-        let cached = self.redis
+        let cached = self
+            .redis
             .get_json::<CachedApiKey>(&self.redis_key(owner_id))
             .await?;
 
@@ -174,13 +175,16 @@ impl ApiKeyManager {
         let api_key_record = self.get(owner_id).await?;
         match api_key_record {
             Some(record) => {
-                let computed_sign = rsws_common::signature::compute_cregis_signature(params, &record.api_key);
+                let computed_sign =
+                    rsws_common::signature::compute_cregis_signature(params, &record.api_key);
                 if computed_sign == sign {
                     Ok(Some(record))
                 } else {
                     tracing::warn!(
                         "Signature mismatch for owner_id: {}. Expected: {}, Got: {}",
-                        owner_id, computed_sign, sign
+                        owner_id,
+                        computed_sign,
+                        sign
                     );
                     Ok(None)
                 }

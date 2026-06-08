@@ -47,7 +47,11 @@ pub async fn create_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
                 rate_limit: data.rate_limit,
                 expires_in_days: data.expires_in_days,
             };
-            match state.admin_api_key_manager.create(admin_id, create_req).await {
+            match state
+                .admin_api_key_manager
+                .create(admin_id, create_req)
+                .await
+            {
                 Ok(response) => {
                     res.status_code(StatusCode::CREATED);
                     res.success(response);
