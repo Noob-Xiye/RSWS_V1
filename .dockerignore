@@ -1,0 +1,13 @@
+target/
+node_modules/
+.git/
+*.log
+*.lock
+!Cargo.lock
+.env
+.env.*
+!*.env.example
+Dockerfile*
+docker-compose*
+*.md
+!Cargo.toml

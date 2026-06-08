@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# Limit parallel compilation to avoid OOM during docker build
+ENV CARGO_BUILD_JOBS=2
+
 # Cache dependencies
 COPY Cargo.toml Cargo.lock ./
 COPY rsws_api/Cargo.toml rsws_api/Cargo.toml
@@ -31,7 +34,7 @@ RUN mkdir -p rsws_api/src && echo "" > rsws_api/src/lib.rs \
     && mkdir -p rsws_usdt/src && echo "" > rsws_usdt/src/lib.rs \
     && mkdir -p rsws_bin/src && echo "fn main(){}" > rsws_bin/src/main.rs
 
-RUN cargo build --release --bin rsws 2>/dev/null || true
+RUN cargo build --release --bin resource-sharing-web-system 2>/dev/null || true
 
 # Copy real source code
 COPY . .
@@ -39,7 +42,7 @@ COPY . .
 RUN touch rsws_api/src/lib.rs rsws_service/src/lib.rs rsws_model/src/lib.rs \
     rsws_db/src/lib.rs rsws_common/src/lib.rs rsws_usdt/src/lib.rs rsws_bin/src/main.rs
 
-RUN cargo build --release --bin rsws
+RUN cargo build --release --bin resource-sharing-web-system
 
 # ---- Runtime stage ----
 FROM debian:bookworm-slim
@@ -56,8 +59,10 @@ WORKDIR /app
 
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.source="https://github.com/<owner>/RSWS_V1"
+LABEL org.opencontainers.image.title="Resource Sharing Web System"
+LABEL org.opencontainers.image.description="数字内容付费交易平台"
 
-COPY --from=builder /app/target/release/rsws /app/rsws
+COPY --from=builder /app/target/release/resource-sharing-web-system /app/resource-sharing-web-system
 # Config via environment variables (RSWS__DATABASE__URL, RSWS__REDIS__URL, etc.)
 # No default config.toml — all settings via env
 
@@ -66,4 +71,4 @@ EXPOSE 5170
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5170/health || exit 1
 
-CMD ["/app/rsws"]
+CMD ["/app/resource-sharing-web-system"]

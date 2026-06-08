@@ -19,5 +19,5 @@ config = { workspace = true }
 dotenvy = { workspace = true }
 
 [[bin]]
-name = "rsws"
+name = "resource-sharing-web-system"
 path = "src/main.rs"

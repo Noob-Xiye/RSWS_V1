@@ -1,6 +1,6 @@
 {
-  "version": "0.1.0",
-  "name": "RSWS",
+  "version": "0.1.1",
+  "name": "Resource Sharing Web System",
   "description": "数字内容付费交易平台",
   "features": [
     "USDT (TRC20/ERC20) 支付监听",
