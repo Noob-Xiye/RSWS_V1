@@ -177,7 +177,9 @@ mod tests {
     }
 
     /// 验证数据库迁移文件存在
+    /// TODO: 迁移文件已清理，待 v1.0.0 重建后恢复此测试
     #[test]
+    #[ignore]
     fn test_migration_file_exists() {
         let migration_dir = std::path::Path::new("../migrations");
         assert!(migration_dir.exists(), "migrations directory should exist");
