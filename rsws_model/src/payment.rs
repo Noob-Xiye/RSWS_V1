@@ -184,10 +184,10 @@ pub struct VerifyPaymentResponse {
 pub struct PayPalConfig {
     pub id: i64,
     pub client_id: String,
-    pub client_secret_encrypted: String,
+    pub client_secret: String,
     pub sandbox: bool,
     pub webhook_id: Option<String>,
-    pub webhook_secret_encrypted: Option<String>,
+    pub webhook_secret: Option<String>,
     pub base_url: String,
     pub return_url: String,
     pub cancel_url: String,
@@ -204,10 +204,10 @@ pub struct PayPalConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdatePayPalConfigRequest {
     pub client_id: Option<String>,
-    pub client_secret_encrypted: Option<String>,
+    pub client_secret: Option<String>,
     pub sandbox: Option<bool>,
     pub webhook_id: Option<String>,
-    pub webhook_secret_encrypted: Option<String>,
+    pub webhook_secret: Option<String>,
     pub base_url: Option<String>,
     pub return_url: Option<String>,
     pub cancel_url: Option<String>,
@@ -222,10 +222,10 @@ pub struct UpdatePayPalConfigRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreatePayPalConfigRequest {
     pub client_id: String,
-    pub client_secret_encrypted: String,
+    pub client_secret: String,
     pub sandbox: bool,
     pub webhook_id: Option<String>,
-    pub webhook_secret_encrypted: Option<String>,
+    pub webhook_secret: Option<String>,
     pub base_url: String,
     pub return_url: String,
     pub cancel_url: String,

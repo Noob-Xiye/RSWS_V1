@@ -194,7 +194,7 @@ impl PayPalConfigRepository {
     /// 获取所有 PayPal 配置
     pub async fn list_all(&self) -> Result<Vec<PayPalConfig>, RswsError> {
         let configs = sqlx::query_as::<_, PayPalConfig>(
-            "SELECT id, client_id, client_secret_encrypted, sandbox, webhook_id, webhook_secret_encrypted, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs ORDER BY id",
+            "SELECT id, client_id, client_secret, sandbox, webhook_id, webhook_secret, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs ORDER BY id",
         )
         .fetch_all(&self.pool)
         .await
@@ -206,7 +206,7 @@ impl PayPalConfigRepository {
     /// 根据 ID 获取 PayPal 配置
     pub async fn get_by_id(&self, id: i32) -> Result<Option<PayPalConfig>, RswsError> {
         let config = sqlx::query_as::<_, PayPalConfig>(
-            "SELECT id, client_id, client_secret_encrypted, sandbox, webhook_id, webhook_secret_encrypted, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs WHERE id = $1",
+            "SELECT id, client_id, client_secret, sandbox, webhook_id, webhook_secret, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs WHERE id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -219,7 +219,7 @@ impl PayPalConfigRepository {
     /// 获取当前激活的 PayPal 配置
     pub async fn get_active(&self) -> Result<Option<PayPalConfig>, RswsError> {
         let config = sqlx::query_as::<_, PayPalConfig>(
-            "SELECT id, client_id, client_secret_encrypted, sandbox, webhook_id, webhook_secret_encrypted, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs WHERE is_active = true LIMIT 1",
+            "SELECT id, client_id, client_secret, sandbox, webhook_id, webhook_secret, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at FROM paypal_configs WHERE is_active = true LIMIT 1",
         )
         .fetch_optional(&self.pool)
         .await
@@ -244,10 +244,10 @@ impl PayPalConfigRepository {
             r#"
             UPDATE paypal_configs SET
                 client_id = COALESCE($1, client_id),
-                client_secret_encrypted = COALESCE($2, client_secret_encrypted),
+                client_secret = COALESCE($2, client_secret),
                 sandbox = COALESCE($3, sandbox),
                 webhook_id = CASE WHEN $4::boolean THEN $5 ELSE webhook_id END,
-                webhook_secret_encrypted = CASE WHEN $6::boolean THEN $7 ELSE webhook_secret_encrypted END,
+                webhook_secret = CASE WHEN $6::boolean THEN $7 ELSE webhook_secret END,
                 base_url = COALESCE($8, base_url),
                 return_url = COALESCE($9, return_url),
                 cancel_url = COALESCE($10, cancel_url),
@@ -258,16 +258,16 @@ impl PayPalConfigRepository {
                 is_active = COALESCE($15, is_active),
                 updated_at = NOW()
             WHERE id = $16
-            RETURNING id, client_id, client_secret_encrypted, sandbox, webhook_id, webhook_secret_encrypted, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at
+            RETURNING id, client_id, client_secret, sandbox, webhook_id, webhook_secret, base_url, return_url, cancel_url, brand_name, min_amount, max_amount, fee_rate, is_active, created_at, updated_at
             "#,
         )
         .bind(req.client_id.as_ref().unwrap_or(&existing.client_id))
-        .bind(req.client_secret_encrypted.as_ref().unwrap_or(&existing.client_secret_encrypted))
+        .bind(req.client_secret.as_ref().unwrap_or(&existing.client_secret))
         .bind(req.sandbox)
         .bind(req.webhook_id.is_some())
         .bind(req.webhook_id.as_deref())
-        .bind(req.webhook_secret_encrypted.is_some())
-        .bind(req.webhook_secret_encrypted.as_deref())
+        .bind(req.webhook_secret.is_some())
+        .bind(req.webhook_secret.as_deref())
         .bind(req.base_url.as_ref().unwrap_or(&existing.base_url))
         .bind(req.return_url.as_ref().unwrap_or(&existing.return_url))
         .bind(req.cancel_url.as_ref().unwrap_or(&existing.cancel_url))
@@ -305,14 +305,14 @@ impl PayPalConfigRepository {
     ) -> Result<PayPalConfig, RswsError> {
         let config = sqlx::query_as::<_, PayPalConfig>(
             r#"INSERT INTO paypal_configs (
-                client_id, client_secret_encrypted, sandbox,
+                client_id, client_secret, sandbox,
                 base_url, return_url, cancel_url, brand_name,
                 min_amount, max_amount, fee_rate, is_active
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *"#,
         )
         .bind(&req.client_id)
-        .bind(&req.client_secret_encrypted)
+        .bind(&req.client_secret)
         .bind(req.sandbox)
         .bind(&req.base_url)
         .bind(&req.return_url)

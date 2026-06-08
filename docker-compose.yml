@@ -1,4 +1,4 @@
-services:
+﻿services:
   postgres:
     image: postgres:16-alpine
     container_name: rsws-postgres
@@ -7,9 +7,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-rsws}
       POSTGRES_USER: ${POSTGRES_USER:-rsws}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rsws_secret}
-    # ports not exposed to host - WSL already runs PostgreSQL on 5432
-    # ports:
-    #   - "${POSTGRES_PORT:-5432}:5432"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,9 +27,8 @@ services:
       --requirepass ${REDIS_PASSWORD:-rsws_redis}
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
-    # ports not exposed to host - WSL already runs Redis on 6379
-    # ports:
-    #   - "${REDIS_PORT:-6379}:6379"
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -48,24 +46,17 @@ services:
     image: rsws:latest
     container_name: rsws-server
     restart: unless-stopped
-    # ports not exposed to host - use nginx proxy instead
-    # ports:
-    #   - "${SERVER_PORT:-5170}:5170"
     environment:
       RSWS_DATABASE_URL: postgresql://${POSTGRES_USER:-rsws}:${POSTGRES_PASSWORD:-rsws_secret}@postgres:5432/${POSTGRES_DB:-rsws}
       RSWS_REDIS_URL: redis://:${REDIS_PASSWORD:-rsws_redis}@redis:6379
       RSWS_SERVER_HOST: "0.0.0.0"
       RSWS_SERVER_PORT: "5170"
-      RSWS_APP_LOG_LEVEL: "${LOG_LEVEL:-info}"
       RUST_LOG: "${LOG_LEVEL:-info}"
-      RSWS_ENCRYPTION_KEY: "${ENCRYPTION_KEY:-change-this-32-byte-encryption-k}"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./migrations:/app/migrations:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:5170/health || exit 1"]
       interval: 30s

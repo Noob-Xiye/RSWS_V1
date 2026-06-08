@@ -1,6 +1,6 @@
 //! 静态配置
 //!
-//! 只保留启动时必需的配置（server/database/redis/encryption）。
+//! 只保留启动时必需的配置（server/database/redis）。
 //! 所有业务配置（PayPal/区块链/Email/USDT监听等）从数据库读取，
 //! 通过 ConfigService 提供。
 //!
@@ -66,18 +66,12 @@ pub struct RedisConfig {
     pub pool_size: usize,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct EncryptionConfig {
-    pub key: String,
-}
-
 /// 应用静态配置（从 config.toml 中的连接配置）
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub redis: RedisConfig,
-    pub encryption: EncryptionConfig,
 }
 
 pub fn load_config() -> Result<AppConfig, ConfigError> {
@@ -105,8 +99,7 @@ min_connections = 1
 url = ""
 pool_size = 10
 
-[encryption]
-key = "change-this-32-byte-encryption-k"
+
 "#,
             config::FileFormat::Toml,
         ))

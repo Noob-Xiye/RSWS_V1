@@ -84,14 +84,14 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
             .ok()
             .flatten();
 
-    let password_encrypted = match &data.password {
+    let password = match &data.password {
         Some(pwd) => pwd.clone(), // TODO: 实际应使用加密，暂明文存储
         None => {
             // 保留现有密码
             match &existing {
                 Some((id,)) => {
                     let row: Option<(String,)> = sqlx::query_as(
-                        "SELECT password_encrypted FROM email_configs WHERE id = $1",
+                        "SELECT password FROM email_configs WHERE id = $1",
                     )
                     .bind(id)
                     .fetch_optional(&state.pool)
@@ -122,8 +122,8 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
             sep.push("username = ").push_bind(v);
         }
         if data.password.is_some() {
-            sep.push("password_encrypted = ")
-                .push_bind(&password_encrypted);
+            sep.push("password = ")
+                .push_bind(&password);
         }
         if let Some(v) = &data.use_tls {
             sep.push("use_tls = ").push_bind(v);
@@ -144,7 +144,7 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
         // 插入新配置
         sqlx::query(
             r#"
-            INSERT INTO email_configs (provider, host, port, username, password_encrypted, use_tls, from_email, from_name, reply_to, is_active)
+            INSERT INTO email_configs (provider, host, port, username, password, use_tls, from_email, from_name, reply_to, is_active)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
             "#
         )
@@ -152,7 +152,7 @@ pub async fn update_email_config(req: &mut Request, depot: &mut Depot, res: &mut
         .bind(data.host.as_deref().unwrap_or(""))
         .bind(data.port.unwrap_or(465))
         .bind(data.username.as_deref().unwrap_or(""))
-        .bind(&password_encrypted)
+        .bind(&password)
         .bind(data.use_tls.unwrap_or(true))
         .bind(data.from_email.as_deref().unwrap_or(""))
         .bind(data.from_name.as_deref().unwrap_or(""))

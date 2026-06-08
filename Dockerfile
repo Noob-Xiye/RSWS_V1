@@ -58,8 +58,6 @@ LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.source="https://github.com/<owner>/RSWS_V1"
 
 COPY --from=builder /app/target/release/rsws /app/rsws
-COPY --from=builder /app/migrations /app/migrations
-
 # Config via environment variables (RSWS__DATABASE__URL, RSWS__REDIS__URL, etc.)
 # No default config.toml — all settings via env
 
