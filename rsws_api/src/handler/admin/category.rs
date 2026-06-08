@@ -1,4 +1,4 @@
-//! Category handler
+//! 管理员分类处理器
 
 use crate::state::get_state;
 use rsws_common::{ResponseExt, RswsError};
@@ -6,32 +6,6 @@ use rsws_db::category::CategoryRepository;
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
 use serde::Deserialize;
-
-// ========== 公开端点（无需管理员权限）==========
-
-/// Get category list (仅活跃分类)
-#[endpoint(
-    responses(
-        (status_code = 200, description = "Category list"),
-    )
-)]
-pub async fn list_categories(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let state = get_state(depot);
-    let repo = CategoryRepository::new(state.pool());
-
-    match repo.find_all().await {
-        Ok(categories) => {
-            let tree = CategoryRepository::build_tree(&categories);
-            res.success(serde_json::json!({
-                "categories": categories,
-                "tree": tree
-            }))
-        }
-        Err(e) => res.error(RswsError::Database(e)),
-    }
-}
-
-// ========== 管理端点（需要 Admin 权限，由 router 层 require_admin 中间件保证）==========
 
 #[derive(Debug, Deserialize)]
 pub struct CreateCategoryRequest {
@@ -69,7 +43,6 @@ pub async fn admin_list_categories(_req: &mut Request, depot: &mut Depot, res: &
 
     match repo.find_all_with_inactive().await {
         Ok(categories) => {
-            // 并行查询每个分类的资源数量
             let mut categories_with_count = Vec::with_capacity(categories.len());
             for cat in categories {
                 let count = repo.count_resources(cat.id).await.unwrap_or(0);
@@ -113,7 +86,6 @@ pub async fn create_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         return;
     }
 
-    // 检查名称是否重复
     if let Ok(Some(_)) = repo.find_by_name(body.name.trim()).await {
         res.http_error(salvo::http::StatusCode::CONFLICT, "分类名称已存在");
         return;
@@ -161,7 +133,6 @@ pub async fn update_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         }
     };
 
-    // 如果更新名称，检查重复
     if let Some(ref name) = body.name {
         if name.trim().is_empty() {
             res.http_error(salvo::http::StatusCode::BAD_REQUEST, "分类名称不能为空");
@@ -175,7 +146,6 @@ pub async fn update_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         }
     }
 
-    // 将 description 的 Option<String> 转为 Option<&str>
     let desc_ref = body.description.as_deref();
 
     match repo
@@ -209,7 +179,6 @@ pub async fn delete_category(req: &mut Request, depot: &mut Depot, res: &mut Res
         }
     };
 
-    // 检查分类下是否有资源
     match repo.count_resources(id).await {
         Ok(count) if count > 0 => {
             res.http_error(

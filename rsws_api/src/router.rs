@@ -18,7 +18,7 @@ pub fn create_router(state: AppState) -> Router {
         // 健康检查（无需认证）
         .push(Router::with_path("health").get(handler::health))
         // 分类列表（无需认证）
-        .push(Router::with_path("api/v1/categories").get(handler::category::list_categories))
+        .push(Router::with_path("api/v1/categories").get(handler::custom::list_categories))
         // API v1（统一 API Key 认证 + 速率限制）
         .push(
             Router::with_path("api/v1")
@@ -27,42 +27,42 @@ pub fn create_router(state: AppState) -> Router {
                 // 用户相关
                 .push(
                     Router::with_path("user")
-                        .push(Router::new().get(handler::user::get_current_user)) // GET /api/v1/user
-                        .push(Router::with_path("info").get(handler::user::get_current_user)) // GET /api/v1/user/info (前端对齐)
-                        .push(Router::with_path("register").post(handler::user::register)) // POST /api/v1/user/register
-                        .push(Router::with_path("login").post(handler::user::login)) // POST /api/v1/user/login
-                        .push(Router::with_path("profile").put(handler::user::update_profile)) // PUT /api/v1/user/profile
-                        .push(Router::with_path("password").put(handler::user::change_password)) // PUT /api/v1/user/password
+                        .push(Router::new().get(handler::custom::get_current_user))
+                        .push(Router::with_path("info").get(handler::custom::get_current_user))
+                        .push(Router::with_path("register").post(handler::custom::register))
+                        .push(Router::with_path("login").post(handler::custom::login))
+                        .push(Router::with_path("profile").put(handler::custom::update_profile))
+                        .push(Router::with_path("password").put(handler::custom::change_password))
                         .push(
                             Router::with_path("change-password")
-                                .post(handler::user::change_password),
-                        ) // POST /api/v1/user/change-password (前端对齐)
-                        .push(Router::with_path("send-code").post(handler::user::send_code)) // POST /api/v1/user/send-code
-                        .push(Router::with_path("avatar").post(handler::user::upload_avatar)), // POST /api/v1/user/avatar
+                                .post(handler::custom::change_password),
+                        )
+                        .push(Router::with_path("send-code").post(handler::custom::send_code))
+                        .push(Router::with_path("avatar").post(handler::custom::upload_avatar)),
                 )
-                .push(Router::with_path("user/{id}").get(handler::user::get_user))
+                .push(Router::with_path("user/{id}").get(handler::custom::get_user))
                 // 资源相关（无认证的查询部分）
                 .push(
                     Router::with_path("resource")
                         .push(
                             Router::new()
-                                .get(handler::resource::list_resources)
-                                .post(handler::resource::create_resource),
+                                .get(handler::custom::list_resources)
+                                .post(handler::custom::create_resource),
                         )
                         .push(
                             Router::with_path("{id}")
-                                .get(handler::resource::get_resource)
-                                .put(handler::resource::update_resource)
-                                .delete(handler::resource::delete_resource)
+                                .get(handler::custom::get_resource)
+                                .put(handler::custom::update_resource)
+                                .delete(handler::custom::delete_resource)
                                 .push(
                                     Router::with_path("purchase-check")
                                         .hoop(api_key_auth)
-                                        .get(handler::order::check_purchase),
+                                        .get(handler::custom::check_purchase),
                                 )
                                 .push(
                                     Router::with_path("download")
                                         .hoop(api_key_auth)
-                                        .get(handler::order::get_resource_download),
+                                        .get(handler::custom::get_resource_download),
                                 ),
                         ),
                 )
@@ -71,35 +71,35 @@ pub fn create_router(state: AppState) -> Router {
                     Router::with_path("order")
                         .push(
                             Router::new()
-                                .get(handler::order::list_orders)
-                                .post(handler::order::create_order),
+                                .get(handler::custom::list_orders)
+                                .post(handler::custom::create_order),
                         )
                         .push(
                             Router::with_path("{id}")
-                                .get(handler::order::get_order)
+                                .get(handler::custom::get_order)
                                 .push(
-                                    Router::with_path("pay").post(handler::order::initiate_payment),
+                                    Router::with_path("pay").post(handler::custom::initiate_payment),
                                 )
                                 .push(
-                                    Router::with_path("cancel").post(handler::order::cancel_order),
+                                    Router::with_path("cancel").post(handler::custom::cancel_order),
                                 )
                                 .push(
                                     Router::with_path("status")
-                                        .get(handler::order::check_order_status),
+                                        .get(handler::custom::check_order_status),
                                 )
                                 .push(
-                                    Router::with_path("refund").post(handler::order::refund_order),
+                                    Router::with_path("refund").post(handler::custom::refund_order),
                                 )
                                 .push(
                                     Router::with_path("complete")
-                                        .post(handler::order::complete_order),
+                                        .post(handler::custom::complete_order),
                                 ),
                         ),
                 )
                 // 管理后台（需要 Admin 权限）
                 .push(
                     Router::with_path("admin")
-                        .hoop(require_admin) // 统一 Admin 权限检查
+                        .hoop(require_admin)
                         // Dashboard
                         .push(
                             Router::with_path("dashboard/stats")
@@ -145,20 +145,20 @@ pub fn create_router(state: AppState) -> Router {
                         // 分类管理
                         .push(
                             Router::with_path("categories")
-                                .get(handler::category::admin_list_categories)
-                                .post(handler::category::create_category),
+                                .get(handler::admin::admin_list_categories)
+                                .post(handler::admin::create_category),
                         )
                         .push(
                             Router::with_path("categories/{id}")
-                                .put(handler::category::update_category)
-                                .delete(handler::category::delete_category),
+                                .put(handler::admin::update_category)
+                                .delete(handler::admin::delete_category),
                         )
                         .push(
                             Router::with_path("categories/sort")
-                                .put(handler::category::batch_update_sort),
+                                .put(handler::admin::batch_update_sort),
                         )
                         // 订单管理
-                        .push(Router::with_path("orders").get(handler::order::admin_list_orders))
+                        .push(Router::with_path("orders").get(handler::admin::admin_list_orders))
                         // 平台资源管理
                         .push(
                             Router::with_path("resources")
@@ -177,15 +177,15 @@ pub fn create_router(state: AppState) -> Router {
                         // PayPal 配置管理
                         .push(
                             Router::with_path("paypal-configs")
-                                .post(handler::admin_paypal::create_paypal_config)
-                                .get(handler::admin_paypal::list_paypal_configs)
+                                .post(handler::admin::create_paypal_config)
+                                .get(handler::admin::list_paypal_configs)
                                 .push(
                                     Router::with_path("{id}")
-                                        .get(handler::admin_paypal::get_paypal_config)
-                                        .put(handler::admin_paypal::update_paypal_config)
+                                        .get(handler::admin::get_paypal_config)
+                                        .put(handler::admin::update_paypal_config)
                                         .push(
                                             Router::with_path("active/{active}").post(
-                                                handler::admin_paypal::set_paypal_config_active,
+                                                handler::admin::set_paypal_config_active,
                                             ),
                                         ),
                                 ),
@@ -203,12 +203,12 @@ pub fn create_router(state: AppState) -> Router {
                         // OSS 存储配置管理
                         .push(
                             Router::with_path("oss-config")
-                                .get(handler::admin_oss::get_storage_config)
-                                .post(handler::admin_oss::update_storage_config),
+                                .get(handler::admin::get_storage_config)
+                                .post(handler::admin::update_storage_config),
                         )
                         .push(
                             Router::with_path("oss-config/test")
-                                .post(handler::admin_oss::test_storage_connection),
+                                .post(handler::admin::test_storage_connection),
                         )
                         // 管理员管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）
                         .push(
@@ -267,25 +267,25 @@ pub fn create_router(state: AppState) -> Router {
         // 支付相关（无需 API Key 认证）
         .push(
             Router::with_path("api/v1/payment")
-                .push(Router::with_path("usdt/{network}").get(handler::payment::get_usdt_address))
-                .push(Router::with_path("paypal/success").get(handler::payment::paypal_success))
-                .push(Router::with_path("paypal/cancel").get(handler::payment::paypal_cancel)),
+                .push(Router::with_path("usdt/{network}").get(handler::common::get_usdt_address))
+                .push(Router::with_path("paypal/success").get(handler::common::paypal_success))
+                .push(Router::with_path("paypal/cancel").get(handler::common::paypal_cancel)),
         )
         // Webhook（无需 API Key 认证，有独立的签名验证）
         .push(
             Router::with_path("api/v1/webhook")
-                .push(Router::with_path("paypal").post(handler::payment::paypal_webhook))
-                .push(Router::with_path("usdt").post(handler::payment::usdt_webhook)),
+                .push(Router::with_path("paypal").post(handler::common::paypal_webhook))
+                .push(Router::with_path("usdt").post(handler::common::usdt_webhook)),
         )
         // 文件上传（分块上传，需认证）
         .push(
             Router::with_path("api/v1/upload")
-                .push(Router::with_path("init").post(handler::upload::init_upload))
-                .push(Router::with_path("chunk").post(handler::upload::upload_chunk))
-                .push(Router::with_path("complete").post(handler::upload::complete_upload)),
+                .push(Router::with_path("init").post(handler::common::init_upload))
+                .push(Router::with_path("chunk").post(handler::common::upload_chunk))
+                .push(Router::with_path("complete").post(handler::common::complete_upload)),
         )
         // 文件上传（单文件上传，需认证）
-        .push(Router::with_path("api/v1/upload/single").post(handler::upload::upload_single));
+        .push(Router::with_path("api/v1/upload/single").post(handler::common::upload_single));
 
     // OpenAPI 文档生成
     let doc = OpenApi::new("RSWS API", "0.1.0").merge_router(&api_routes);

@@ -3,8 +3,7 @@
 //! 提供各业务模块的服务逻辑
 
 pub mod admin_service;
-pub mod api_key_service;
-pub mod auth_service;
+pub mod api_key_manager;
 pub mod blockchain_service;
 pub mod commission_service;
 pub mod config_service;
@@ -22,8 +21,7 @@ pub mod webhook_service;
 
 // 导出主要服务
 pub use admin_service::AdminService;
-pub use api_key_service::ApiKeyService;
-pub use auth_service::AuthService;
+pub use api_key_manager::ApiKeyManager;
 pub use blockchain_service::BlockchainService;
 pub use commission_service::CommissionService;
 pub use config_service::ConfigService;
@@ -70,9 +68,14 @@ pub fn create_cross_platform_service() -> CrossPlatformService {
     CrossPlatformService::new()
 }
 
-/// 创建 API Key 服务（纯 Redis，无 DB）
-pub fn create_api_key_service(redis: RedisService) -> ApiKeyService {
-    ApiKeyService::new(Arc::new(redis))
+/// 创建 Admin API Key 管理器
+pub fn create_admin_api_key_manager(redis: RedisService) -> ApiKeyManager {
+    ApiKeyManager::for_admin(Arc::new(redis))
+}
+
+/// 创建 User API Key 管理器
+pub fn create_user_api_key_manager(redis: RedisService) -> ApiKeyManager {
+    ApiKeyManager::for_user(Arc::new(redis))
 }
 
 /// 创建用户服务
@@ -128,11 +131,7 @@ pub fn create_payment_service(pool: sqlx::PgPool) -> PaymentService {
     PaymentService::new(Arc::new(PaymentRepository::new(pool)))
 }
 
-/// 创建管理员服务
-pub fn create_admin_service(pool: sqlx::PgPool, redis: Option<RedisService>) -> AdminService {
-    if let Some(redis) = redis {
-        AdminService::with_redis(AdminRepository::new(pool), redis)
-    } else {
-        AdminService::new(AdminRepository::new(pool))
-    }
+/// 创建管理员服务（不再持有 Redis，API Key 管理已迁移至 api_key_manager）
+pub fn create_admin_service(pool: sqlx::PgPool) -> AdminService {
+    AdminService::new(AdminRepository::new(pool))
 }

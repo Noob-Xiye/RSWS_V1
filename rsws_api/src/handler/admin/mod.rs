@@ -6,11 +6,15 @@
 // 子模块声明
 mod api_key;
 mod auth;
+mod category;
 mod dashboard;
 mod email;
 mod log;
 mod management;
+mod order;
+mod oss;
 mod payment_method;
+mod paypal;
 mod resource;
 mod user;
 mod wallet;
@@ -70,3 +74,25 @@ pub use email::update_email_config;
 pub use payment_method::create_payment_method;
 pub use payment_method::delete_payment_method;
 pub use payment_method::list_payment_methods;
+
+// oss.rs
+pub use oss::get_storage_config;
+pub use oss::test_storage_connection;
+pub use oss::update_storage_config;
+
+// paypal.rs
+pub use paypal::create_paypal_config;
+pub use paypal::get_paypal_config;
+pub use paypal::list_paypal_configs;
+pub use paypal::set_paypal_config_active;
+pub use paypal::update_paypal_config;
+
+// category.rs
+pub use category::admin_list_categories;
+pub use category::batch_update_sort;
+pub use category::create_category;
+pub use category::delete_category;
+pub use category::update_category;
+
+// order.rs
+pub use order::admin_list_orders;

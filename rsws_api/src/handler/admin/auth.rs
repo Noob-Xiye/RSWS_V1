@@ -49,16 +49,13 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
             {
                 Ok(info) => {
                     // 为管理员创建 admin_api_key
-                    match state
-                        .admin_service
-                        .create_api_key(
-                            info.id,
-                            "login_session",
-                            vec!["all".to_string()],
-                            Some(1000),
-                            Some(30),
-                        )
-                        .await
+                    let create_req = rsws_model::api_key::CreateApiKeyRequest {
+                        name: "login_session".to_string(),
+                        permissions: vec!["all".to_string()],
+                        rate_limit: Some(1000),
+                        expires_in_days: Some(30),
+                    };
+                    match state.admin_api_key_manager.create(info.id, create_req).await
                     {
                         Ok(api_key_resp) => {
                             let login_resp = AdminLoginResponse {

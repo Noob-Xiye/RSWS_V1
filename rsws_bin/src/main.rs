@@ -198,7 +198,8 @@ async fn main() -> Result<(), RswsError> {
     let order_service = rsws_service::create_order_service(pool.clone());
     let resource_service =
         rsws_service::create_resource_service(pool.clone(), Some(config_service.as_ref().clone()));
-    let api_key_service = rsws_service::ApiKeyService::new(std::sync::Arc::new(redis_pool.clone()));
+    let admin_api_key_manager = rsws_service::create_admin_api_key_manager(redis_pool.clone());
+    let user_api_key_manager = rsws_service::create_user_api_key_manager(redis_pool.clone());
     let wallet_repo = rsws_db::WalletRepository::new(pool.clone());
 
     // PayPal 服务 — 配置从 DB 读取
@@ -213,7 +214,7 @@ async fn main() -> Result<(), RswsError> {
     // Admin 服务
     let admin_repo = rsws_db::AdminRepository::new(pool.clone());
     let category_repo = rsws_db::CategoryRepository::new(pool.clone());
-    let admin_service = rsws_service::create_admin_service(pool.clone(), Some(redis_pool.clone()));
+    let admin_service = rsws_service::create_admin_service(pool.clone());
     let log_service = rsws_service::LogService::new(pool.clone());
 
     info!("Services initialized");
@@ -225,7 +226,8 @@ async fn main() -> Result<(), RswsError> {
         user_service,
         order_service,
         resource_service,
-        api_key_service,
+        admin_api_key_manager,
+        user_api_key_manager,
         paypal_service,
         payment_service,
         blockchain_service,

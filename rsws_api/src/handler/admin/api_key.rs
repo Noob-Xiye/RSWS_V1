@@ -4,7 +4,7 @@
 
 use crate::state::{get_state, require_user_id};
 use rsws_common::ResponseExt;
-use rsws_common::RswsError;
+use rsws_model::api_key::CreateApiKeyRequest;
 use salvo::http::StatusCode;
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
@@ -41,17 +41,13 @@ pub async fn create_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
     match body {
         Ok(data) => {
             let state = get_state(depot);
-            match state
-                .admin_service
-                .create_api_key(
-                    admin_id,
-                    &data.name,
-                    data.permissions,
-                    data.rate_limit,
-                    data.expires_in_days,
-                )
-                .await
-            {
+            let create_req = CreateApiKeyRequest {
+                name: data.name,
+                permissions: data.permissions,
+                rate_limit: data.rate_limit,
+                expires_in_days: data.expires_in_days,
+            };
+            match state.admin_api_key_manager.create(admin_id, create_req).await {
                 Ok(response) => {
                     res.status_code(StatusCode::CREATED);
                     res.success(response);
@@ -82,8 +78,9 @@ pub async fn list_api_keys(_req: &mut Request, depot: &mut Depot, res: &mut Resp
     };
 
     let state = get_state(depot);
-    match state.admin_service.list_api_keys(admin_id).await {
-        Ok(keys) => res.success(keys),
+    match state.admin_api_key_manager.get(admin_id).await {
+        Ok(Some(key)) => res.success(vec![key]),
+        Ok(None) => res.success(Vec::<rsws_model::api_key::ApiKey>::new()),
         Err(e) => res.error(e),
     }
 }
@@ -104,17 +101,10 @@ pub async fn delete_api_key(req: &mut Request, depot: &mut Depot, res: &mut Resp
         }
     };
 
-    let key_id: i64 = req.param("key_id").unwrap_or(0);
-    if key_id <= 0 {
-        res.error_msg(
-            RswsError::from(rsws_common::error_code::ErrorCode::INVALID_PARAMETER),
-            "Invalid API key ID",
-        );
-        return;
-    }
+    let _key_id: i64 = req.param("key_id").unwrap_or(0);
 
     let state = get_state(depot);
-    match state.admin_service.delete_api_key(key_id, admin_id).await {
+    match state.admin_api_key_manager.delete(admin_id).await {
         Ok(deleted) => res.success(serde_json::json!({
             "deleted": deleted
         })),
@@ -145,14 +135,7 @@ pub async fn toggle_api_key_status(req: &mut Request, depot: &mut Depot, res: &m
         }
     };
 
-    let key_id: i64 = req.param("key_id").unwrap_or(0);
-    if key_id <= 0 {
-        res.error_msg(
-            RswsError::from(rsws_common::error_code::ErrorCode::INVALID_PARAMETER),
-            "Invalid API key ID",
-        );
-        return;
-    }
+    let _key_id: i64 = req.param("key_id").unwrap_or(0);
 
     let body: Result<ToggleApiKeyStatusBody, _> = req.parse_json().await;
 
@@ -160,8 +143,8 @@ pub async fn toggle_api_key_status(req: &mut Request, depot: &mut Depot, res: &m
         Ok(data) => {
             let state = get_state(depot);
             match state
-                .admin_service
-                .toggle_api_key_status(key_id, admin_id, data.is_active)
+                .admin_api_key_manager
+                .toggle_status(admin_id, data.is_active)
                 .await
             {
                 Ok(_) => res.success("API key status updated"),

@@ -2,7 +2,7 @@
 //!
 //! 统一 API Key 认证（Cregis 方案）：
 //! - 前端传 user_id + timestamp + nonce + sign
-//! - 后端通过 user_id 查库获取 api_key，重算签名验签
+//! - 后端通过 user_id 查 Redis 获取 api_key，重算签名验签
 //!
 //! 速率限制中间件
 //! Admin 权限检查中间件
@@ -60,7 +60,7 @@ async fn check_nonce_once(redis: &RedisService, nonce: &str) -> Result<bool, Rsw
 /// 认证流程：
 /// 1. 从请求参数获取 user_id, timestamp, nonce, sign
 /// 2. 检查时间戳防重放
-/// 3. 用 user_id 查库获取 api_key，重算签名验签
+/// 3. 先尝试 user 验签，失败则尝试 admin 验签
 /// 4. 验签通过后注入 depot：user_id, api_key_id, is_admin
 #[handler]
 pub async fn api_key_auth(
@@ -120,7 +120,6 @@ pub async fn api_key_auth(
         }
 
         // 收集所有参数用于签名验证（排除 sign 本身）
-
         let mut params: std::collections::HashMap<String, String> =
             std::collections::HashMap::new();
         params.insert("user_id".to_string(), user_id_str);
@@ -128,64 +127,36 @@ pub async fn api_key_auth(
         params.insert("nonce".to_string(), nonce.clone());
 
         // 从查询参数收集其他业务参数
-        // Salvo 正确写法：req.queries() 返回 HashMap<String, Vec<String>>
         let query = req.queries();
         for (k, v) in query {
             if k != "sign" && k != "user_id" && k != "timestamp" && k != "nonce" {
-                // 取第一个值（查询参数通常只有一个值）
                 if let Some(first_value) = v.first() {
                     params.insert(k.clone(), first_value.clone());
                 }
             }
         }
 
-        // 将请求路径纳入签名（防路径篡改）
-        // 注意：前端当前未发送 _path，暂不从 query params 读取
-        // 如需启用，前后端需同步开启
-        // let mut request_path = path.to_string();
-        // if request_path.ends_with('/') && request_path.len() > 1 {
-        //     request_path = request_path.trim_end_matches('/').to_string();
-        // }
-        // params.insert("_path".to_string(), request_path);
-
         let state = get_state(depot);
 
-        // 用户签名认证
-        let user_validate_result = state
-            .api_key_service
-            .validate_signature_by_user_id(user_id, &params, &sign)
+        // 先尝试 user 验签
+        let user_result = state
+            .user_api_key_manager
+            .validate_signature(user_id, &params, &sign)
             .await;
-        tracing::info!(
-            "validate_signature_by_user_id for user_id={}: {:?}",
-            user_id,
-            user_validate_result
-        );
-        match user_validate_result {
-            Ok(Some(_api_key_record)) => {
-                // 用户签名验证通过
-                // 额外检查：是否同时是管理员？（admin login 也存了 CachedApiKey）
-                let admin_key_result = state
-                    .admin_service
-                    .validate_signature_by_admin_id(user_id, &params, &sign)
-                    .await;
 
-                let is_admin = admin_key_result
-                    .as_ref()
-                    .map(|r| r.is_some())
-                    .unwrap_or(false);
+        match user_result {
+            Ok(Some(api_key_record)) => {
+                // 用户验签通过，检查是否同时是 admin
+                let is_admin = state
+                    .admin_api_key_manager
+                    .get(user_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .is_some();
 
                 depot.insert("user_id", user_id);
-                // Use admin key_id if admin, otherwise use user key_id
-                let key_id: i64 = if is_admin {
-                    if let Ok(Some(kid)) = admin_key_result.as_ref() {
-                        *kid
-                    } else {
-                        _api_key_record.id
-                    }
-                } else {
-                    _api_key_record.id
-                };
-                depot.insert("api_key_id", key_id);
+                depot.insert("api_key_id", api_key_record.id);
                 depot.insert("is_admin", is_admin);
 
                 // Nonce 去重检查
@@ -201,7 +172,6 @@ pub async fn api_key_auth(
                     return;
                 }
 
-                // 记录到审计日志
                 if is_admin {
                     tracing::info!("Admin user_id={} passed auth for admin endpoint", user_id);
                 }
@@ -210,15 +180,15 @@ pub async fn api_key_auth(
                 return;
             }
             Ok(None) => {
-                // 用户签名验证失败，尝试管理员签名验证
+                // 用户验签失败，尝试 admin 验签
                 match state
-                    .admin_service
-                    .validate_signature_by_admin_id(user_id, &params, &sign)
+                    .admin_api_key_manager
+                    .validate_signature(user_id, &params, &sign)
                     .await
                 {
-                    Ok(Some(api_key_id)) => {
+                    Ok(Some(api_key_record)) => {
                         depot.insert("user_id", user_id);
-                        depot.insert("api_key_id", api_key_id);
+                        depot.insert("api_key_id", api_key_record.id);
                         depot.insert("is_admin", true);
 
                         // Nonce 去重检查
@@ -237,32 +207,23 @@ pub async fn api_key_auth(
                         ctrl.call_next(req, depot, res).await;
                         return;
                     }
-                    Ok(None) | Err(_) => {
-                        // 管理员验证也失败
-                    }
+                    Ok(None) | Err(_) => {}
                 }
-
-                // 验签失败，返回 401
-                res.status_code(StatusCode::UNAUTHORIZED);
-                res.render(Json(
-                    rsws_common::response::ApiResponse::<()>::error_with_message(
-                        rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
-                        "Signature verification failed",
-                    ),
-                ));
-                return;
             }
             Err(e) => {
-                tracing::error!("Signature validation error: {}", e);
-                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-                res.render(Json(
-                    rsws_common::response::ApiResponse::<()>::internal_error(
-                        "Authentication service error",
-                    ),
-                ));
-                return;
+                tracing::error!("User signature validation error: {}", e);
             }
         }
+
+        // 验签失败，返回 401
+        res.status_code(StatusCode::UNAUTHORIZED);
+        res.render(Json(
+            rsws_common::response::ApiResponse::<()>::error_with_message(
+                rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
+                "Signature verification failed",
+            ),
+        ));
+        return;
     }
 
     // ========== 无认证信息 ==========

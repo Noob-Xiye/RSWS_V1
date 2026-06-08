@@ -5,7 +5,7 @@
 use rsws_common::config::AppConfig;
 use rsws_db::CategoryRepository;
 use rsws_service::{
-    AdminRepository, AdminService, ApiKeyService, BlockchainService, ConfigService,
+    AdminRepository, AdminService, ApiKeyManager, BlockchainService, ConfigService,
     CrossPlatformService, LogService, OrderService, PayPalService, PaymentService, ResourceService,
     UserService, WebhookService,
 };
@@ -15,14 +15,14 @@ use std::sync::Arc;
 
 /// 应用全局状态
 #[derive(Clone)]
-/// 应用全局状态
 pub struct AppState {
     pub pool: PgPool,
     pub config: AppConfig,
     pub user_service: Arc<UserService>,
     pub order_service: Arc<OrderService>,
     pub resource_service: Arc<ResourceService>,
-    pub api_key_service: Arc<ApiKeyService>,
+    pub admin_api_key_manager: Arc<ApiKeyManager>,
+    pub user_api_key_manager: Arc<ApiKeyManager>,
     pub paypal_service: Arc<PayPalService>,
     pub payment_service: Arc<PaymentService>,
     pub blockchain_service: Arc<BlockchainService>,
@@ -43,7 +43,8 @@ impl AppState {
         user_service: UserService,
         order_service: OrderService,
         resource_service: ResourceService,
-        api_key_service: ApiKeyService,
+        admin_api_key_manager: ApiKeyManager,
+        user_api_key_manager: ApiKeyManager,
         paypal_service: Arc<PayPalService>,
         payment_service: PaymentService,
         blockchain_service: BlockchainService,
@@ -61,7 +62,8 @@ impl AppState {
             user_service: Arc::new(user_service),
             order_service: Arc::new(order_service),
             resource_service: Arc::new(resource_service),
-            api_key_service: Arc::new(api_key_service),
+            admin_api_key_manager: Arc::new(admin_api_key_manager),
+            user_api_key_manager: Arc::new(user_api_key_manager),
             paypal_service,
             payment_service: Arc::new(payment_service),
             blockchain_service: Arc::new(blockchain_service),

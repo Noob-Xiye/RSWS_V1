@@ -69,7 +69,7 @@ pub async fn register(req: &mut Request, depot: &mut Depot, res: &mut Response) 
                         expires_in_days: Some(7),
                     };
 
-                    match state.api_key_service.create(user.id, create_req).await {
+                    match state.user_api_key_manager.create(user.id, create_req).await {
                         Ok(api_key_resp) => {
                             res.success(serde_json::json!({
                                 "user": {
@@ -146,7 +146,7 @@ pub async fn login(req: &mut Request, depot: &mut Depot, res: &mut Response) {
                             expires_in_days: Some(7),
                         };
 
-                        match state.api_key_service.create(user.id, create_req).await {
+                        match state.user_api_key_manager.create(user.id, create_req).await {
                             Ok(api_key_resp) => {
                                 login_response.api_key = Some(api_key_resp.api_key);
                                 login_response.expires_at = Some(

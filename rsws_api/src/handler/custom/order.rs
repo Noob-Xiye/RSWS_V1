@@ -1,6 +1,4 @@
-//! 订单处理器
-//!
-//! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
+//! 用户端订单处理器
 
 use crate::state::get_state;
 use num_traits::cast::ToPrimitive;
@@ -14,7 +12,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateOrderRequest {
     pub resource_id: i64,
-    pub payment_method: String, // "paypal" | "usdt_trc20" | "usdt_erc20"
+    pub payment_method: String,
 }
 
 /// 获取订单列表
@@ -535,7 +533,7 @@ pub async fn initiate_payment(req: &mut Request, depot: &mut Depot, res: &mut Re
             "Not your order",
         );
         return;
-    };
+    }
 
     // 检查订单状态
     if order.status != "pending" {
@@ -615,71 +613,6 @@ pub async fn initiate_payment(req: &mut Request, depot: &mut Depot, res: &mut Re
                 RswsError::from(ErrorCode::PAYMENT_METHOD_NOT_SUPPORTED),
                 "Unsupported payment method",
             );
-        }
-    }
-}
-
-// ==================== 管理员订单 ====================
-
-/// 管理员订单查询参数
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct AdminOrderQuery {
-    pub page: Option<i64>,
-    pub page_size: Option<i64>,
-    pub status: Option<String>,
-    pub user_id: Option<i64>,
-    pub payment_method: Option<String>,
-}
-
-/// 管理员获取全部订单列表
-#[endpoint]
-pub async fn admin_list_orders(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let is_admin: bool = depot.get("is_admin").copied().unwrap_or(false);
-    if !is_admin {
-        res.http_error(StatusCode::FORBIDDEN, "Admin access required");
-        return;
-    }
-
-    let query: AdminOrderQuery = req.parse_queries().unwrap_or(AdminOrderQuery {
-        page: Some(1),
-        page_size: Some(20),
-        status: None,
-        user_id: None,
-        payment_method: None,
-    });
-
-    let page = query.page.unwrap_or(1).max(1);
-    let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
-
-    let state = get_state(depot);
-
-    match state
-        .order_service
-        .admin_list_orders(
-            query.status.as_deref(),
-            query.user_id,
-            query.payment_method.as_deref(),
-            page,
-            page_size,
-        )
-        .await
-    {
-        Ok((orders, total)) => {
-            let total_pages = if page_size > 0 {
-                (total + page_size - 1) / page_size
-            } else {
-                0
-            };
-            res.success(serde_json::json!({
-                "items": orders,
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "total_pages": total_pages,
-            }));
-        }
-        Err(e) => {
-            res.error(e);
         }
     }
 }
