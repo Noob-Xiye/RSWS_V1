@@ -53,7 +53,7 @@ jobs:
       - name: Cache cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: ${{ github.workspace }} -> target
+          workspaces: ". -> target"
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y postgresql-client redis-tools
