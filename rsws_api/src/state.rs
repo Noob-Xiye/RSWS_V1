@@ -5,9 +5,9 @@
 use rsws_common::config::AppConfig;
 use rsws_db::CategoryRepository;
 use rsws_service::{
-    AdminRepository, AdminService, ApiKeyManager, BlockchainService, ConfigService,
-    CrossPlatformService, LogService, OrderService, PayPalService, PaymentService, ResourceService,
-    UserService, WebhookService,
+    AdminRepository, AdminService, ApiKeyManager, AuditLogService, BlockchainService, ConfigService,
+    CrossPlatformService, ErrorLogService, LogService, LoginLogService, OrderService, PayPalService,
+    PaymentService, ResourceService, UserService, WebhookService,
 };
 use salvo::prelude::*;
 use sqlx::PgPool;
@@ -31,6 +31,9 @@ pub struct AppState {
     pub config_service: Arc<ConfigService>,
     pub admin_service: Arc<AdminService>,
     pub log_service: Arc<LogService>,
+    pub login_log_service: Arc<LoginLogService>,
+    pub error_log_service: Arc<ErrorLogService>,
+    pub audit_log_service: Arc<AuditLogService>,
     admin_repo: Arc<AdminRepository>,
     pub category_service: Arc<CategoryRepository>,
 }
@@ -53,6 +56,9 @@ impl AppState {
         config_service: Arc<ConfigService>,
         admin_service: AdminService,
         log_service: LogService,
+        login_log_service: LoginLogService,
+        error_log_service: ErrorLogService,
+        audit_log_service: AuditLogService,
         admin_repo: AdminRepository,
         category_service: CategoryRepository,
     ) -> Self {
@@ -72,6 +78,9 @@ impl AppState {
             config_service,
             admin_service: Arc::new(admin_service),
             log_service: Arc::new(log_service),
+            login_log_service: Arc::new(login_log_service),
+            error_log_service: Arc::new(error_log_service),
+            audit_log_service: Arc::new(audit_log_service),
             admin_repo: Arc::new(admin_repo),
             category_service: Arc::new(category_service),
         }

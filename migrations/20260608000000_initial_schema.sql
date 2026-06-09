@@ -304,3 +304,22 @@ CREATE TABLE IF NOT EXISTS payment_methods (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- System logs table
+CREATE TABLE IF NOT EXISTS system_logs (
+    id BIGINT PRIMARY KEY,
+    log_level VARCHAR(20) NOT NULL DEFAULT 'info',
+    module VARCHAR(100),
+    message TEXT NOT NULL,
+    context JSONB DEFAULT '{}',
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    admin_id BIGINT REFERENCES admins(id) ON DELETE SET NULL,
+    ip_address INET,
+    user_agent TEXT,
+    request_id VARCHAR(64),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(log_level);
+CREATE INDEX IF NOT EXISTS idx_system_logs_module ON system_logs(module);
+CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at DESC);

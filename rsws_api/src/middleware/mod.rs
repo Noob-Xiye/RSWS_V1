@@ -2,9 +2,11 @@
 
 pub mod auth;
 pub mod request_id;
+pub mod tracing;
 
 pub use auth::{api_key_auth, rate_limit, require_admin};
 pub use request_id::{get_request_id, request_id_middleware, REQUEST_ID_HEADER};
+pub use tracing::tracing_logger;
 
 /// 认证上下文（从中间件传递到 handler）
 #[derive(Debug, Clone)]

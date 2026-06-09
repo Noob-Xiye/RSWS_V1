@@ -6,7 +6,6 @@ use crate::state::get_state;
 use chrono::DateTime;
 use chrono::Utc;
 use rsws_common::{error_code::ErrorCode, ResponseExt, RswsError};
-use rsws_service::UpdateLogConfigRequest;
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
 use serde::Deserialize;
@@ -57,7 +56,10 @@ pub async fn get_log_config(req: &mut Request, depot: &mut Depot, res: &mut Resp
 pub struct SetLogConfigBody {
     pub config_key: String,
     pub config_value: String,
+    /// 配置类型: string, bool, number
     pub config_type: Option<String>,
+    /// 日志级别（仅当 config_key 为日志节点时有效）: trace, debug, info, warn, error
+    pub level: Option<String>,
     pub description: Option<String>,
 }
 
@@ -82,6 +84,7 @@ pub async fn create_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
                     &data.config_value,
                     config_type,
                     data.description.as_deref(),
+                    data.level.as_deref(),
                 )
                 .await
             {
@@ -102,7 +105,10 @@ pub async fn create_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
 #[derive(Debug, Deserialize, salvo_oapi::ToSchema)]
 pub struct UpdateLogConfigBody {
     pub config_value: String,
+    /// 配置类型: string, bool, number
     pub config_type: Option<String>,
+    /// 日志级别（仅当 config_key 为日志节点时有效）: trace, debug, info, warn, error
+    pub level: Option<String>,
     pub description: Option<String>,
     pub is_active: Option<bool>,
 }
@@ -130,12 +136,13 @@ pub async fn update_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
     match body {
         Ok(data) => {
             let state = get_state(depot);
-            let request = UpdateLogConfigRequest {
+            let request = rsws_service::UpdateLogConfigRequest {
                 config_key: key,
                 config_value: data.config_value,
                 config_type: data.config_type,
                 description: data.description,
                 is_active: data.is_active,
+                level: data.level,
             };
             match state.log_service.update_log_config(&request).await {
                 Ok(config) => res.success(config),
@@ -177,7 +184,11 @@ pub async fn delete_log_config(req: &mut Request, depot: &mut Depot, res: &mut R
 /// 查询系统日志
 #[endpoint(
     parameters(
-        ("level", Query, description = "日志级别筛选"),
+        ("level", Query, description = "日志级别筛选 (trace|debug|info|warn|error)"),
+        ("module", Query, description = "模块名称筛选"),
+        ("user_id", Query, description = "用户ID筛选"),
+        ("start_time", Query, description = "开始时间 (RFC3339)"),
+        ("end_time", Query, description = "结束时间 (RFC3339)"),
         ("page", Query, description = "页码"),
         ("page_size", Query, description = "每页数量"),
     ),
@@ -195,7 +206,6 @@ pub async fn query_system_logs(req: &mut Request, depot: &mut Depot, res: &mut R
     let page: i64 = req.query("page").unwrap_or(1);
     let page_size: i64 = req.query("page_size").unwrap_or(20);
 
-    // 解析时间参数
     let start_time_dt: Option<DateTime<Utc>> = start_time
         .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
         .map(|dt| dt.with_timezone(&Utc));

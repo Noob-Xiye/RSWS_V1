@@ -1,47 +1,54 @@
-# ============================
-# RSWS_V1 Dockerfile — Multi-stage build
-# ============================
+# ===========================
+# RSWS_V1 Dockerfile — Multi-stage build with low memory
+# ===========================
 
 # ---- Builder stage ----
-FROM rust:1.92-slim AS builder
+FROM rust:1.96-slim-bookworm AS builder
 
+WORKDIR /app
+
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Configure cargo for low-memory build
+ENV CARGO_BUILD_JOBS=1
+ENV CARGO_INCREMENTAL=0
 
-# Limit parallel compilation to avoid OOM during docker build
-ENV CARGO_BUILD_JOBS=2
-
-# Cache dependencies
+# Copy manifests first for dependency caching
 COPY Cargo.toml Cargo.lock ./
-COPY rsws_api/Cargo.toml rsws_api/Cargo.toml
-COPY rsws_service/Cargo.toml rsws_service/Cargo.toml
-COPY rsws_model/Cargo.toml rsws_model/Cargo.toml
-COPY rsws_db/Cargo.toml rsws_db/Cargo.toml
-COPY rsws_common/Cargo.toml rsws_common/Cargo.toml
-COPY rsws_usdt/Cargo.toml rsws_usdt/Cargo.toml
-COPY rsws_bin/Cargo.toml rsws_bin/Cargo.toml
+COPY rsws_api/Cargo.toml ./rsws_api/
+COPY rsws_service/Cargo.toml ./rsws_service/
+COPY rsws_db/Cargo.toml ./rsws_db/
+COPY rsws_model/Cargo.toml ./rsws_model/
+COPY rsws_common/Cargo.toml ./rsws_common/
+COPY rsws_usdt/Cargo.toml ./rsws_usdt/
+COPY rsws_bin/Cargo.toml ./rsws_bin/
 
-# Create dummy source files to cache deps
-RUN mkdir -p rsws_api/src && echo "" > rsws_api/src/lib.rs \
-    && mkdir -p rsws_service/src && echo "" > rsws_service/src/lib.rs \
-    && mkdir -p rsws_model/src && echo "" > rsws_model/src/lib.rs \
-    && mkdir -p rsws_db/src && echo "" > rsws_db/src/lib.rs \
-    && mkdir -p rsws_common/src && echo "" > rsws_common/src/lib.rs \
-    && mkdir -p rsws_usdt/src && echo "" > rsws_usdt/src/lib.rs \
-    && mkdir -p rsws_bin/src && echo "fn main(){}" > rsws_bin/src/main.rs
+# Dummy build to cache dependencies
+RUN mkdir -p rsws_api/src rsws_service/src rsws_db/src rsws_model/src rsws_common/src rsws_usdt/src rsws_bin/src \
+    && echo "fn main() {}" > rsws_api/src/lib.rs \
+    && echo "fn main() {}" > rsws_service/src/lib.rs \
+    && echo "fn main() {}" > rsws_db/src/lib.rs \
+    && echo "fn main() {}" > rsws_model/src/lib.rs \
+    && echo "fn main() {}" > rsws_common/src/lib.rs \
+    && echo "fn main() {}" > rsws_usdt/src/lib.rs \
+    && echo "fn main() {}" > rsws_bin/src/main.rs \
+    && cargo build --release --bin resource-sharing-web-system \
+    && rm -rf rsws_*/src
 
-RUN cargo build --release --bin resource-sharing-web-system 2>/dev/null || true
+# Copy actual source and build
+COPY rsws_api/src ./rsws_api/src
+COPY rsws_service/src ./rsws_service/src
+COPY rsws_db/src ./rsws_db/src
+COPY rsws_model/src ./rsws_model/src
+COPY rsws_common/src ./rsws_common/src
+COPY rsws_usdt/src ./rsws_usdt/src
+COPY rsws_bin/src ./rsws_bin/src
 
-# Copy real source code
-COPY . .
-
-RUN touch rsws_api/src/lib.rs rsws_service/src/lib.rs rsws_model/src/lib.rs \
-    rsws_db/src/lib.rs rsws_common/src/lib.rs rsws_usdt/src/lib.rs rsws_bin/src/main.rs
-
+# Build the binary
 RUN cargo build --release --bin resource-sharing-web-system
 
 # ---- Runtime stage ----
@@ -53,6 +60,7 @@ ENV APP_VERSION=$VERSION
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
+    libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -63,8 +71,7 @@ LABEL org.opencontainers.image.title="Resource Sharing Web System"
 LABEL org.opencontainers.image.description="数字内容付费交易平台"
 
 COPY --from=builder /app/target/release/resource-sharing-web-system /app/resource-sharing-web-system
-# Config via environment variables (RSWS__DATABASE__URL, RSWS__REDIS__URL, etc.)
-# No default config.toml — all settings via env
+RUN chmod +x /app/resource-sharing-web-system
 
 EXPOSE 5170
 

@@ -4,11 +4,14 @@
 
 pub mod admin_service;
 pub mod api_key_manager;
+pub mod audit_log_service;
 pub mod blockchain_service;
 pub mod commission_service;
 pub mod config_service;
 pub mod cross_platform_service;
+pub mod error_log_service;
 pub mod log_service;
+pub mod login_log_service;
 pub mod order_service;
 pub mod oss_service;
 pub mod payment_service;
@@ -22,13 +25,16 @@ pub mod webhook_service;
 // 导出主要服务
 pub use admin_service::AdminService;
 pub use api_key_manager::ApiKeyManager;
+pub use audit_log_service::{AuditAction, AuditLog, AuditLogPage, AuditLogQuery, AuditLogService, AuditStats, CreateAuditLogRequest, ResourceType, RiskLevel, VerificationMethod};
 pub use blockchain_service::BlockchainService;
 pub use commission_service::CommissionService;
 pub use config_service::ConfigService;
 pub use config_service::{BlockchainDbConfig, EmailDbConfig, PayPalDbConfig, UsdtListenDbConfig};
 pub use cross_platform_service::CrossPlatformService;
+pub use error_log_service::{CreateErrorLogRequest, ErrorLog, ErrorLogPage, ErrorLogQuery, ErrorLogService, ErrorStats, ErrorType, ResolveErrorRequest};
 pub use log_service::LogService;
 pub use log_service::{LogConfig, UpdateLogConfigRequest};
+pub use login_log_service::{CreateLoginLogRequest, LoginLog, LoginLogPage, LoginLogQuery, LoginLogService, LoginStatus, LoginType};
 pub use order_service::OrderService;
 pub use oss_service::{FileMetadata, StorageBackend, StorageError, StorageService, UploadResult};
 pub use payment_service::PaymentService;

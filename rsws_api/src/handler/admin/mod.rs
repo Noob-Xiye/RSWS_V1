@@ -5,11 +5,14 @@
 
 // 子模块声明
 mod api_key;
+mod audit_log;
 mod auth;
 mod category;
 mod dashboard;
 mod email;
+mod error_log;
 mod log;
+mod login_log;
 mod management;
 mod order;
 mod oss;
@@ -45,6 +48,21 @@ pub use log::get_log_config;
 pub use log::list_log_configs;
 pub use log::query_system_logs;
 pub use log::update_log_config;
+
+// audit_log.rs
+pub use audit_log::get_audit_stats;
+pub use audit_log::get_resource_history;
+pub use audit_log::list_audit_logs;
+
+// error_log.rs
+pub use error_log::get_error_log;
+pub use error_log::get_error_stats;
+pub use error_log::list_error_logs;
+pub use error_log::resolve_error;
+
+// login_log.rs
+pub use login_log::get_login_stats;
+pub use login_log::list_login_logs;
 
 // wallet.rs
 pub use wallet::list_usdt_wallets;

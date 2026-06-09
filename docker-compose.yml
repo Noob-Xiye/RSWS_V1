@@ -45,6 +45,8 @@
         VERSION: "${IMAGE_VERSION:-dev}"
     image: rsws:latest
     container_name: rsws-server
+    ports:
+      - "${SERVER_PORT:-5170}:5170"
     restart: unless-stopped
     environment:
       RSWS_DATABASE_URL: postgresql://${POSTGRES_USER:-rsws}:${POSTGRES_PASSWORD:-rsws_secret}@postgres:5432/${POSTGRES_DB:-rsws}
@@ -52,6 +54,7 @@
       RSWS_SERVER_HOST: "0.0.0.0"
       RSWS_SERVER_PORT: "5170"
       RUST_LOG: "${LOG_LEVEL:-info}"
+      APP_SECRET: "${APP_SECRET:-rsws_dev_secret_change_in_production}"
     depends_on:
       postgres:
         condition: service_healthy

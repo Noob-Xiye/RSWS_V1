@@ -216,6 +216,9 @@ async fn main() -> Result<(), RswsError> {
     let category_repo = rsws_db::CategoryRepository::new(pool.clone());
     let admin_service = rsws_service::create_admin_service(pool.clone());
     let log_service = rsws_service::LogService::new(pool.clone());
+    let login_log_service = rsws_service::LoginLogService::new(pool.clone());
+    let error_log_service = rsws_service::ErrorLogService::new(pool.clone());
+    let audit_log_service = rsws_service::AuditLogService::new(pool.clone());
 
     info!("Services initialized");
 
@@ -236,6 +239,9 @@ async fn main() -> Result<(), RswsError> {
         config_service.clone(),
         admin_service,
         log_service,
+        login_log_service,
+        error_log_service,
+        audit_log_service,
         admin_repo,
         category_repo,
     );

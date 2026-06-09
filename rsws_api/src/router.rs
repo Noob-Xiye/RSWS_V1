@@ -2,12 +2,14 @@
 
 use crate::handler;
 use crate::middleware::auth::{api_key_auth, rate_limit, require_admin};
+use crate::middleware::tracing::tracing_logger;
 use crate::middleware::request_id::request_id_middleware;
 use crate::state::AppState;
 use salvo::affix_state;
 use salvo::http::Method;
 use salvo::oapi::OpenApi;
 use salvo::prelude::*;
+
 use salvo_cors::Any;
 use salvo_cors::Cors;
 use salvo_oapi::swagger_ui::SwaggerUi;
@@ -41,7 +43,7 @@ pub fn create_router(state: AppState) -> Router {
                         .push(Router::with_path("avatar").post(handler::custom::upload_avatar)),
                 )
                 .push(Router::with_path("user/{id}").get(handler::custom::get_user))
-                // 资源相关（无认证的查询部分）
+                // 资源相关
                 .push(
                     Router::with_path("resource")
                         .push(
@@ -127,7 +129,18 @@ pub fn create_router(state: AppState) -> Router {
                         .push(Router::with_path("logs").push(
                             Router::with_path("system").get(handler::admin::query_system_logs),
                         ))
-                        // 邮件配置管理（单例，仅一个活跃配置）
+                        // 登录日志
+                        .push(Router::with_path("login-logs").get(handler::admin::list_login_logs))
+                        .push(Router::with_path("login-logs/stats").get(handler::admin::get_login_stats))
+                        // 错误日志
+                        .push(Router::with_path("error-logs").get(handler::admin::list_error_logs))
+                        .push(Router::with_path("error-logs/stats").get(handler::admin::get_error_stats))
+                        .push(Router::with_path("error-logs/resolve").post(handler::admin::resolve_error))
+                        // 审计日志
+                        .push(Router::with_path("audit-logs").get(handler::admin::list_audit_logs))
+                        .push(Router::with_path("audit-logs/stats").get(handler::admin::get_audit_stats))
+                        .push(Router::with_path("audit-logs/history").get(handler::admin::get_resource_history))
+                        // 邮件配置管理
                         .push(
                             Router::with_path("email-configs")
                                 .get(handler::admin::get_email_config)
@@ -210,7 +223,7 @@ pub fn create_router(state: AppState) -> Router {
                             Router::with_path("oss-config/test")
                                 .post(handler::admin::test_storage_connection),
                         )
-                        // 管理员管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）
+                        // 管理员管理（字面量路由必须在 {id} 之前）
                         .push(
                             Router::new()
                                 .get(handler::admin::get_current_admin)
@@ -218,7 +231,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .push(
                                     Router::with_path("create").post(handler::admin::create_admin),
                                 )
-                                // 用户管理（字面量路由必须在 {id} 之前，避免被参数路由匹配）
+                                // 用户管理
                                 .push(
                                     Router::with_path("user")
                                         .get(handler::admin::list_users)
@@ -242,7 +255,7 @@ pub fn create_router(state: AppState) -> Router {
                                                 .put(handler::admin::toggle_api_key_status),
                                         ),
                                 )
-                                // 管理员详情 + 启停用 + 重置密码（{id} 必须在所有字面量路由之后）
+                                // 管理员详情 + 启停用 + 重置密码
                                 .push(
                                     Router::with_path("{id}")
                                         .get(handler::admin::get_admin)
@@ -262,38 +275,34 @@ pub fn create_router(state: AppState) -> Router {
                         ),
                 ),
         )
-        // 管理员登录（无需 API Key，使用邮箱+密码）
+        // 管理员登录（无需 API Key）
         .push(Router::with_path("api/v1/admin/login").post(handler::admin::login))
-        // 支付相关（无需 API Key 认证）
+        // 支付相关（无需 API Key）
         .push(
             Router::with_path("api/v1/payment")
                 .push(Router::with_path("usdt/{network}").get(handler::common::get_usdt_address))
                 .push(Router::with_path("paypal/success").get(handler::common::paypal_success))
                 .push(Router::with_path("paypal/cancel").get(handler::common::paypal_cancel)),
         )
-        // Webhook（无需 API Key 认证，有独立的签名验证）
+        // Webhook（独立签名验证）
         .push(
             Router::with_path("api/v1/webhook")
                 .push(Router::with_path("paypal").post(handler::common::paypal_webhook))
                 .push(Router::with_path("usdt").post(handler::common::usdt_webhook)),
         )
-        // 文件上传（分块上传，需认证）
+        // 文件上传
         .push(
             Router::with_path("api/v1/upload")
                 .push(Router::with_path("init").post(handler::common::init_upload))
                 .push(Router::with_path("chunk").post(handler::common::upload_chunk))
                 .push(Router::with_path("complete").post(handler::common::complete_upload)),
         )
-        // 文件上传（单文件上传，需认证）
         .push(Router::with_path("api/v1/upload/single").post(handler::common::upload_single));
 
-    // OpenAPI 文档生成
     let doc = OpenApi::new("RSWS API", "0.1.0").merge_router(&api_routes);
 
-    // CORS 中间件 — 从配置读取允许的域名
     let cors_origins = &state.config.server.cors_origins;
     let cors = if cors_origins.contains(&"*".to_string()) || cors_origins.is_empty() {
-        // 开发模式：允许所有来源（不建议在生产环境使用）
         tracing::warn!("CORS allow_origin set to '*' — not recommended for production");
         Cors::new()
             .allow_origin(Any)
@@ -310,10 +319,9 @@ pub fn create_router(state: AppState) -> Router {
                 "X-Api-Key",
                 "X-Signature",
             ])
-            .allow_credentials(false) // ⚠️ 当 allow_origin 为 * 时，必须为 false
+            .allow_credentials(false)
             .max_age(3600)
     } else {
-        // 生产模式：仅允许配置的域名（取第一个，salvo-cors 单域名支持更好）
         let allowed_origin = &cors_origins[0];
         tracing::info!("CORS allow_origin set to: {}", allowed_origin);
         Cors::new()
@@ -338,16 +346,21 @@ pub fn create_router(state: AppState) -> Router {
     let upload_dir = state.config.server.upload_dir.clone();
 
     Router::new()
-        // Request ID 追踪（所有请求）
+        // 全局中间件（按注册顺序执行）
+        // 1. Request ID 追踪（生成/读取 X-Request-ID，注入 depot）
         .hoop(request_id_middleware)
+        // 2. CORS
         .hoop(cors.into_handler())
+        // 3. Tracing Logger（自动记录请求/响应日志，带 trace_id）
+        .hoop(tracing_logger)
+        // 4. 注入 AppState
         .hoop(affix_state::inject(state))
-        // Swagger UI
+        // OpenAPI 文档
         .push(doc.into_router("/api-doc/openapi.json"))
         .push(SwaggerUi::new("/swagger-ui").into_router("/api-doc/openapi.json"))
         // 业务路由
         .push(api_routes)
-        // 静态文件（上传目录）
+        // 静态文件
         .push(
             Router::with_path("uploads/<**path>")
                 .get(salvo::serve_static::StaticDir::new([upload_dir])),
