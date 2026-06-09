@@ -138,78 +138,73 @@ pub async fn api_key_auth(
 
         let state = get_state(depot);
 
-        // 先尝试 user 验签
-        let user_result = state
-            .user_api_key_manager
+        // 先尝试 admin 验签（管理员优先级更高，避免 user 验签 Err 时跳过 admin 验签）
+        if let Ok(Some(api_key_record)) = state
+            .admin_api_key_manager
             .validate_signature(user_id, &params, &sign)
-            .await;
+            .await
+        {
+            depot.insert("user_id", user_id);
+            depot.insert("api_key_id", api_key_record.id);
+            depot.insert("is_admin", true);
 
-        match user_result {
-            Ok(Some(api_key_record)) => {
-                // 用户验签通过，检查是否同时是 admin
-                let is_admin = state
-                    .admin_api_key_manager
-                    .get(user_id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .is_some();
+            tracing::info!("Admin user_id={} authenticated via admin_api_key", user_id);
 
-                depot.insert("user_id", user_id);
-                depot.insert("api_key_id", api_key_record.id);
-                depot.insert("is_admin", is_admin);
-
-                // Nonce 去重检查
-                let redis = state.config_service.redis_client();
-                if let Ok(false) = check_nonce_once(redis, &nonce).await {
-                    res.status_code(StatusCode::UNAUTHORIZED);
-                    res.render(Json(
-                        rsws_common::response::ApiResponse::<()>::error_with_message(
-                            rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
-                            "Nonce already used (replay detected)",
-                        ),
-                    ));
-                    return;
-                }
-
-                if is_admin {
-                    tracing::info!("Admin user_id={} passed auth for admin endpoint", user_id);
-                }
-
-                ctrl.call_next(req, depot, res).await;
+            // Nonce 去重检查
+            let redis = state.config_service.redis_client();
+            if let Ok(false) = check_nonce_once(redis, &nonce).await {
+                res.status_code(StatusCode::UNAUTHORIZED);
+                res.render(Json(
+                    rsws_common::response::ApiResponse::<()>::error_with_message(
+                        rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
+                        "Nonce already used (replay detected)",
+                    ),
+                ));
                 return;
             }
-            Ok(None) => {
-                // 用户验签失败，尝试 admin 验签
-                if let Ok(Some(api_key_record)) = state
-                    .admin_api_key_manager
-                    .validate_signature(user_id, &params, &sign)
-                    .await
-                {
-                    depot.insert("user_id", user_id);
-                    depot.insert("api_key_id", api_key_record.id);
-                    depot.insert("is_admin", true);
 
-                    // Nonce 去重检查
-                    let redis = state.config_service.redis_client();
-                    if let Ok(false) = check_nonce_once(redis, &nonce).await {
-                        res.status_code(StatusCode::UNAUTHORIZED);
-                        res.render(Json(
-                            rsws_common::response::ApiResponse::<()>::error_with_message(
-                                rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
-                                "Nonce already used (replay detected)",
-                            ),
-                        ));
-                        return;
-                    }
+            ctrl.call_next(req, depot, res).await;
+            return;
+        }
 
-                    ctrl.call_next(req, depot, res).await;
-                    return;
-                }
+        // Admin 验签失败，尝试 user 验签
+        if let Ok(Some(api_key_record)) = state
+            .user_api_key_manager
+            .validate_signature(user_id, &params, &sign)
+            .await
+        {
+            // 用户验签通过，检查是否同时持有 admin API Key
+            let is_admin = state
+                .admin_api_key_manager
+                .get(user_id)
+                .await
+                .ok()
+                .flatten()
+                .is_some();
+
+            depot.insert("user_id", user_id);
+            depot.insert("api_key_id", api_key_record.id);
+            depot.insert("is_admin", is_admin);
+
+            // Nonce 去重检查
+            let redis = state.config_service.redis_client();
+            if let Ok(false) = check_nonce_once(redis, &nonce).await {
+                res.status_code(StatusCode::UNAUTHORIZED);
+                res.render(Json(
+                    rsws_common::response::ApiResponse::<()>::error_with_message(
+                        rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
+                        "Nonce already used (replay detected)",
+                    ),
+                ));
+                return;
             }
-            Err(e) => {
-                tracing::error!("User signature validation error: {}", e);
+
+            if is_admin {
+                tracing::info!("Admin user_id={} passed auth (also holds admin api key)", user_id);
             }
+
+            ctrl.call_next(req, depot, res).await;
+            return;
         }
 
         // 验签失败，返回 401

@@ -326,10 +326,9 @@ impl AuditLogService {
              new_value, change_summary, ip_address, user_agent, verified_by, risk_level, created_at \
              FROM audit_logs WHERE {} ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
             where_clause,
-            conditions.len() + 1,
-            conditions.len() + 2
+            conditions.len(),
+            conditions.len() + 1
         );
-        
         // Build and execute count query
         let mut count_query = sqlx::query_scalar::<_, i64>(&count_sql);
         if let Some(uid) = query.user_id { count_query = count_query.bind(uid); }

@@ -323,3 +323,16 @@ CREATE TABLE IF NOT EXISTS system_logs (
 CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(log_level);
 CREATE INDEX IF NOT EXISTS idx_system_logs_module ON system_logs(module);
 CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS usdt_wallets (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    wallet_address VARCHAR(255) NOT NULL UNIQUE,
+    network VARCHAR(50) NOT NULL DEFAULT 'tron',
+    is_active BOOLEAN DEFAULT true,
+    label VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_usdt_wallets_user_id ON usdt_wallets(user_id);
+CREATE INDEX IF NOT EXISTS idx_usdt_wallets_address ON usdt_wallets(wallet_address);

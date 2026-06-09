@@ -198,8 +198,8 @@ impl ErrorLogService {
              source_file, line_number, resolved, resolved_at, resolved_by, created_at \
              FROM error_logs WHERE {} ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
             where_clause,
-            conditions.len() + 1,
-            conditions.len() + 2
+            conditions.len(),
+            conditions.len() + 1
         );
         
         // Build and execute count query
