@@ -21,25 +21,26 @@ pub fn create_router(state: AppState) -> Router {
         .push(Router::with_path("health").get(handler::health))
         // 分类列表（无需认证）
         .push(Router::with_path("api/v1/categories").get(handler::custom::list_categories))
+        // 公开认证端点（无需 API Key）
+        .push(Router::with_path("api/v1/user/register").post(handler::custom::register))
+        .push(Router::with_path("api/v1/user/login").post(handler::custom::login))
+        .push(Router::with_path("api/v1/user/send-code").post(handler::custom::send_code))
         // API v1（统一 API Key 认证 + 速率限制）
         .push(
             Router::with_path("api/v1")
                 .hoop(api_key_auth)
                 .hoop(rate_limit)
-                // 用户相关
+                // 用户相关（需要认证）
                 .push(
                     Router::with_path("user")
                         .push(Router::new().get(handler::custom::get_current_user))
                         .push(Router::with_path("info").get(handler::custom::get_current_user))
-                        .push(Router::with_path("register").post(handler::custom::register))
-                        .push(Router::with_path("login").post(handler::custom::login))
                         .push(Router::with_path("profile").put(handler::custom::update_profile))
                         .push(Router::with_path("password").put(handler::custom::change_password))
                         .push(
                             Router::with_path("change-password")
                                 .post(handler::custom::change_password),
                         )
-                        .push(Router::with_path("send-code").post(handler::custom::send_code))
                         .push(Router::with_path("avatar").post(handler::custom::upload_avatar)),
                 )
                 .push(Router::with_path("user/{id}").get(handler::custom::get_user))
