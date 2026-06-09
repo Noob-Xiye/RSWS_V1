@@ -1,6 +1,7 @@
 //! Tracing 中间件
 //!
 //! 基于 tracing crate 的请求日志中间件。
+//! 依赖 Salvo 内置 RequestId 中间件注入的 x-request-id。
 
 use crate::middleware::request_id::get_request_id;
 use salvo::prelude::*;
@@ -16,7 +17,7 @@ pub async fn tracing_logger(
     let start = Instant::now();
     ctrl.call_next(req, depot, res).await;
 
-    let request_id = get_request_id(depot).unwrap_or("unknown");
+    let request_id = get_request_id(req).unwrap_or_else(|| "unknown".to_string());
     let method = req.method().as_str();
     let path = req.uri().path();
     let duration_ms = start.elapsed().as_millis() as u64;
@@ -35,9 +36,6 @@ pub async fn tracing_logger(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("-")
         .to_string();
-
-    let _user_id: Option<i64> = depot.get::<i64>("user_id").ok().copied();
-    let _is_admin: bool = depot.get::<bool>("is_admin").ok().copied().unwrap_or(false);
 
     if status_u16 >= 500 {
         tracing::error!(

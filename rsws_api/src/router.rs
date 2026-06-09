@@ -3,7 +3,7 @@
 use crate::handler;
 use crate::middleware::auth::{api_key_auth, rate_limit, require_admin};
 use crate::middleware::tracing::tracing_logger;
-use crate::middleware::request_id::request_id_middleware;
+use salvo::request_id::RequestId;
 use crate::state::AppState;
 use salvo::affix_state;
 use salvo::http::Method;
@@ -347,14 +347,14 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         // 全局中间件（按注册顺序执行）
-        // 1. Request ID 追踪（生成/读取 X-Request-ID，注入 depot）
-        .hoop(request_id_middleware)
-        // 2. CORS
-        .hoop(cors.into_handler())
-        // 3. Tracing Logger（自动记录请求/响应日志，带 trace_id）
-        .hoop(tracing_logger)
-        // 4. 注入 AppState
+        // 1. 注入 AppState（必须最先，后续所有中间件和 handler 都依赖它）
         .hoop(affix_state::inject(state))
+        // 2. Request ID 追踪（Salvo 内置 UlidGenerator，注入 x-request-id 响应头）
+        .hoop(RequestId::new())
+        // 3. CORS
+        .hoop(cors.into_handler())
+        // 4. Tracing Logger（自动记录请求/响应日志，带 request_id）
+        .hoop(tracing_logger)
         // OpenAPI 文档
         .push(doc.into_router("/api-doc/openapi.json"))
         .push(SwaggerUi::new("/swagger-ui").into_router("/api-doc/openapi.json"))
