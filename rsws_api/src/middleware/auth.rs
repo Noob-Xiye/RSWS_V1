@@ -78,7 +78,7 @@ pub async fn api_key_auth(
         || path.contains("/payment/paypal/success")
         || path.contains("/payment/paypal/cancel")
         || path.contains("/payment/usdt/")
-        || path.contains("/admin/login")
+        || path == "/api/v1/admin/login" || path.ends_with("/admin/login")
     {
         ctrl.call_next(req, depot, res).await;
         return;
@@ -359,3 +359,4 @@ pub async fn require_admin(
 
     ctrl.call_next(req, depot, res).await;
 }
+
