@@ -26,7 +26,7 @@ pub struct CachedApiKey {
 /// 统一 API Key 管理器
 pub struct ApiKeyManager {
     redis: Arc<RedisService>,
-    key_prefix: String, // "admin_apikey" 或 "user_apikey"
+    key_prefix: String, // "admin_api_key" 或 "user_api_key"
 }
 
 impl ApiKeyManager {
@@ -39,7 +39,7 @@ impl ApiKeyManager {
 
     /// 创建 Admin API Key 管理器
     pub fn for_admin(redis: Arc<RedisService>) -> Self {
-        Self::new(redis, "admin_apikey")
+        Self::new(redis, "admin_api_key")
     }
 
     /// 创建 User API Key 管理器
