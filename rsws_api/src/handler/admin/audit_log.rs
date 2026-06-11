@@ -32,7 +32,7 @@ pub async fn list_audit_logs(req: &mut Request, depot: &mut Depot, res: &mut Res
     match state.audit_log_service.query(query).await {
         Ok(page) => {
             res.render(Json(serde_json::json!({
-                "code": 200,
+                "code": 0,
                 "message": "Success",
                 "data": {
                     "items": page.items,
@@ -61,7 +61,7 @@ pub async fn get_audit_stats(depot: &mut Depot, res: &mut Response) {
     match state.audit_log_service.get_stats(24).await {
         Ok(stats) => {
             res.render(Json(serde_json::json!({
-                "code": 200,
+                "code": 0,
                 "message": "Success",
                 "data": stats,
             })));
@@ -126,7 +126,7 @@ pub async fn get_resource_history(req: &mut Request, depot: &mut Depot, res: &mu
     {
         Ok(logs) => {
             res.render(Json(serde_json::json!({
-                "code": 200,
+                "code": 0,
                 "message": "Success",
                 "data": { "items": logs }
             })));

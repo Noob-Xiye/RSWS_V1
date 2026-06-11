@@ -30,7 +30,7 @@ pub async fn list_login_logs(req: &mut Request, depot: &mut Depot, res: &mut Res
     match state.login_log_service.query_logs(query).await {
         Ok(page) => {
             res.render(Json(serde_json::json!({
-                "code": 200,
+                "code": 0,
                 "message": "Success",
                 "data": {
                     "items": page.items,
@@ -55,7 +55,7 @@ pub async fn list_login_logs(req: &mut Request, depot: &mut Depot, res: &mut Res
 #[endpoint]
 pub async fn get_login_stats(_depot: &mut Depot, res: &mut Response) {
     res.render(Json(serde_json::json!({
-        "code": 200,
+        "code": 0,
         "message": "Success",
         "data": { "status": "operational" }
     })));

@@ -30,7 +30,7 @@ pub async fn list_error_logs(req: &mut Request, depot: &mut Depot, res: &mut Res
     match state.error_log_service.query_errors(query).await {
         Ok(page) => {
             res.render(Json(serde_json::json!({
-                "code": 200,
+                "code": 0,
                 "message": "Success",
                 "data": {
                     "items": page.items,
@@ -59,7 +59,7 @@ pub async fn get_error_stats(depot: &mut Depot, res: &mut Response) {
     match state.error_log_service.get_stats(24).await {
         Ok(stats) => {
             res.render(Json(serde_json::json!({
-                "code": 200,
+                "code": 0,
                 "message": "Success",
                 "data": stats,
             })));
@@ -106,7 +106,7 @@ pub async fn resolve_error(req: &mut Request, depot: &mut Depot, res: &mut Respo
     {
         Ok(log) => {
             res.render(Json(serde_json::json!({
-                "code": 200,
+                "code": 0,
                 "message": "Error resolved",
                 "data": log,
             })));
@@ -130,7 +130,7 @@ pub async fn get_error_log(depot: &mut Depot, res: &mut Response) {
     match state.error_log_service.get_stats(24).await {
         Ok(stats) => {
             res.render(Json(serde_json::json!({
-                "code": 200,
+                "code": 0,
                 "message": "Success",
                 "data": stats,
             })));
