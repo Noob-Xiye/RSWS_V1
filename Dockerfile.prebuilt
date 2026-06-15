@@ -1,0 +1,29 @@
+# ===========================
+# RSWS Dockerfile — Pre-built binary (compiled in WSL2 Ubuntu 24.04)
+# ===========================
+FROM ubuntu:24.04
+
+ENV APP_VERSION=0.1.5
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+LABEL org.opencontainers.image.version="${APP_VERSION}"
+LABEL org.opencontainers.image.title="Resource Sharing Web System"
+LABEL org.opencontainers.image.description="数字内容付费交易平台"
+
+# Copy pre-built binary from build context (project root)
+COPY resource-sharing-web-system /app/resource-sharing-web-system
+RUN chmod +x /app/resource-sharing-web-system
+
+EXPOSE 5170
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:5170/health || exit 1
+
+CMD ["/app/resource-sharing-web-system"]

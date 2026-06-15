@@ -25,6 +25,9 @@ pub fn create_router(state: AppState) -> Router {
         .push(Router::with_path("api/v1/user/register").post(handler::custom::register))
         .push(Router::with_path("api/v1/user/login").post(handler::custom::login))
         .push(Router::with_path("api/v1/user/send-code").post(handler::custom::send_code))
+        // 资源浏览（公开端点 — 游客可浏览资源列表和详情）
+        .push(Router::with_path("api/v1/resource").get(handler::custom::list_resources))
+        .push(Router::with_path("api/v1/resource/{id}").get(handler::custom::get_resource))
         // API v1（统一 API Key 认证 + 速率限制）
         .push(
             Router::with_path("api/v1")
@@ -44,27 +47,20 @@ pub fn create_router(state: AppState) -> Router {
                         .push(Router::with_path("avatar").post(handler::custom::upload_avatar)),
                 )
                 .push(Router::with_path("user/{id}").get(handler::custom::get_user))
-                // 资源相关
+                // 资源管理（需认证 — 创建/修改/删除 + 购买检查/下载）
                 .push(
                     Router::with_path("resource")
-                        .push(
-                            Router::new()
-                                .get(handler::custom::list_resources)
-                                .post(handler::custom::create_resource),
-                        )
+                        .push(Router::new().post(handler::custom::create_resource))
                         .push(
                             Router::with_path("{id}")
-                                .get(handler::custom::get_resource)
                                 .put(handler::custom::update_resource)
                                 .delete(handler::custom::delete_resource)
                                 .push(
                                     Router::with_path("purchase-check")
-                                        .hoop(api_key_auth)
                                         .get(handler::custom::check_purchase),
                                 )
                                 .push(
                                     Router::with_path("download")
-                                        .hoop(api_key_auth)
                                         .get(handler::custom::get_resource_download),
                                 ),
                         ),

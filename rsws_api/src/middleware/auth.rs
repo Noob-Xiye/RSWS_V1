@@ -60,8 +60,11 @@ async fn check_nonce_once(redis: &RedisService, nonce: &str) -> Result<bool, Rsw
 /// 认证流程：
 /// 1. 从请求参数获取 user_id, timestamp, nonce, sign
 /// 2. 检查时间戳防重放
-/// 3. 先尝试 user 验签，失败则尝试 admin 验签
+/// 3. 先尝试 admin 验签，失败则尝试 user 验签
 /// 4. 验签通过后注入 depot：user_id, api_key_id, is_admin
+///
+/// 认证失败时返回 HTTP 401 + ctrl.skip_remaining() 终止后续 handler，
+/// 防止响应体追加多个 JSON 对象。
 #[handler]
 pub async fn api_key_auth(
     req: &mut Request,
@@ -73,6 +76,7 @@ pub async fn api_key_auth(
     // 跳过不需要认证的端点
     if path.contains("/user/login")
         || path.contains("/user/register")
+        || path.contains("/user/send-code")
         || path.contains("/health")
         || path.contains("/webhook/")
         || path.contains("/payment/paypal/success")
@@ -110,7 +114,7 @@ pub async fn api_key_auth(
 
         // 检查时间戳防重放
         if let Err(e) = check_timestamp(&timestamp) {
-            // 业务层错误：HTTP 200 + 业务错误码
+            res.status_code(StatusCode::UNAUTHORIZED);
             res.render(Json(
                 rsws_common::response::ApiResponse::<()>::error_with_message(
                     e.error_code(),
@@ -139,7 +143,7 @@ pub async fn api_key_auth(
 
         let state = get_state(depot);
 
-        // 先尝试 admin 验签（管理员优先级更高，避免 user 验签 Err 时跳过 admin 验签）
+        // 先尝试 admin 验签
         if let Ok(Some(api_key_record)) = state
             .admin_api_key_manager
             .validate_signature(user_id, &params, &sign)
@@ -154,7 +158,7 @@ pub async fn api_key_auth(
             // Nonce 去重检查
             let redis = state.config_service.redis_client();
             if let Ok(false) = check_nonce_once(redis, &nonce).await {
-                // 业务层错误：HTTP 200 + 业务错误码，避免前端误判为 session 过期
+                res.status_code(StatusCode::UNAUTHORIZED);
                 res.render(Json(
                     rsws_common::response::ApiResponse::<()>::error_with_message(
                         rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
@@ -190,7 +194,7 @@ pub async fn api_key_auth(
             // Nonce 去重检查
             let redis = state.config_service.redis_client();
             if let Ok(false) = check_nonce_once(redis, &nonce).await {
-                // 业务层错误：HTTP 200 + 业务错误码
+                res.status_code(StatusCode::UNAUTHORIZED);
                 res.render(Json(
                     rsws_common::response::ApiResponse::<()>::error_with_message(
                         rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
@@ -211,24 +215,29 @@ pub async fn api_key_auth(
             return;
         }
 
-        // 验签失败，返回业务层错误码（HTTP 200），避免前端误判为 session 过期清除 localStorage
+        // 验签失败：HTTP 401
+        // 注意：res.render() 会 stamp 响应，后续 middleware 会自动跳过
+        res.status_code(StatusCode::UNAUTHORIZED);
         res.render(Json(
             rsws_common::response::ApiResponse::<()>::error_with_message(
                 rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
                 "Signature verification failed",
             ),
         ));
+        ctrl.skip_rest();
         return;
     }
 
     // ========== 无认证信息 ==========
-    // 业务层错误：HTTP 200 + 业务错误码
+    // HTTP 401 - 使用 skip_rest() 终止后续 handler
+    res.status_code(StatusCode::UNAUTHORIZED);
     res.render(Json(
         rsws_common::response::ApiResponse::<()>::error_with_message(
             rsws_common::error_code::ErrorCode::AUTH_MISSING_CREDENTIALS,
             "Missing authentication credentials. Please provide user_id, timestamp, nonce, and sign parameters.",
         ),
     ));
+    ctrl.skip_rest();
 }
 
 /// 速率限制中间件（Redis 固定窗口）
@@ -278,9 +287,8 @@ pub async fn rate_limit(
             res.add_header(
                 "X-RateLimit-Remaining",
                 (limit.saturating_sub(count)).max(0).to_string(),
-                true,
-            )
-            .ok();
+                true)
+                .ok();
 
             if count > limit as i64 {
                 tracing::warn!(
