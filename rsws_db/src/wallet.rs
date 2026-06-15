@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use rsws_common::error::RswsError;
 use rsws_common::snowflake;
 use serde::{Deserialize, Serialize};
+use sqlx::types::Decimal;
 use sqlx::FromRow;
 use sqlx::PgPool;
 
@@ -17,7 +18,7 @@ pub struct UsdtWallet {
     pub network: String,
     pub name: Option<String>,
     pub is_active: bool,
-    pub total_received: Option<f64>,
+    pub total_received: Option<Decimal>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

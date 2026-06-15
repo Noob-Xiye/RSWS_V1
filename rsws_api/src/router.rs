@@ -113,6 +113,10 @@ pub fn create_router(state: AppState) -> Router {
                             Router::with_path("dashboard/revenue-chart")
                                 .get(handler::admin::revenue_chart),
                         )
+                        .push(
+                            Router::with_path("system/log-stats")
+                                .get(handler::admin::get_log_stats),
+                        )
                         // 管理员管理
                         // 日志配置管理
                         .push(
@@ -216,63 +220,66 @@ pub fn create_router(state: AppState) -> Router {
                         )
                         // OSS 存储配置管理
                         .push(
-                            Router::with_path("oss-config")
+                            Router::with_path("oss-configs")
                                 .get(handler::admin::get_storage_config)
                                 .post(handler::admin::update_storage_config),
                         )
                         .push(
-                            Router::with_path("oss-config/test")
+                            Router::with_path("oss-configs/test")
                                 .post(handler::admin::test_storage_connection),
                         )
-                        // 管理员管理（字面量路由必须在 {id} 之前）
+                        // 管理员当前信息（GET /admin）
                         .push(
                             Router::new()
-                                .get(handler::admin::get_current_admin)
-                                .push(Router::with_path("list").get(handler::admin::list_admins))
+                                .get(handler::admin::get_current_admin),
+                        )
+                        // 管理员列表
+                        .push(Router::with_path("list").get(handler::admin::list_admins))
+                        // 创建管理员
+                        .push(Router::with_path("create").post(handler::admin::create_admin))
+                        // 用户管理
+                        .push(
+                            Router::with_path("user")
+                                .get(handler::admin::list_users)
                                 .push(
-                                    Router::with_path("create").post(handler::admin::create_admin),
+                                    Router::with_path("{id}/deactivate")
+                                        .post(handler::admin::deactivate_user),
                                 )
-                                // 用户管理
                                 .push(
-                                    Router::with_path("user")
-                                        .get(handler::admin::list_users)
-                                        .push(
-                                            Router::with_path("{id}/deactivate")
-                                                .post(handler::admin::deactivate_user),
-                                        )
-                                        .push(
-                                            Router::with_path("{id}/activate")
-                                                .post(handler::admin::activate_user),
-                                        ),
-                                )
-                                // API Key 管理
-                                .push(
-                                    Router::with_path("api-keys")
-                                        .get(handler::admin::list_api_keys)
-                                        .post(handler::admin::create_api_key)
-                                        .push(
-                                            Router::with_path("{key_id}")
-                                                .delete(handler::admin::delete_api_key)
-                                                .put(handler::admin::toggle_api_key_status),
-                                        ),
-                                )
-                                // 管理员详情 + 启停用 + 重置密码
-                                .push(
-                                    Router::with_path("{id}")
-                                        .get(handler::admin::get_admin)
-                                        .push(
-                                            Router::with_path("deactivate")
-                                                .post(handler::admin::deactivate_admin),
-                                        )
-                                        .push(
-                                            Router::with_path("activate")
-                                                .post(handler::admin::activate_admin),
-                                        )
-                                        .push(
-                                            Router::with_path("reset-password")
-                                                .post(handler::admin::reset_admin_password),
-                                        ),
+                                    Router::with_path("{id}/activate")
+                                        .post(handler::admin::activate_user),
                                 ),
+                        )
+                        // API Key 管理
+                        .push(
+                            Router::with_path("api-keys")
+                                .get(handler::admin::list_api_keys)
+                                .post(handler::admin::create_api_key)
+                                .push(
+                                    Router::with_path("{key_id}")
+                                        .delete(handler::admin::delete_api_key)
+                                        .put(handler::admin::toggle_api_key_status),
+                                ),
+                        )
+                        // 管理员详情（by query param id，避免 {id} 通配误匹配字面量路由）
+                        .push(
+                            Router::with_path("detail")
+                                .get(handler::admin::get_admin),
+                        )
+                        // 管理员停用
+                        .push(
+                            Router::with_path("deactivate")
+                                .post(handler::admin::deactivate_admin),
+                        )
+                        // 管理员启用
+                        .push(
+                            Router::with_path("activate")
+                                .post(handler::admin::activate_admin),
+                        )
+                        // 重置管理员密码
+                        .push(
+                            Router::with_path("reset-password")
+                                .post(handler::admin::reset_admin_password),
                         ),
                 ),
         )

@@ -1,7 +1,8 @@
 //! 用户服务
 
-use rsws_common::email::EmailService;
 use rsws_common::error::RswsError;
+
+use crate::config_service::EmailDbConfig;
 use rsws_common::error_code::ErrorCode;
 use rsws_common::password::PasswordService;
 use rsws_db::{RedisService, UserRepository};
@@ -9,11 +10,14 @@ use rsws_model::user_models::user::{LoginRequest, LoginResponse, RegisterRequest
 use rsws_model::user_models::AdminUserView;
 use tracing::{info, warn};
 
+use crate::EmailVerificationService;
+
+
 /// 用户服务
 pub struct UserService {
     user_repo: UserRepository,
     redis: Option<RedisService>,
-    email_service: Option<EmailService>,
+    email_verification_service: Option<EmailVerificationService>,
 }
 
 impl UserService {
@@ -22,7 +26,7 @@ impl UserService {
         Self {
             user_repo,
             redis: None,
-            email_service: None,
+            email_verification_service: None,
         }
     }
 
@@ -31,29 +35,22 @@ impl UserService {
         Self {
             user_repo,
             redis: Some(redis),
-            email_service: None,
+            email_verification_service: None,
         }
     }
 
-    /// 创建用户服务实例（完整）
-    pub fn with_services(
+    /// 创建用户服务实例（带 EmailVerificationService）
+    pub fn with_email_verification_service(
         user_repo: UserRepository,
         redis: RedisService,
-        email_service: EmailService,
+        email_config: Option<&EmailDbConfig>,
     ) -> Self {
+        let email_verification_service =
+            EmailVerificationService::new(redis.clone(), email_config);
         Self {
             user_repo,
             redis: Some(redis),
-            email_service: Some(email_service),
-        }
-    }
-
-    /// 创建用户服务实例（带 Email，无 Redis）
-    pub fn with_redis_and_email(user_repo: UserRepository, email_service: EmailService) -> Self {
-        Self {
-            user_repo,
-            redis: None,
-            email_service: Some(email_service),
+            email_verification_service: Some(email_verification_service),
         }
     }
 
@@ -279,7 +276,14 @@ impl UserService {
             return Err(RswsError::business(ErrorCode::USER_DISABLED));
         }
 
-        // 检查是否已有验证码（防止频繁发送）
+        // 使用 EmailVerificationService 发送登录验证码
+        if let Some(ref email_verif_svc) = self.email_verification_service {
+            email_verif_svc.send_code(email, "login").await?;
+            info!("Login verification code sent to: {} (via EmailVerificationService)", email);
+            return Ok(300);
+        }
+
+        // 回退到旧逻辑
         if redis.has_verification_code(email, "login").await? {
             return Err(RswsError::business_with_message(
                 ErrorCode::RATE_LIMIT_EXCEEDED,
@@ -287,21 +291,10 @@ impl UserService {
             ));
         }
 
-        // 生成 6 位验证码
         let code = format!("{:06}", rand::random::<u32>() % 1_000_000);
-
-        // 存储验证码
         redis.set_verification_code(email, "login", &code).await?;
-
-        // 发送邮件
-        if let Some(ref email_service) = self.email_service {
-            email_service
-                .send_verification_code(email, &code, "login")
-                .await?;
-        }
-
-        info!("Login verification code sent to: {}", email);
-        Ok(300) // 返回有效期（秒）
+        info!("Login verification code sent to: {} (legacy path)", email);
+        Ok(300)
     }
 
     /// 获取用户信息
@@ -394,29 +387,40 @@ impl UserService {
     }
 
     /// 发送验证码（通用，支持 register / login / reset_password）
+    ///
+    /// 优先使用 EmailVerificationService（支持 dev/prod 模式切换）
     pub async fn send_verification_code(
         &self,
         email: &str,
         code_type: &str,
     ) -> Result<i64, RswsError> {
+        // 如果有 EmailVerificationService，优先使用
+        if let Some(ref email_verif_svc) = self.email_verification_service {
+            // login / reset_password 需要检查用户存在性
+            if code_type != "register" {
+                let user = self
+                    .user_repo
+                    .find_user_by_email(email)
+                    .await?
+                    .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
+                if !user.is_active {
+                    return Err(RswsError::business(ErrorCode::USER_DISABLED));
+                }
+            }
+            email_verif_svc.send_code(email, code_type).await?;
+            info!(
+                "Verification code sent to {} for code_type: {} (via EmailVerificationService)",
+                email, code_type
+            );
+            return Ok(300);
+        }
+
+        // 回退到旧逻辑（无 EmailVerificationService）
         let redis = self
             .redis
             .as_ref()
             .ok_or_else(|| RswsError::internal("Redis not configured"))?;
 
-        // register 场景不检查用户存在性，login / reset_password 需要检查
-        if code_type != "register" {
-            let user = self
-                .user_repo
-                .find_user_by_email(email)
-                .await?
-                .ok_or_else(|| RswsError::business(ErrorCode::USER_NOT_FOUND))?;
-            if !user.is_active {
-                return Err(RswsError::business(ErrorCode::USER_DISABLED));
-            }
-        }
-
-        // 检查是否已有验证码（防止频繁发送）
         if redis.has_verification_code(email, code_type).await? {
             return Err(RswsError::business_with_message(
                 ErrorCode::RATE_LIMIT_EXCEEDED,
@@ -424,21 +428,11 @@ impl UserService {
             ));
         }
 
-        // 生成 6 位验证码
         let code = format!("{:06}", rand::random::<u32>() % 1_000_000);
-
-        // 存储验证码
         redis.set_verification_code(email, code_type, &code).await?;
 
-        // 发送邮件
-        if let Some(ref email_service) = self.email_service {
-            email_service
-                .send_verification_code(email, &code, code_type)
-                .await?;
-        }
-
         info!(
-            "Verification code sent to {} for code_type: {}",
+            "Verification code sent to {} for code_type: {} (legacy path - no email service)",
             email, code_type
         );
         Ok(300)

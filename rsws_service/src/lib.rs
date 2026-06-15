@@ -9,6 +9,7 @@ pub mod blockchain_service;
 pub mod commission_service;
 pub mod config_service;
 pub mod cross_platform_service;
+pub mod email_verification_service;
 pub mod error_log_service;
 pub mod log_service;
 pub mod login_log_service;
@@ -31,6 +32,7 @@ pub use commission_service::CommissionService;
 pub use config_service::ConfigService;
 pub use config_service::{BlockchainDbConfig, EmailDbConfig, PayPalDbConfig, UsdtListenDbConfig};
 pub use cross_platform_service::CrossPlatformService;
+pub use email_verification_service::EmailVerificationService;
 pub use error_log_service::{CreateErrorLogRequest, ErrorLog, ErrorLogPage, ErrorLogQuery, ErrorLogService, ErrorStats, ErrorType, ResolveErrorRequest};
 pub use log_service::LogService;
 pub use log_service::{LogConfig, UpdateLogConfigRequest};
@@ -85,28 +87,17 @@ pub fn create_user_api_key_manager(redis: RedisService) -> ApiKeyManager {
 }
 
 /// 创建用户服务
-pub fn create_user_service(pool: sqlx::PgPool, redis: Option<RedisService>) -> UserService {
-    let user_repo = UserRepository::new(pool);
-
-    if let Some(redis) = redis {
-        UserService::with_redis(user_repo, redis)
-    } else {
-        UserService::new(user_repo)
-    }
-}
-
-/// 创建用户服务（带 Email）
-pub fn create_user_service_with_email(
+pub fn create_user_service(
     pool: sqlx::PgPool,
     redis: Option<RedisService>,
-    email_service: rsws_common::email::EmailService,
+    email_config: Option<&EmailDbConfig>,
 ) -> UserService {
     let user_repo = UserRepository::new(pool);
+
     if let Some(redis) = redis {
-        UserService::with_services(user_repo, redis, email_service)
+        UserService::with_email_verification_service(user_repo, redis, email_config)
     } else {
-        // 没有 Redis 的情况，用 with_email
-        UserService::with_redis_and_email(user_repo, email_service)
+        UserService::new(user_repo)
     }
 }
 

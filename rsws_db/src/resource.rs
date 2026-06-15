@@ -135,7 +135,7 @@ impl ResourceRepository {
         });
 
         let resource = sqlx::query_as::<_, Resource>(
-            "INSERT INTO resources (id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, supported_os, provider_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 0) RETURNING *"
+            "INSERT INTO resources (id, title, description, price, category_id, file_url, thumbnail_url, detail_description, specifications, usage_guide, precautions, display_images, supported_os, owner_type, provider_id, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 0) RETURNING *"
         )
         .bind(id)
         .bind(&req.title)

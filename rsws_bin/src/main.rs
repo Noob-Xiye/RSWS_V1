@@ -167,34 +167,12 @@ async fn main() -> Result<(), RswsError> {
     }
 
     // ========== 4. 创建所有 service ==========
-    let user_service = match email_db_config {
-        Some(ref email_cfg) => {
-            let email_config = rsws_common::email::EmailConfig {
-                smtp_server: email_cfg.host.clone(),
-                smtp_username: email_cfg.username.clone(),
-                smtp_password: email_cfg.password.clone(),
-                from_email: email_cfg.from_email.clone(),
-            };
-            match rsws_common::email::EmailService::new(&email_config) {
-                Ok(email_service) => {
-                    info!("Email service initialized");
-                    rsws_service::create_user_service_with_email(
-                        pool.clone(),
-                        Some(redis_pool.clone()),
-                        email_service,
-                    )
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to initialize email service: {}, continuing without email",
-                        e
-                    );
-                    rsws_service::create_user_service(pool.clone(), Some(redis_pool.clone()))
-                }
-            }
-        }
-        None => rsws_service::create_user_service(pool.clone(), Some(redis_pool.clone())),
-    };
+    // EmailVerificationService 根据 email_configs.provider 自动切换 dev/prod 模式
+    let user_service = rsws_service::create_user_service(
+        pool.clone(),
+        Some(redis_pool.clone()),
+        email_db_config.as_ref(),
+    );
     let order_service = rsws_service::create_order_service(pool.clone());
     let resource_service =
         rsws_service::create_resource_service(pool.clone(), Some(config_service.as_ref().clone()));

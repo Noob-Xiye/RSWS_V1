@@ -101,6 +101,18 @@ mod tests {
     }
 
     #[test]
+    fn test_admin_password_hash() {
+        let password = "Admin123!@#";
+        let hash = PasswordService::hash(password).expect("Hash failed");
+        println!("\nPassword: {}", password);
+        println!("Argon2 Hash: {}", hash);
+        
+        // Verify it works
+        let result = PasswordService::verify(password, &hash).expect("Verify failed");
+        assert!(result);
+    }
+
+    #[test]
     fn test_validate_strength() {
         // 有效密码
         assert!(PasswordService::validate_strength("Password123").is_ok());

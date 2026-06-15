@@ -109,7 +109,7 @@ pub async fn api_key_auth(
 
         // 检查时间戳防重放
         if let Err(e) = check_timestamp(&timestamp) {
-            res.status_code(StatusCode::UNAUTHORIZED);
+            // 业务层错误：HTTP 200 + 业务错误码
             res.render(Json(
                 rsws_common::response::ApiResponse::<()>::error_with_message(
                     e.error_code(),
@@ -153,7 +153,7 @@ pub async fn api_key_auth(
             // Nonce 去重检查
             let redis = state.config_service.redis_client();
             if let Ok(false) = check_nonce_once(redis, &nonce).await {
-                res.status_code(StatusCode::UNAUTHORIZED);
+                // 业务层错误：HTTP 200 + 业务错误码，避免前端误判为 session 过期
                 res.render(Json(
                     rsws_common::response::ApiResponse::<()>::error_with_message(
                         rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
@@ -189,7 +189,7 @@ pub async fn api_key_auth(
             // Nonce 去重检查
             let redis = state.config_service.redis_client();
             if let Ok(false) = check_nonce_once(redis, &nonce).await {
-                res.status_code(StatusCode::UNAUTHORIZED);
+                // 业务层错误：HTTP 200 + 业务错误码
                 res.render(Json(
                     rsws_common::response::ApiResponse::<()>::error_with_message(
                         rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
@@ -207,8 +207,7 @@ pub async fn api_key_auth(
             return;
         }
 
-        // 验签失败，返回 401
-        res.status_code(StatusCode::UNAUTHORIZED);
+        // 验签失败，返回业务层错误码（HTTP 200），避免前端误判为 session 过期清除 localStorage
         res.render(Json(
             rsws_common::response::ApiResponse::<()>::error_with_message(
                 rsws_common::error_code::ErrorCode::AUTH_SIGNATURE_INVALID,
@@ -219,7 +218,7 @@ pub async fn api_key_auth(
     }
 
     // ========== 无认证信息 ==========
-    res.status_code(StatusCode::UNAUTHORIZED);
+    // 业务层错误：HTTP 200 + 业务错误码
     res.render(Json(
         rsws_common::response::ApiResponse::<()>::error_with_message(
             rsws_common::error_code::ErrorCode::AUTH_MISSING_CREDENTIALS,

@@ -10,6 +10,7 @@ use tracing::error;
 /// 获取 OSS 存储配置
 #[endpoint]
 pub async fn get_storage_config(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    // DEBUG: 如果请求到达此 handler，返回特殊标记
     let state = get_state(depot);
 
     match state.config_service.get_storage_config().await {

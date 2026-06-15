@@ -40,10 +40,8 @@
   rsws:
     build:
       context: .
-      dockerfile: Dockerfile
-      args:
-        VERSION: "${IMAGE_VERSION:-dev}"
-    image: rsws:latest
+      dockerfile: Dockerfile.prebuilt
+    image: rsws-server:latest
     container_name: rsws-server
     ports:
       - "${SERVER_PORT:-5170}:5170"

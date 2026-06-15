@@ -303,14 +303,16 @@ impl PayPalConfigRepository {
         &self,
         req: &rsws_model::payment::CreatePayPalConfigRequest,
     ) -> Result<PayPalConfig, RswsError> {
+        let id = rsws_common::snowflake::next_id();
         let config = sqlx::query_as::<_, PayPalConfig>(
             r#"INSERT INTO paypal_configs (
-                client_id, client_secret, sandbox,
+                id, client_id, client_secret, sandbox,
                 base_url, return_url, cancel_url, brand_name,
                 min_amount, max_amount, fee_rate, is_active
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *"#,
         )
+        .bind(id)
         .bind(&req.client_id)
         .bind(&req.client_secret)
         .bind(req.sandbox)

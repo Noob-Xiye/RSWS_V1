@@ -70,6 +70,7 @@ pub use wallet::update_usdt_wallet;
 
 // dashboard.rs
 pub use dashboard::dashboard_stats;
+pub use dashboard::get_log_stats;
 pub use dashboard::revenue_chart;
 
 // user.rs

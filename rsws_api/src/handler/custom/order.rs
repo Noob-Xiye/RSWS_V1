@@ -116,7 +116,8 @@ pub async fn create_order(req: &mut Request, depot: &mut Depot, res: &mut Respon
     match body {
         Ok(data) => {
             let valid_methods = ["paypal", "usdt_trc20", "usdt_erc20"];
-            if !valid_methods.contains(&data.payment_method.as_str()) {
+            let method_lower = data.payment_method.to_lowercase();
+            if !valid_methods.contains(&method_lower.as_str()) {
                 res.error_msg(
                     RswsError::from(ErrorCode::PAYMENT_METHOD_NOT_SUPPORTED),
                     format!("Unsupported payment method: {}", data.payment_method),

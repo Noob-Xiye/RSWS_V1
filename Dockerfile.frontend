@@ -8,16 +8,16 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files first for cache
-COPY ui/admin/package.json ui/admin/package-lock.json* ./admin/
-COPY ui/user/package.json ui/user/package-lock.json* ./user/
+COPY frontend/admin/package.json frontend/admin/package-lock.json* ./admin/
+COPY frontend/user/package.json frontend/user/package-lock.json* ./user/
 
 # Install dependencies
 RUN cd /app/admin && npm ci --prefer-offline 2>/dev/null || npm install
 RUN cd /app/user && npm ci --prefer-offline 2>/dev/null || npm install
 
 # Copy source code
-COPY ui/admin ./admin
-COPY ui/user ./user
+COPY frontend/admin ./admin
+COPY frontend/user ./user
 
 # Build both frontends (production env uses VITE_API_URL=/api/v1 by default)
 RUN cd /app/admin && npm run build

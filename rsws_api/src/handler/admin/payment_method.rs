@@ -4,6 +4,7 @@
 
 use crate::state::get_state;
 use rsws_common::{ResponseExt, RswsError};
+use rsws_common::snowflake;
 use salvo::prelude::*;
 use salvo_oapi::endpoint;
 use serde::{Deserialize, Serialize};
@@ -90,9 +91,11 @@ pub async fn create_payment_method(req: &mut Request, depot: &mut Depot, res: &m
     let state = get_state(depot);
     let is_enabled = data.is_enabled.unwrap_or(true);
     let config = data.config.unwrap_or(serde_json::json!({}));
+    let id = snowflake::next_id();
     let result = sqlx::query(
-        "INSERT INTO payment_methods (method_type, method_name, is_enabled, config) VALUES ($1, $2, $3, $4) ON CONFLICT (method_type) DO UPDATE SET is_enabled = EXCLUDED.is_enabled, config = EXCLUDED.config, updated_at = NOW()"
+        "INSERT INTO payment_methods (id, method_type, method_name, is_enabled, config) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (method_type) DO UPDATE SET is_enabled = EXCLUDED.is_enabled, config = EXCLUDED.config, updated_at = NOW()"
     )
+    .bind(id)
     .bind(&data.method_type)
     .bind(&data.method_name)
     .bind(is_enabled)

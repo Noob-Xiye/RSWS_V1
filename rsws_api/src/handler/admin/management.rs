@@ -129,11 +129,13 @@ pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Respons
     )
 )]
 pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let id: i64 = req.param("id").unwrap_or(0);
+    eprintln!("=== get_admin handler reached, id query={:?} ===", req.query::<i64>("id"));
+    let id: i64 = req.query("id").unwrap_or(0);
+    // DEBUG: 标记请求是否到达此 handler
     if id <= 0 {
         res.error_msg(
             RswsError::from(rsws_common::error_code::ErrorCode::INVALID_PARAMETER),
-            "Invalid admin ID",
+            "Invalid admin ID [from get_admin handler]",
         );
         return;
     }
@@ -154,7 +156,7 @@ pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response)
     )
 )]
 pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let id: i64 = req.param("id").unwrap_or(0);
+    let id: i64 = req.query("id").unwrap_or(0);
     let operator_id = match require_user_id(depot) {
         Ok(id) => id,
         Err(status) => {
@@ -166,7 +168,7 @@ pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Re
     if id <= 0 {
         res.error_msg(
             RswsError::from(rsws_common::error_code::ErrorCode::INVALID_PARAMETER),
-            "Invalid admin ID",
+            "Invalid admin ID [deactivate_admin]",
         );
         return;
     }
@@ -200,7 +202,7 @@ pub async fn deactivate_admin(req: &mut Request, depot: &mut Depot, res: &mut Re
     )
 )]
 pub async fn activate_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let id: i64 = req.param("id").unwrap_or(0);
+    let id: i64 = req.query("id").unwrap_or(0);
     let operator_id = match require_user_id(depot) {
         Ok(id) => id,
         Err(status) => {
@@ -212,7 +214,7 @@ pub async fn activate_admin(req: &mut Request, depot: &mut Depot, res: &mut Resp
     if id <= 0 {
         res.error_msg(
             RswsError::from(rsws_common::error_code::ErrorCode::INVALID_PARAMETER),
-            "Invalid admin ID",
+            "Invalid admin ID [activate_admin]",
         );
         return;
     }
@@ -246,7 +248,7 @@ pub async fn activate_admin(req: &mut Request, depot: &mut Depot, res: &mut Resp
     )
 )]
 pub async fn reset_admin_password(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    let id: i64 = req.param("id").unwrap_or(0);
+    let id: i64 = req.query("id").unwrap_or(0);
     let operator_id = match require_user_id(depot) {
         Ok(id) => id,
         Err(status) => {
@@ -258,7 +260,7 @@ pub async fn reset_admin_password(req: &mut Request, depot: &mut Depot, res: &mu
     if id <= 0 {
         res.error_msg(
             RswsError::from(rsws_common::error_code::ErrorCode::INVALID_PARAMETER),
-            "Invalid admin ID",
+            "Invalid admin ID [reset_admin_password]",
         );
         return;
     }

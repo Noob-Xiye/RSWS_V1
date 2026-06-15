@@ -97,6 +97,45 @@ pub async fn dashboard_stats(_req: &mut Request, depot: &mut Depot, res: &mut Re
     res.success(stats);
 }
 
+/// 统一日志统计
+#[endpoint(
+    responses(
+        (status_code = 200, description = "获取成功"),
+        (status_code = 403, description = "非管理员"),
+    )
+)]
+pub async fn get_log_stats(_req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    let state = get_state(depot);
+    let pool = &state.pool;
+
+    let (login_count, error_count, audit_count): (i64, i64, i64) = tokio::join!(
+        async {
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM login_logs")
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0)
+        },
+        async {
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM error_logs")
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0)
+        },
+        async {
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM audit_logs")
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0)
+        }
+    );
+
+    res.success(serde_json::json!({
+        "login_logs": login_count,
+        "error_logs": error_count,
+        "audit_logs": audit_count,
+    }));
+}
+
 /// 收入图表
 #[endpoint(
     parameters(
@@ -114,7 +153,6 @@ pub async fn revenue_chart(req: &mut Request, depot: &mut Depot, res: &mut Respo
     let days: i64 = req.query("days").unwrap_or(30).clamp(1, 365);
 
     // 查询每日收入
-    // 使用 make_interval() 避免字符串拼接（SQL 注入风险）
     let rows: Vec<(String, i64)> = match sqlx::query_as(
         r#"
         SELECT DATE(paid_at AT TIME ZONE 'UTC')::text AS date, COALESCE(SUM(amount), 0)::bigint AS revenue

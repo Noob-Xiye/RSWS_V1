@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
 # Configure cargo for low-memory build
 ENV CARGO_BUILD_JOBS=1
 ENV CARGO_INCREMENTAL=0
+ENV CMAKE_BUILD_PARALLEL_LEVEL=1
 
 # Copy manifests first for dependency caching
 COPY Cargo.toml Cargo.lock ./
