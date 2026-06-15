@@ -106,7 +106,7 @@ mod tests {
         let hash = PasswordService::hash(password).expect("Hash failed");
         println!("\nPassword: {}", password);
         println!("Argon2 Hash: {}", hash);
-        
+
         // Verify it works
         let result = PasswordService::verify(password, &hash).expect("Verify failed");
         assert!(result);

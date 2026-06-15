@@ -168,9 +168,9 @@ impl ErrorLogService {
     /// Query error logs with pagination
     pub async fn query_errors(&self, query: ErrorLogQuery) -> Result<ErrorLogPage, RswsError> {
         let offset = (query.page - 1) * query.page_size;
-        
+
         let mut conditions = vec!["1=1".to_string()];
-        
+
         if query.error_type.is_some() {
             conditions.push(format!("error_type = ${}", conditions.len()));
         }
@@ -189,9 +189,9 @@ impl ErrorLogService {
         if query.to_date.is_some() {
             conditions.push(format!("created_at <= ${}", conditions.len()));
         }
-        
+
         let where_clause = conditions.join(" AND ");
-        
+
         let count_sql = format!("SELECT COUNT(*) FROM error_logs WHERE {}", where_clause);
         let data_sql = format!(
             "SELECT id, error_type, error_message, stack_trace, request_id, user_id, context, \
@@ -201,37 +201,61 @@ impl ErrorLogService {
             conditions.len(),
             conditions.len() + 1
         );
-        
+
         // Build and execute count query
         let mut count_query = sqlx::query_scalar::<_, i64>(&count_sql);
-        if let Some(et) = &query.error_type { count_query = count_query.bind(et); }
-        if let Some(r) = query.resolved { count_query = count_query.bind(r); }
-        if let Some(uid) = query.user_id { count_query = count_query.bind(uid); }
-        if let Some(rid) = &query.request_id { count_query = count_query.bind(rid); }
-        if let Some(from) = query.from_date { count_query = count_query.bind(from); }
-        if let Some(to) = query.to_date { count_query = count_query.bind(to); }
-        
+        if let Some(et) = &query.error_type {
+            count_query = count_query.bind(et);
+        }
+        if let Some(r) = query.resolved {
+            count_query = count_query.bind(r);
+        }
+        if let Some(uid) = query.user_id {
+            count_query = count_query.bind(uid);
+        }
+        if let Some(rid) = &query.request_id {
+            count_query = count_query.bind(rid);
+        }
+        if let Some(from) = query.from_date {
+            count_query = count_query.bind(from);
+        }
+        if let Some(to) = query.to_date {
+            count_query = count_query.bind(to);
+        }
+
         let total = count_query
             .fetch_one(&self.pool)
             .await
             .map_err(|e| RswsError::internal(format!("Failed to count errors: {}", e)))?;
-        
+
         // Build and execute data query
         let mut data_query = sqlx::query_as::<_, ErrorLog>(&data_sql);
-        if let Some(et) = &query.error_type { data_query = data_query.bind(et); }
-        if let Some(r) = query.resolved { data_query = data_query.bind(r); }
-        if let Some(uid) = query.user_id { data_query = data_query.bind(uid); }
-        if let Some(rid) = &query.request_id { data_query = data_query.bind(rid); }
-        if let Some(from) = query.from_date { data_query = data_query.bind(from); }
-        if let Some(to) = query.to_date { data_query = data_query.bind(to); }
-        
+        if let Some(et) = &query.error_type {
+            data_query = data_query.bind(et);
+        }
+        if let Some(r) = query.resolved {
+            data_query = data_query.bind(r);
+        }
+        if let Some(uid) = query.user_id {
+            data_query = data_query.bind(uid);
+        }
+        if let Some(rid) = &query.request_id {
+            data_query = data_query.bind(rid);
+        }
+        if let Some(from) = query.from_date {
+            data_query = data_query.bind(from);
+        }
+        if let Some(to) = query.to_date {
+            data_query = data_query.bind(to);
+        }
+
         let items = data_query
             .bind(query.page_size)
             .bind(offset)
             .fetch_all(&self.pool)
             .await
             .map_err(|e| RswsError::internal(format!("Failed to fetch errors: {}", e)))?;
-        
+
         Ok(ErrorLogPage {
             items,
             total,
@@ -250,34 +274,33 @@ impl ErrorLogService {
             RETURNING 
                 id, error_type, error_message, stack_trace, request_id, user_id, context,
                 source_file, line_number, resolved, resolved_at, resolved_by, created_at
-            "#
+            "#,
         )
         .bind(req.error_id)
         .bind(req.resolved_by)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| RswsError::internal(format!("Failed to resolve error: {}", e)))?;
-        
+
         Ok(log)
     }
 
     /// Get error statistics
     pub async fn get_stats(&self, hours: i64) -> Result<ErrorStats, RswsError> {
         let total_errors: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM error_logs WHERE created_at > NOW() - INTERVAL '1 hour' * $1"
+            "SELECT COUNT(*) FROM error_logs WHERE created_at > NOW() - INTERVAL '1 hour' * $1",
         )
         .bind(hours)
         .fetch_one(&self.pool)
         .await
         .unwrap_or(0);
-        
-        let unresolved_errors: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM error_logs WHERE resolved = FALSE"
-        )
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(0);
-        
+
+        let unresolved_errors: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM error_logs WHERE resolved = FALSE")
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or(0);
+
         let errors_by_type = sqlx::query_as::<_, ErrorTypeCount>(
             r#"
             SELECT error_type, COUNT(*) as count
@@ -285,13 +308,13 @@ impl ErrorLogService {
             WHERE created_at > NOW() - INTERVAL '1 hour' * $1
             GROUP BY error_type
             ORDER BY count DESC
-            "#
+            "#,
         )
         .bind(hours)
         .fetch_all(&self.pool)
         .await
         .unwrap_or_default();
-        
+
         let recent_errors = sqlx::query_as::<_, ErrorLog>(
             r#"
             SELECT id, error_type, error_message, stack_trace, request_id, user_id, context,
@@ -300,12 +323,12 @@ impl ErrorLogService {
             WHERE resolved = FALSE
             ORDER BY created_at DESC
             LIMIT 10
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await
         .unwrap_or_default();
-        
+
         Ok(ErrorStats {
             total_errors,
             unresolved_errors,
@@ -322,14 +345,14 @@ impl ErrorLogService {
                    source_file, line_number, resolved, resolved_at, resolved_by, created_at
             FROM error_logs
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| RswsError::internal(format!("Failed to fetch error: {}", e)))?
         .ok_or_else(|| RswsError::not_found("Error log not found"))?;
-        
+
         Ok(log)
     }
 }

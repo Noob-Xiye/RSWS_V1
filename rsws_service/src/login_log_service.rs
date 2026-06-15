@@ -111,7 +111,7 @@ impl LoginLogService {
     /// Record a login attempt
     pub async fn record_login(&self, req: CreateLoginLogRequest) -> Result<LoginLog, RswsError> {
         let ip_str = req.ip_address.map(|ip| ip.to_string());
-        
+
         let row = sqlx::query(
             r#"
             INSERT INTO login_logs 
@@ -152,7 +152,7 @@ impl LoginLogService {
     /// Query login logs with pagination
     pub async fn query_logs(&self, query: LoginLogQuery) -> Result<LoginLogPage, RswsError> {
         let offset = (query.page - 1) * query.page_size;
-        
+
         let mut conditions: Vec<String> = vec!["1=1".to_string()];
         let mut param_idx = 1;
 
@@ -203,7 +203,7 @@ impl LoginLogService {
         } else {
             None
         };
-        
+
         let where_clause = conditions.join(" AND ");
 
         let count_sql = format!("SELECT COUNT(*) FROM login_logs WHERE {}", where_clause);
@@ -212,29 +212,53 @@ impl LoginLogService {
              fail_reason, request_id, created_at FROM login_logs WHERE {} ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
             where_clause, param_idx, param_idx + 1
         );
-        
+
         // Build and execute count query
         let mut count_query = sqlx::query_scalar::<_, i64>(&count_sql);
-        if let Some(uid) = user_id_param { count_query = count_query.bind(uid); }
-        if let Some(ref s) = status_param { count_query = count_query.bind(s); }
-        if let Some(ref lt) = login_type_param { count_query = count_query.bind(lt); }
-        if let Some(ref ip) = ip_param { count_query = count_query.bind(ip); }
-        if let Some(ref from) = from_date_param { count_query = count_query.bind(from); }
-        if let Some(ref to) = to_date_param { count_query = count_query.bind(to); }
+        if let Some(uid) = user_id_param {
+            count_query = count_query.bind(uid);
+        }
+        if let Some(ref s) = status_param {
+            count_query = count_query.bind(s);
+        }
+        if let Some(ref lt) = login_type_param {
+            count_query = count_query.bind(lt);
+        }
+        if let Some(ref ip) = ip_param {
+            count_query = count_query.bind(ip);
+        }
+        if let Some(ref from) = from_date_param {
+            count_query = count_query.bind(from);
+        }
+        if let Some(ref to) = to_date_param {
+            count_query = count_query.bind(to);
+        }
 
         let total = count_query
             .fetch_one(&self.pool)
             .await
             .map_err(|e| RswsError::internal(format!("Failed to count login logs: {}", e)))?;
-        
+
         // Build and execute data query
         let mut data_query = sqlx::query_as::<_, LoginLog>(&data_sql);
-        if let Some(uid) = user_id_param { data_query = data_query.bind(uid); }
-        if let Some(ref s) = status_param { data_query = data_query.bind(s); }
-        if let Some(ref lt) = login_type_param { data_query = data_query.bind(lt); }
-        if let Some(ref ip) = ip_param { data_query = data_query.bind(ip); }
-        if let Some(ref from) = from_date_param { data_query = data_query.bind(from); }
-        if let Some(ref to) = to_date_param { data_query = data_query.bind(to); }
+        if let Some(uid) = user_id_param {
+            data_query = data_query.bind(uid);
+        }
+        if let Some(ref s) = status_param {
+            data_query = data_query.bind(s);
+        }
+        if let Some(ref lt) = login_type_param {
+            data_query = data_query.bind(lt);
+        }
+        if let Some(ref ip) = ip_param {
+            data_query = data_query.bind(ip);
+        }
+        if let Some(ref from) = from_date_param {
+            data_query = data_query.bind(from);
+        }
+        if let Some(ref to) = to_date_param {
+            data_query = data_query.bind(to);
+        }
 
         let items = data_query
             .bind(query.page_size)
@@ -242,7 +266,7 @@ impl LoginLogService {
             .fetch_all(&self.pool)
             .await
             .map_err(|e| RswsError::internal(format!("Failed to fetch login logs: {}", e)))?;
-        
+
         Ok(LoginLogPage {
             items,
             total,
@@ -252,7 +276,11 @@ impl LoginLogService {
     }
 
     /// Get recent login attempts for a user
-    pub async fn get_recent_logins(&self, user_id: i64, limit: i64) -> Result<Vec<LoginLog>, RswsError> {
+    pub async fn get_recent_logins(
+        &self,
+        user_id: i64,
+        limit: i64,
+    ) -> Result<Vec<LoginLog>, RswsError> {
         let logs = sqlx::query_as::<_, LoginLog>(
             r#"
             SELECT id, user_id, login_type, status, ip_address, user_agent, device_info,
@@ -261,19 +289,23 @@ impl LoginLogService {
             WHERE user_id = $1
             ORDER BY created_at DESC
             LIMIT $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(limit)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RswsError::internal(format!("Failed to fetch recent logins: {}", e)))?;
-        
+
         Ok(logs)
     }
 
     /// Check for suspicious login patterns (brute force detection)
-    pub async fn check_suspicious_activity(&self, ip: &str, minutes: i64) -> Result<(i64, i64), RswsError> {
+    pub async fn check_suspicious_activity(
+        &self,
+        ip: &str,
+        minutes: i64,
+    ) -> Result<(i64, i64), RswsError> {
         let result = sqlx::query(
             r#"
             SELECT 
@@ -282,17 +314,17 @@ impl LoginLogService {
             FROM login_logs
             WHERE ip_address = $1
               AND created_at > NOW() - INTERVAL '1 minute' * $2
-            "#
+            "#,
         )
         .bind(ip)
         .bind(minutes)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| RswsError::internal(format!("Failed to check suspicious activity: {}", e)))?;
-        
+
         let total: i64 = result.try_get("total_attempts").unwrap_or(0);
         let failed: i64 = result.try_get("failed_attempts").unwrap_or(0);
-        
+
         Ok((total, failed))
     }
 }

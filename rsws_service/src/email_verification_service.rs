@@ -135,8 +135,7 @@ impl EmailVerificationService {
         } else {
             // Production mode: send via SMTP
             if let Some(ref svc) = self.email_service {
-                svc.send_verification_code(email, code, code_type)
-                    .await?;
+                svc.send_verification_code(email, code, code_type).await?;
                 Ok(())
             } else {
                 Err(RswsError::internal("Email service not configured"))

@@ -5,9 +5,9 @@
 use rsws_common::config::AppConfig;
 use rsws_db::CategoryRepository;
 use rsws_service::{
-    AdminRepository, AdminService, ApiKeyManager, AuditLogService, BlockchainService, ConfigService,
-    CrossPlatformService, ErrorLogService, LogService, LoginLogService, OrderService, PayPalService,
-    PaymentService, ResourceService, UserService, WebhookService,
+    AdminRepository, AdminService, ApiKeyManager, AuditLogService, BlockchainService,
+    ConfigService, CrossPlatformService, ErrorLogService, LogService, LoginLogService,
+    OrderService, PayPalService, PaymentService, ResourceService, UserService, WebhookService,
 };
 use salvo::prelude::*;
 use sqlx::PgPool;

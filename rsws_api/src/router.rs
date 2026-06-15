@@ -3,12 +3,12 @@
 use crate::handler;
 use crate::middleware::auth::{api_key_auth, rate_limit, require_admin};
 use crate::middleware::tracing::tracing_logger;
-use salvo::request_id::RequestId;
 use crate::state::AppState;
 use salvo::affix_state;
 use salvo::http::Method;
 use salvo::oapi::OpenApi;
 use salvo::prelude::*;
+use salvo::request_id::RequestId;
 
 use salvo_cors::Any;
 use salvo_cors::Cors;
@@ -136,15 +136,30 @@ pub fn create_router(state: AppState) -> Router {
                         ))
                         // 登录日志
                         .push(Router::with_path("login-logs").get(handler::admin::list_login_logs))
-                        .push(Router::with_path("login-logs/stats").get(handler::admin::get_login_stats))
+                        .push(
+                            Router::with_path("login-logs/stats")
+                                .get(handler::admin::get_login_stats),
+                        )
                         // 错误日志
                         .push(Router::with_path("error-logs").get(handler::admin::list_error_logs))
-                        .push(Router::with_path("error-logs/stats").get(handler::admin::get_error_stats))
-                        .push(Router::with_path("error-logs/resolve").post(handler::admin::resolve_error))
+                        .push(
+                            Router::with_path("error-logs/stats")
+                                .get(handler::admin::get_error_stats),
+                        )
+                        .push(
+                            Router::with_path("error-logs/resolve")
+                                .post(handler::admin::resolve_error),
+                        )
                         // 审计日志
                         .push(Router::with_path("audit-logs").get(handler::admin::list_audit_logs))
-                        .push(Router::with_path("audit-logs/stats").get(handler::admin::get_audit_stats))
-                        .push(Router::with_path("audit-logs/history").get(handler::admin::get_resource_history))
+                        .push(
+                            Router::with_path("audit-logs/stats")
+                                .get(handler::admin::get_audit_stats),
+                        )
+                        .push(
+                            Router::with_path("audit-logs/history")
+                                .get(handler::admin::get_resource_history),
+                        )
                         // 邮件配置管理
                         .push(
                             Router::with_path("email-configs")
@@ -229,10 +244,7 @@ pub fn create_router(state: AppState) -> Router {
                                 .post(handler::admin::test_storage_connection),
                         )
                         // 管理员当前信息（GET /admin）
-                        .push(
-                            Router::new()
-                                .get(handler::admin::get_current_admin),
-                        )
+                        .push(Router::new().get(handler::admin::get_current_admin))
                         // 管理员列表
                         .push(Router::with_path("list").get(handler::admin::list_admins))
                         // 创建管理员
@@ -262,20 +274,13 @@ pub fn create_router(state: AppState) -> Router {
                                 ),
                         )
                         // 管理员详情（by query param id，避免 {id} 通配误匹配字面量路由）
-                        .push(
-                            Router::with_path("detail")
-                                .get(handler::admin::get_admin),
-                        )
+                        .push(Router::with_path("detail").get(handler::admin::get_admin))
                         // 管理员停用
                         .push(
-                            Router::with_path("deactivate")
-                                .post(handler::admin::deactivate_admin),
+                            Router::with_path("deactivate").post(handler::admin::deactivate_admin),
                         )
                         // 管理员启用
-                        .push(
-                            Router::with_path("activate")
-                                .post(handler::admin::activate_admin),
-                        )
+                        .push(Router::with_path("activate").post(handler::admin::activate_admin))
                         // 重置管理员密码
                         .push(
                             Router::with_path("reset-password")

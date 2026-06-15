@@ -12,7 +12,6 @@ use tracing::{info, warn};
 
 use crate::EmailVerificationService;
 
-
 /// 用户服务
 pub struct UserService {
     user_repo: UserRepository,
@@ -45,8 +44,7 @@ impl UserService {
         redis: RedisService,
         email_config: Option<&EmailDbConfig>,
     ) -> Self {
-        let email_verification_service =
-            EmailVerificationService::new(redis.clone(), email_config);
+        let email_verification_service = EmailVerificationService::new(redis.clone(), email_config);
         Self {
             user_repo,
             redis: Some(redis),
@@ -279,7 +277,10 @@ impl UserService {
         // 使用 EmailVerificationService 发送登录验证码
         if let Some(ref email_verif_svc) = self.email_verification_service {
             email_verif_svc.send_code(email, "login").await?;
-            info!("Login verification code sent to: {} (via EmailVerificationService)", email);
+            info!(
+                "Login verification code sent to: {} (via EmailVerificationService)",
+                email
+            );
             return Ok(300);
         }
 

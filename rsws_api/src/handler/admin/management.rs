@@ -129,7 +129,10 @@ pub async fn list_admins(req: &mut Request, depot: &mut Depot, res: &mut Respons
     )
 )]
 pub async fn get_admin(req: &mut Request, depot: &mut Depot, res: &mut Response) {
-    eprintln!("=== get_admin handler reached, id query={:?} ===", req.query::<i64>("id"));
+    eprintln!(
+        "=== get_admin handler reached, id query={:?} ===",
+        req.query::<i64>("id")
+    );
     let id: i64 = req.query("id").unwrap_or(0);
     // DEBUG: 标记请求是否到达此 handler
     if id <= 0 {
