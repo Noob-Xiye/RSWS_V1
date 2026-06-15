@@ -151,7 +151,6 @@ impl EmailVerificationService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_generate_code_dev_mode() {
