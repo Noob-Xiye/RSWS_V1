@@ -36,6 +36,6 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/admin/dist /usr/share/nginx/admin
 COPY --from=builder /app/user/dist /usr/share/nginx/user
 
-EXPOSE 80
+EXPOSE 3000 3001
 
 CMD ["nginx", "-g", "daemon off;"]

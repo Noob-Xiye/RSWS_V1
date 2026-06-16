@@ -73,7 +73,7 @@
     restart: unless-stopped
     ports:
       - "${ADMIN_PORT:-4000}:3000"
-      - "${USER_PORT:-4001}:3001"
+      - "${USER_PORT:-4002}:3001"
     depends_on:
       rsws:
         condition: service_healthy
