@@ -1,7 +1,7 @@
 import request, { type ApiResponse } from './request'
 
 export interface Resource {
-  id: number
+  id: number | string
   title: string
   description: string | null
   price: number
@@ -36,7 +36,7 @@ export type ResourceDetail = Resource & {
 
 export interface PurchaseCheckResponse {
   purchased: boolean
-  resource_id: number
+  resource_id: number | string
 }
 
 export interface DownloadInfo {
@@ -55,17 +55,17 @@ export async function listResources(params?: {
 }
 
 /** 获取资源详情（公开端点） */
-export async function getResource(id: number): Promise<ApiResponse<ResourceDetail>> {
+export async function getResource(id: number | string): Promise<ApiResponse<ResourceDetail>> {
   return request.get(`/resource/${id}`)
 }
 
 /** 检查用户是否已购买某资源 */
-export async function checkPurchase(resourceId: number): Promise<ApiResponse<PurchaseCheckResponse>> {
+export async function checkPurchase(resourceId: number | string): Promise<ApiResponse<PurchaseCheckResponse>> {
   return request.get(`/resource/${resourceId}/purchase-check`)
 }
 
 /** 获取资源下载信息（需要已购买） */
-export async function getDownloadInfo(resourceId: number): Promise<ApiResponse<DownloadInfo>> {
+export async function getDownloadInfo(resourceId: number | string): Promise<ApiResponse<DownloadInfo>> {
   return request.get(`/resource/${resourceId}/download`)
 }
 

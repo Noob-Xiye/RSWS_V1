@@ -5,11 +5,11 @@ export type PaymentMethod = 'paypal' | 'usdt_trc20' | 'usdt_erc20'
 
 /** 管理员订单详情（对齐后端 AdminOrderDetail） */
 export interface AdminOrder {
-  id: number
-  user_id: number
+  id: number | string
+  user_id: number | string
   user_name: string | null
   user_email: string | null
-  resource_id: number
+  resource_id: number | string
   resource_title: string | null
   amount: number          // 分(cents)，显示时除以100
   status: string
@@ -31,11 +31,11 @@ export async function adminListOrders(params?: AdminOrderListParams): Promise<Ap
 }
 
 // 退款
-export async function refundOrder(id: number): Promise<ApiResponse<void>> {
+export async function refundOrder(id: number | string): Promise<ApiResponse<void>> {
   return request.post(`/order/${id}/refund`)
 }
 
 // 完成订单
-export async function completeOrder(id: number): Promise<ApiResponse<void>> {
+export async function completeOrder(id: number | string): Promise<ApiResponse<void>> {
   return request.post(`/order/${id}/complete`)
 }

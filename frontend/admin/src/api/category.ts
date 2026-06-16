@@ -2,10 +2,10 @@ import request, { type ApiResponse } from './request'
 
 /** 分类信息 */
 export interface Category {
-  id: number
+  id: number | string
   name: string
   description: string | null
-  parent_id: number | null
+  parent_id: number | string | null
   path: string | null
   sort_order: number
   is_active: boolean
@@ -33,7 +33,7 @@ export interface UpdateCategoryRequest {
 
 /** 排序项 */
 export interface SortItem {
-  id: number
+  id: number | string
   sort_order: number
 }
 
@@ -57,12 +57,12 @@ export async function createCategory(data: CreateCategoryRequest): Promise<ApiRe
 }
 
 /** 更新分类 */
-export async function updateCategory(id: number, data: UpdateCategoryRequest): Promise<ApiResponse<Category>> {
+export async function updateCategory(id: number | string, data: UpdateCategoryRequest): Promise<ApiResponse<Category>> {
   return request.put(`/admin/categories/${id}`, data)
 }
 
 /** 删除分类 */
-export async function deleteCategory(id: number): Promise<ApiResponse<void>> {
+export async function deleteCategory(id: number | string): Promise<ApiResponse<void>> {
   return request.delete(`/admin/categories/${id}`)
 }
 

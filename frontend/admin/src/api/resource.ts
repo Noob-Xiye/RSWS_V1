@@ -2,12 +2,12 @@ import request, { type ApiResponse, type PaginatedResponse, type PaginationParam
 import { adminListCategories, type Category } from './category'
 
 export interface Resource {
-  id: number
-  user_id: number
+  id: number | string
+  user_id: number | string
   title: string
   description: string | null
   price: number
-  category_id: number | null
+  category_id: number | string | null
   file_url: string | null
   thumbnail_url: string | null
   is_active: boolean
@@ -18,7 +18,7 @@ export interface Resource {
   display_images: string[] | null
   supported_os: string[] | null
   provider_type: string
-  provider_id: number | null
+  provider_id: number | string | null
   commission_rate: number
   download_count: number
   created_at: string
@@ -73,22 +73,22 @@ export async function listResources(params?: ResourceListParams): Promise<ApiRes
 }
 
 // 获取资源详情
-export async function getResource(id: number): Promise<ApiResponse<Resource>> {
+export async function getResource(id: number | string): Promise<ApiResponse<Resource>> {
   return request.get(`/resource/${id}`)
 }
 
 // 删除资源（软删除）
-export async function deleteResource(id: number): Promise<ApiResponse<void>> {
+export async function deleteResource(id: number | string): Promise<ApiResponse<void>> {
   return request.delete(`/resource/${id}`)
 }
 
 // 切换资源上下架状态（用户端，更新资源自身）
-export async function toggleResourceActive(id: number, is_active: boolean): Promise<ApiResponse<Resource>> {
+export async function toggleResourceActive(id: number | string, is_active: boolean): Promise<ApiResponse<Resource>> {
   return request.put(`/resource/${id}`, { is_active })
 }
 
 // 管理员切换资源上下架状态
-export async function togglePlatformResourceActive(id: number): Promise<ApiResponse<Resource>> {
+export async function togglePlatformResourceActive(id: number | string): Promise<ApiResponse<Resource>> {
   return request.put(`/admin/resources/${id}/toggle-active`)
 }
 
@@ -98,7 +98,7 @@ export async function createResource(data: Partial<CreateResourceRequest>): Prom
 }
 
 // 更新资源
-export async function updateResource(id: number, data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
+export async function updateResource(id: number | string, data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
   return request.put(`/resource/${id}`, data)
 }
 
@@ -108,12 +108,12 @@ export async function createPlatformResource(data: Partial<CreateResourceRequest
 }
 
 // 管理员更新资源
-export async function updatePlatformResource(id: number, data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
+export async function updatePlatformResource(id: number | string, data: Partial<CreateResourceRequest>): Promise<ApiResponse<Resource>> {
   return request.put(`/admin/resources/${id}`, data)
 }
 
 // 管理员删除资源
-export async function deletePlatformResource(id: number): Promise<ApiResponse<void>> {
+export async function deletePlatformResource(id: number | string): Promise<ApiResponse<void>> {
   return request.delete(`/admin/resources/${id}`)
 }
 

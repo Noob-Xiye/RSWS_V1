@@ -7,7 +7,7 @@ export async function getUsdtAddress(network: 'trc20' | 'erc20'): Promise<ApiRes
 
 // ========== 支付方式管理 ==========
 export interface PaymentMethod {
-  id: number
+  id: number | string
   method_type: string
   method_name: string
   is_enabled: boolean
@@ -34,6 +34,6 @@ export async function createPaymentMethod(data: CreatePaymentMethodParams): Prom
 }
 
 /** 删除/禁用支付方式（软删除） */
-export async function deletePaymentMethod(id: number): Promise<ApiResponse<{ success: boolean }>> {
+export async function deletePaymentMethod(id: number | string): Promise<ApiResponse<{ success: boolean }>> {
   return request.delete(`/admin/payment-methods/${id}`)
 }

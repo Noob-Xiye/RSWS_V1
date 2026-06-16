@@ -195,14 +195,14 @@ const pollingStatus = ref(false)
 let pollingTimer: ReturnType<typeof setInterval> | null = null
 
 async function fetchResource() {
-  const id = Number(route.params.id)
+  const id = route.params.id as string
   if (!id) return
   loading.value = true
   try {
     const res = await getResource(id)
     if (res.code === 0 && res.data) {
       resource.value = res.data
-      await checkPurchasedStatus(id)
+      await checkPurchasedStatus(id as any)
     } else {
       ElMessage.error('资源不存在')
       router.push('/')
@@ -214,7 +214,7 @@ async function fetchResource() {
   }
 }
 
-async function checkPurchasedStatus(resourceId: number) {
+async function checkPurchasedStatus(resourceId: number | string) {
   if (!userStore.isLoggedIn) { isPurchased.value = false; return }
   try {
     const res = await checkPurchase(resourceId)

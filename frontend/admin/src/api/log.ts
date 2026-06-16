@@ -2,13 +2,13 @@ import request, { type ApiResponse, type PaginatedResponse, type PaginationParam
 
 // 对齐后端 SystemLog 结构体字段名
 export interface SystemLog {
-  id: number
+  id: number | string
   log_level: string  // 后端字段名（不是 level）
   module: string     // 后端字段名（不是 category）
   message: string
   context: any | null  // 后端是 Option<serde_json::Value>（不是 details）
-  user_id: number | null
-  admin_id: number | null
+  user_id: number | string | null
+  admin_id: number | string | null
   ip_address: string | null   // 新增
   user_agent: string | null   // 新增
   request_id: string | null   // 新增

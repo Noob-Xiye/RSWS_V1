@@ -2,7 +2,7 @@ import request, { type ApiResponse, type PaginatedResponse, type PaginationParam
 
 /** 管理员视图用户信息（对齐后端 AdminUserView） */
 export interface AdminUser {
-  id: number
+  id: number | string
   email: string
   username: string
   nickname: string
@@ -23,20 +23,20 @@ export async function listUsers(params?: UserListParams): Promise<ApiResponse<Pa
 }
 
 /** 禁用用户 */
-export async function deactivateUser(id: number): Promise<ApiResponse<void>> {
+export async function deactivateUser(id: number | string): Promise<ApiResponse<void>> {
   return request.post(`/admin/user/${id}/deactivate`)
 }
 
 /** 启用用户 */
-export async function activateUser(id: number): Promise<ApiResponse<void>> {
+export async function activateUser(id: number | string): Promise<ApiResponse<void>> {
   return request.post(`/admin/user/${id}/activate`)
 }
 
 // ==================== 用户 API Key 管理 ====================
 
 export interface UserApiKey {
-  id: number
-  user_id: number
+  id: number | string
+  user_id: number | string
   api_key: string
   name: string
   permissions: string[]
@@ -56,7 +56,7 @@ export interface CreateApiKeyParams {
 }
 
 /** 获取用户的 API Key 列表 */
-export async function listUserApiKeys(userId: number): Promise<ApiResponse<{ items: UserApiKey[] }>> {
+export async function listUserApiKeys(userId: number | string): Promise<ApiResponse<{ items: UserApiKey[] }>> {
   return request.get(`/admin/users/${userId}/api-keys`)
 }
 
