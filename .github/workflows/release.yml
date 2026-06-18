@@ -7,7 +7,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/rsws-v1
+  # Docker image names must be lowercase
+  IMAGE_NAME: noob-xiye/rsws-v1
 
 jobs:
   build-binary:
