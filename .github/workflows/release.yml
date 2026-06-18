@@ -12,7 +12,7 @@ env:
 jobs:
   build-binary:
     name: Build Release Binary
-    runs-on: ubuntu-latest-8core
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
@@ -37,6 +37,10 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build release binary
+        env:
+          CARGO_BUILD_JOBS: 1
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C codegen-units=1"
         run: cargo build --release --bin resource-sharing-web-system
 
       - name: Upload binary artifact
