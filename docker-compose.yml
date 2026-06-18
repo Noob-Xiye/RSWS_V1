@@ -46,6 +46,8 @@
     ports:
       - "${SERVER_PORT:-5170}:5170"
     restart: unless-stopped
+    volumes:
+      - uploads_data:/app/uploads
     environment:
       RSWS_DATABASE_URL: postgresql://${POSTGRES_USER:-rsws}:${POSTGRES_PASSWORD:-rsws_secret}@postgres:5432/${POSTGRES_DB:-rsws}
       RSWS_REDIS_URL: redis://:${REDIS_PASSWORD:-rsws_redis}@redis:6379
@@ -86,3 +88,4 @@
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:

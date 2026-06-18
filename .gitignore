@@ -1,4 +1,7 @@
 /target/
+# 编译产物（根目录）
+/resource-sharing-web-system
+/rsws
 *.lock
 *.pid
 *.log
