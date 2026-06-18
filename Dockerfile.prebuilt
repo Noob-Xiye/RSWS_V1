@@ -1,9 +1,10 @@
 # ===========================
-# RSWS Dockerfile — Pre-built binary (compiled in WSL2 Ubuntu 24.04)
+# RSWS Dockerfile — Pre-built binary (compiled in WSL2 Ubuntu 24.04 or CI)
 # ===========================
 FROM ubuntu:24.04
 
-ENV APP_VERSION=0.1.5
+ARG VERSION=dev
+ENV APP_VERSION=$VERSION
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
@@ -17,8 +18,10 @@ LABEL org.opencontainers.image.version="${APP_VERSION}"
 LABEL org.opencontainers.image.title="Resource Sharing Web System"
 LABEL org.opencontainers.image.description="数字内容付费交易平台"
 
-# Copy pre-built binary from build context (project root)
-COPY resource-sharing-web-system /app/resource-sharing-web-system
+# Copy pre-built binary
+# CI: binary is in rsws-bin/ directory (artifact download)
+# Local: copy binary to rsws-bin/ first: mkdir -p rsws-bin && cp target/release/resource-sharing-web-system rsws-bin/
+COPY rsws-bin/resource-sharing-web-system /app/resource-sharing-web-system
 RUN chmod +x /app/resource-sharing-web-system
 
 EXPOSE 5170
