@@ -287,8 +287,9 @@ pub async fn rate_limit(
             res.add_header(
                 "X-RateLimit-Remaining",
                 (limit.saturating_sub(count)).max(0).to_string(),
-                true)
-                .ok();
+                true,
+            )
+            .ok();
 
             if count > limit as i64 {
                 tracing::warn!(
