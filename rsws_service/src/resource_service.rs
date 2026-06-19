@@ -1,13 +1,12 @@
 //! 资源服务
 
-use crate::oss_service::StorageService;
 use crate::order_service::OrderService;
+use crate::oss_service::StorageService;
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_db::ResourceRepository;
 use rsws_model::resource::{
-    CreateResourceRequest, Resource, ResourceDetailResponse, UpdateResourceRequest,
-    OWNER_TYPE_USER,
+    CreateResourceRequest, Resource, ResourceDetailResponse, UpdateResourceRequest, OWNER_TYPE_USER,
 };
 use rust_decimal::Decimal;
 use std::sync::Arc;
@@ -104,7 +103,10 @@ impl ResourceService {
         // 检查是否已购买
         let is_purchased = if let Some(uid) = user_id {
             if let Some(ref order_service) = self.order_service {
-                order_service.check_purchased(uid, resource_id).await.unwrap_or(false)
+                order_service
+                    .check_purchased(uid, resource_id)
+                    .await
+                    .unwrap_or(false)
             } else {
                 false
             }
@@ -115,22 +117,22 @@ impl ResourceService {
         // 付费资源且未购买：截断 detail_description 并隐藏 file_url
         let is_paid = resource.price > Decimal::ZERO;
         let (detail_description, file_url) = if is_paid && !is_purchased {
-            let truncated = resource
-                .detail_description
-                .as_ref()
-                .map(|content| {
-                    let len = content.chars().count();
-                    let cutoff = (len as f64 * 0.25).floor() as usize;
-                    if cutoff >= len {
-                        content.clone()
-                    } else {
-                        let truncated: String = content.chars().take(cutoff).collect();
-                        format!("{}...", truncated)
-                    }
-                });
+            let truncated = resource.detail_description.as_ref().map(|content| {
+                let len = content.chars().count();
+                let cutoff = (len as f64 * 0.25).floor() as usize;
+                if cutoff >= len {
+                    content.clone()
+                } else {
+                    let truncated: String = content.chars().take(cutoff).collect();
+                    format!("{}...", truncated)
+                }
+            });
             (truncated, None) // 隐藏 file_url 防止直接下载绕过
         } else {
-            (resource.detail_description.clone(), resource.file_url.clone())
+            (
+                resource.detail_description.clone(),
+                resource.file_url.clone(),
+            )
         };
 
         Ok(Some(ResourceDetailResponse {

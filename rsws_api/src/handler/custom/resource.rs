@@ -87,7 +87,8 @@ pub async fn get_resource(req: &mut Request, depot: &mut Depot, res: &mut Respon
     }
 
     // 优先从 depot 获取已认证 user_id，其次从 query 参数获取
-    let query_user_id: Option<i64> = req.query::<String>("user_id")
+    let query_user_id: Option<i64> = req
+        .query::<String>("user_id")
         .and_then(|s| s.parse::<i64>().ok());
     let user_id = get_user_id(depot).or(query_user_id);
     let state = get_state(depot);
