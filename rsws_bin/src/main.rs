@@ -174,8 +174,9 @@ async fn main() -> Result<(), RswsError> {
         email_db_config.as_ref(),
     );
     let order_service = rsws_service::create_order_service(pool.clone());
+    let order_service_arc = Arc::new(order_service);
     let resource_service =
-        rsws_service::create_resource_service(pool.clone(), Some(config_service.as_ref().clone()));
+        rsws_service::create_resource_service(pool.clone(), Some(config_service.as_ref().clone()), Some(order_service_arc.clone()));
     let admin_api_key_manager = rsws_service::create_admin_api_key_manager(redis_pool.clone());
     let user_api_key_manager = rsws_service::create_user_api_key_manager(redis_pool.clone());
     let wallet_repo = rsws_db::WalletRepository::new(pool.clone());
@@ -205,7 +206,7 @@ async fn main() -> Result<(), RswsError> {
         pool.clone(),
         config.clone(),
         user_service,
-        order_service,
+        order_service_arc.as_ref().clone(),
         resource_service,
         admin_api_key_manager,
         user_api_key_manager,

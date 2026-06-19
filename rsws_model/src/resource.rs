@@ -70,6 +70,33 @@ pub struct UpdateResourceRequest {
     pub supported_os: Option<Vec<String>>,
 }
 
+/// 资源详情响应（含购买状态和内容截断）
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ResourceDetailResponse {
+    pub id: i64,
+    pub title: String,
+    pub description: Option<String>,
+    pub price: Decimal,
+    pub category_id: Option<i64>,
+    pub file_url: Option<String>,
+    pub thumbnail_url: Option<String>,
+    pub is_active: bool,
+    pub detail_description: Option<String>,
+    pub specifications: Option<serde_json::Value>,
+    pub usage_guide: Option<String>,
+    pub precautions: Option<String>,
+    pub display_images: Option<serde_json::Value>,
+    pub owner_type: String,
+    pub provider_id: Option<i64>,
+    pub supported_os: Option<serde_json::Value>,
+    pub commission_rate: Decimal,
+    pub download_count: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    /// 用户是否已购买此资源
+    pub is_purchased: bool,
+}
+
 /// 资源列表响应
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ResourceListResponse {

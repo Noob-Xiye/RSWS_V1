@@ -26,8 +26,8 @@ export function generateSignature(params: Record<string, string>, apiKey: string
   // 3. apiKey 拼在前面（Cregis 方案）
   const signStr = apiKey + paramStr
   
-  // 4. MD5 + 小写 hex
-  return CryptoJS.MD5(signStr).toString()
+  // 4. MD5 + 小写 hex（明确指定 Hex 编码器，确保前后端一致）
+  return CryptoJS.MD5(signStr).toString(CryptoJS.enc.Hex)
 }
 
 /**

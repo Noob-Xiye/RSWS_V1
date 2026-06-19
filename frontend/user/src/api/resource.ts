@@ -32,6 +32,7 @@ export interface ResourceListResponse {
 /** 资源详情（购买后有 file_url） */
 export type ResourceDetail = Resource & {
   file_url?: string | null
+  is_purchased?: boolean
 }
 
 export interface PurchaseCheckResponse {

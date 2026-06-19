@@ -55,8 +55,9 @@ request.interceptors.response.use(
     const data = response.data
     // 检查业务层错误码（后端返回 200，但 code !== 0）
     if (data && data.code !== undefined && data.code !== 0) {
-      // 401 = 未登录 / 认证失败
-      if (data.code === 401 || (data.msg && data.msg.includes('未登录'))) {
+      // 仅当 token 过期（code 20001）时才清除 token 并跳转
+      // 其他认证错误（如签名失败 code 20004）不清除 token，由组件处理
+      if (data.code === 20001) {
         if (shouldRedirectToLogin()) {
           removeApiKey()
           removeUserId()
@@ -64,7 +65,6 @@ request.interceptors.response.use(
             window.location.href = '/login'
           }
         }
-        // 游客：不跳转，直接 reject，由组件处理
       }
       return Promise.reject(data)
     }
@@ -73,16 +73,19 @@ request.interceptors.response.use(
   (error) => {
     const { response } = error
 
-    // 401 未授权：仅当曾经登录过才跳转（session 过期）
+    // 401 未授权：仅当曾经登录过且是 token 过期才跳转
+    // 注意：后端签名验证失败也返回 HTTP 401，但不应清除 token
     if (response?.status === 401) {
-      if (shouldRedirectToLogin()) {
+      const data = response?.data
+      // 仅当业务 code 是 20001（token 过期）时才清除 token
+      if (data && data.code === 20001 && shouldRedirectToLogin()) {
         removeApiKey()
         removeUserId()
         if (window.location.pathname !== '/login') {
           window.location.href = '/login'
         }
       }
-      // 游客：不跳转，由组件处理
+      // 其他 401 错误（如签名失败）不清除 token，由组件处理
     }
 
     // 网络错误（后端挂掉）：不跳转登录页，游客不应因网络问题被踢出

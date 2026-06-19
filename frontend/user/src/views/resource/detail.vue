@@ -38,7 +38,30 @@
                   <!-- 详细内容 -->
                   <div class="content-section" v-if="resource.detail_description">
                     <h3>详细内容</h3>
-                    <div class="rich-content" v-html="resource.detail_description"></div>
+                    <div class="rich-content-wrapper">
+                      <div 
+                        class="rich-content" 
+                        :class="{ 'blurred': !isPurchased }" 
+                        v-html="displayContent"
+                      ></div>
+                      <!-- 付费阅读遮罩层 -->
+                      <div v-if="!isPurchased && resource.price > 0" class="paywall-overlay">
+                        <div class="paywall-content">
+                          <div class="paywall-icon">🔒</div>
+                          <h4>付费内容</h4>
+                          <p>此内容需要付费后才能阅读全文</p>
+                          <div class="paywall-price">
+                            <span class="price">{{ formatPrice(resource.price) }} USDT</span>
+                            <span class="price-note">（约 {{ formatPrice(resource.price) }} 元）</span>
+                          </div>
+                          <button class="btn-unlock" :disabled="purchasing" @click="handlePurchase">
+                            <el-icon v-if="!purchasing"><ShoppingCart /></el-icon>
+                            <el-icon v-else class="is-loading"><Loading /></el-icon>
+                            {{ purchasing ? '创建订单中...' : '付费解锁全文' }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -163,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -178,6 +201,12 @@ const userStore = useUserStore()
 const loading = ref(true)
 const resource = ref<ResourceDetail | null>(null)
 const isPurchased = ref(false)
+
+// 付费阅读：直接显示后端返回的内容（后端已截断付费内容前25%以防绕过）
+const displayContent = computed(() => {
+  if (!resource.value?.detail_description) return ''
+  return resource.value.detail_description
+})
 const downloading = ref(false)
 const purchasing = ref(false)
 const paymentMethod = ref<'usdt_trc20' | 'usdt_erc20' | 'paypal'>('usdt_trc20')
@@ -202,7 +231,8 @@ async function fetchResource() {
     const res = await getResource(id)
     if (res.code === 0 && res.data) {
       resource.value = res.data
-      await checkPurchasedStatus(id as any)
+      // 后端已返回 is_purchased，直接使用
+      isPurchased.value = res.data.is_purchased || false
     } else {
       ElMessage.error('资源不存在')
       router.push('/')
@@ -373,6 +403,99 @@ onUnmounted(() => stopPolling())
 .rich-content {
   color: rgba(255, 255, 255, 0.7);
   line-height: 1.8;
+}
+
+.rich-content.blurred {
+  max-height: 300px;
+  overflow: hidden;
+  position: relative;
+}
+
+.rich-content-wrapper {
+  position: relative;
+}
+
+/* 付费阅读遮罩层 */
+.paywall-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 400px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9) 50%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 40px;
+  pointer-events: none;
+}
+
+.paywall-content {
+  text-align: center;
+  pointer-events: auto;
+}
+
+.paywall-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.paywall-content h4 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.paywall-content p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 16px;
+}
+
+.paywall-price {
+  margin-bottom: 20px;
+}
+
+.paywall-price .price {
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.paywall-price .price-note {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-unlock {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+  transition: all 0.3s;
+}
+
+.btn-unlock:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-unlock:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* 购买侧栏 */

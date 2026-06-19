@@ -2,7 +2,7 @@
 //!
 //! 使用 ResponseExt 和 AuthHandler trait 简化样板代码
 
-use crate::state::get_state;
+use crate::state::{get_state, get_user_id};
 use rsws_common::{error_code::ErrorCode, AuthHandler, ResponseExt, RswsError};
 use rsws_model::resource::{CreateResourceRequest, UpdateResourceRequest};
 use salvo::prelude::*;
@@ -86,9 +86,13 @@ pub async fn get_resource(req: &mut Request, depot: &mut Depot, res: &mut Respon
         return;
     }
 
+    // 优先从 depot 获取已认证 user_id，其次从 query 参数获取
+    let query_user_id: Option<i64> = req.query::<String>("user_id")
+        .and_then(|s| s.parse::<i64>().ok());
+    let user_id = get_user_id(depot).or(query_user_id);
     let state = get_state(depot);
 
-    match state.resource_service.get(id).await {
+    match state.resource_service.get_detail(user_id, id).await {
         Ok(Some(resource)) => {
             res.success(resource);
         }

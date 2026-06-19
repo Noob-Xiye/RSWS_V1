@@ -10,6 +10,7 @@ use std::sync::Arc;
 use tracing::info;
 
 /// 订单服务
+#[derive(Clone)]
 pub struct OrderService {
     order_repo: Arc<OrderRepository>,
 }

@@ -1,18 +1,22 @@
 //! 资源服务
 
 use crate::oss_service::StorageService;
+use crate::order_service::OrderService;
 use rsws_common::error::RswsError;
 use rsws_common::error_code::ErrorCode;
 use rsws_db::ResourceRepository;
 use rsws_model::resource::{
-    CreateResourceRequest, Resource, UpdateResourceRequest, OWNER_TYPE_USER,
+    CreateResourceRequest, Resource, ResourceDetailResponse, UpdateResourceRequest,
+    OWNER_TYPE_USER,
 };
+use rust_decimal::Decimal;
 use std::sync::Arc;
 use tracing::{info, warn};
 
 /// 资源服务
 pub struct ResourceService {
     resource_repo: Arc<ResourceRepository>,
+    order_service: Option<Arc<OrderService>>,
     config_service: Option<crate::config_service::ConfigService>,
 }
 
@@ -21,6 +25,7 @@ impl ResourceService {
     pub fn new(resource_repo: Arc<ResourceRepository>) -> Self {
         Self {
             resource_repo,
+            order_service: None,
             config_service: None,
         }
     }
@@ -32,8 +37,14 @@ impl ResourceService {
     ) -> Self {
         Self {
             resource_repo,
+            order_service: None,
             config_service: Some(config_service),
         }
+    }
+
+    /// 设置订单服务（用于购买检查）
+    pub fn set_order_service(&mut self, order_service: Arc<OrderService>) {
+        self.order_service = Some(order_service);
     }
 
     /// 获取 OSS 存储服务（如果配置了）
@@ -74,6 +85,77 @@ impl ResourceService {
     /// 获取资源
     pub async fn get(&self, resource_id: i64) -> Result<Option<Resource>, RswsError> {
         self.resource_repo.get_by_id(resource_id).await
+    }
+
+    /// 获取资源详情（含购买状态和付费内容截断）
+    ///
+    /// - 未登录或未购买且资源有价格时，截断 `detail_description` 至 25% 并隐藏 `file_url`
+    /// - 已购买或免费资源返回完整内容
+    pub async fn get_detail(
+        &self,
+        user_id: Option<i64>,
+        resource_id: i64,
+    ) -> Result<Option<ResourceDetailResponse>, RswsError> {
+        let resource = match self.resource_repo.get_by_id(resource_id).await? {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+
+        // 检查是否已购买
+        let is_purchased = if let Some(uid) = user_id {
+            if let Some(ref order_service) = self.order_service {
+                order_service.check_purchased(uid, resource_id).await.unwrap_or(false)
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        // 付费资源且未购买：截断 detail_description 并隐藏 file_url
+        let is_paid = resource.price > Decimal::ZERO;
+        let (detail_description, file_url) = if is_paid && !is_purchased {
+            let truncated = resource
+                .detail_description
+                .as_ref()
+                .map(|content| {
+                    let len = content.chars().count();
+                    let cutoff = (len as f64 * 0.25).floor() as usize;
+                    if cutoff >= len {
+                        content.clone()
+                    } else {
+                        let truncated: String = content.chars().take(cutoff).collect();
+                        format!("{}...", truncated)
+                    }
+                });
+            (truncated, None) // 隐藏 file_url 防止直接下载绕过
+        } else {
+            (resource.detail_description.clone(), resource.file_url.clone())
+        };
+
+        Ok(Some(ResourceDetailResponse {
+            id: resource.id,
+            title: resource.title,
+            description: resource.description,
+            price: resource.price,
+            category_id: resource.category_id,
+            file_url,
+            thumbnail_url: resource.thumbnail_url,
+            is_active: resource.is_active,
+            detail_description,
+            specifications: resource.specifications,
+            usage_guide: resource.usage_guide,
+            precautions: resource.precautions,
+            display_images: resource.display_images,
+            owner_type: resource.owner_type,
+            provider_id: resource.provider_id,
+            supported_os: resource.supported_os,
+            commission_rate: resource.commission_rate,
+            download_count: resource.download_count,
+            created_at: resource.created_at,
+            updated_at: resource.updated_at,
+            is_purchased,
+        }))
     }
 
     /// 获取资源列表

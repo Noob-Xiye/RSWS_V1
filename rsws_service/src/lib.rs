@@ -119,12 +119,17 @@ pub fn create_order_service(pool: sqlx::PgPool) -> OrderService {
 pub fn create_resource_service(
     pool: sqlx::PgPool,
     config_service: Option<ConfigService>,
+    order_service: Option<Arc<OrderService>>,
 ) -> ResourceService {
-    if let Some(cfg) = config_service {
+    let mut service = if let Some(cfg) = config_service {
         ResourceService::with_oss(Arc::new(ResourceRepository::new(pool)), cfg)
     } else {
         ResourceService::new(Arc::new(ResourceRepository::new(pool)))
+    };
+    if let Some(os) = order_service {
+        service.set_order_service(os);
     }
+    service
 }
 
 /// 创建配置服务
