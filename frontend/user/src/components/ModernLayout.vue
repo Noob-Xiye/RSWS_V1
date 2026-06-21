@@ -9,7 +9,19 @@
         </router-link>
 
         <nav class="nav-links">
-          <router-link to="/" class="nav-link" :class="{ active: $route.path === '/' }">首页</router-link>
+          <router-link to="/" class="nav-link" :class="{ active: $route.path === '/' && !$route.query.category_id }">首页</router-link>
+          <router-link
+            v-for="cat in categories"
+            :key="cat.id"
+            :to="{ path: '/', query: { category_id: cat.id } }"
+            class="nav-link"
+            :class="{ active: Number($route.query.category_id) === cat.id }"
+          >
+            <el-icon style="margin-right: 4px; vertical-align: -2px;" :size="14">
+              <FolderOpened />
+            </el-icon>
+            {{ cat.name }}
+          </router-link>
           <router-link v-if="userStore.isLoggedIn" to="/orders" class="nav-link" :class="{ active: $route.path === '/orders' }">我的订单</router-link>
         </nav>
 
@@ -61,25 +73,43 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { getCategoryList } from '@/api/category'
+import type { Category } from '@/api/category'
 
 withDefaults(defineProps<{ showFooter?: boolean }>(), { showFooter: true })
 
 const router = useRouter()
 const userStore = useUserStore()
 
+const categories = ref<Category[]>([])
+
+async function fetchCategories() {
+  try {
+    const res = await getCategoryList()
+    categories.value = res.filter(c => c.is_active !== false)
+  } catch {
+    categories.value = []
+  }
+}
+
 function handleLogout() {
   userStore.logout()
   router.push('/')
 }
+
+onMounted(() => {
+  fetchCategories()
+})
 </script>
 
 <style scoped>
 .layout {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
-  color: #fff;
+  background: var(--theme-bg-primary);
+  color: var(--theme-text-primary);
   display: flex;
   flex-direction: column;
 }
@@ -91,10 +121,10 @@ function handleLogout() {
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(15, 15, 26, 0.8);
+  background: var(--theme-bg-sidebar);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--theme-border);
 }
 
 .navbar-container {
@@ -121,7 +151,7 @@ function handleLogout() {
 }
 
 .logo-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--theme-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -132,7 +162,7 @@ function handleLogout() {
 }
 
 .nav-link {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--theme-text-secondary);
   text-decoration: none;
   font-size: 15px;
   font-weight: 500;
@@ -143,7 +173,7 @@ function handleLogout() {
 
 .nav-link:hover,
 .nav-link.active {
-  color: #fff;
+  color: var(--theme-text-primary);
 }
 
 .nav-link.active::after {
@@ -153,7 +183,7 @@ function handleLogout() {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: var(--theme-gradient);
   border-radius: 2px;
 }
 
@@ -179,13 +209,13 @@ function handleLogout() {
 }
 
 .user-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: var(--theme-gradient);
+  color: var(--theme-text-primary);
   font-weight: 600;
 }
 
 .user-name {
-  color: #fff;
+  color: var(--theme-text-primary);
   font-size: 14px;
 }
 
@@ -200,7 +230,7 @@ function handleLogout() {
 }
 
 .btn-login {
-  color: #fff;
+  color: var(--theme-text-primary);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -210,8 +240,8 @@ function handleLogout() {
 }
 
 .btn-register {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: var(--theme-gradient);
+  color: var(--theme-text-primary);
   border: none;
 }
 
@@ -228,7 +258,7 @@ function handleLogout() {
 
 /* 页脚 */
 .footer {
-  background: rgba(15, 15, 26, 0.8);
+  background: var(--theme-bg-sidebar);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding: 40px 24px;
 }
@@ -266,7 +296,7 @@ function handleLogout() {
 
 :deep(.el-dropdown-menu__item:hover) {
   background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  color: var(--theme-text-primary);
 }
 
 /* 响应式 */

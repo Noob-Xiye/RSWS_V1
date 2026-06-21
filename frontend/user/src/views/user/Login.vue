@@ -262,10 +262,10 @@ async function handleLogin() {
 
 /* 登录卡片 */
 .login-card {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--theme-bg-input);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--theme-border);
   border-radius: 24px;
   padding: 40px;
 }
@@ -290,7 +290,7 @@ async function handleLogin() {
 .logo-text {
   font-size: 28px;
   font-weight: 800;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--theme-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -298,19 +298,19 @@ async function handleLogin() {
 .login-title {
   font-size: 28px;
   font-weight: 700;
-  color: #fff;
+  color: var(--theme-text-primary);
   margin-bottom: 8px;
 }
 
 .login-subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--theme-text-muted);
 }
 
 /* 登录方式切换 */
 .login-tabs {
   display: flex;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--theme-bg-input);
   border-radius: 12px;
   padding: 4px;
   margin-bottom: 24px;
@@ -334,43 +334,43 @@ async function handleLogin() {
 }
 
 .tab-btn.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: var(--theme-gradient);
+  color: var(--theme-text-primary);
 }
 
 /* 表单样式 */
 .form-input :deep(.el-input__wrapper) {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--theme-bg-input);
+  border: 1px solid var(--theme-border);
   border-radius: 12px;
   box-shadow: none;
   transition: all 0.3s;
 }
 
 .form-input :deep(.el-input__wrapper:hover) {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--theme-border);
 }
 
 .form-input :deep(.el-input__wrapper.is-focus) {
-  border-color: #667eea;
-  background: rgba(102, 126, 234, 0.1);
+  border-color: var(--theme-primary);
+  background: var(--theme-primary-soft);
 }
 
 .form-input :deep(.el-input__inner) {
-  color: #fff;
+  color: var(--theme-text-primary);
 }
 
 .form-input :deep(.el-input__inner::placeholder) {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--theme-text-placeholder);
 }
 
 .form-input :deep(.el-input__prefix) {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--theme-text-muted);
 }
 
 .form-input :deep(.el-input-group__append) {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--theme-bg-input);
+  border: 1px solid var(--theme-border);
   border-left: none;
   border-radius: 0 12px 12px 0;
   padding: 0;
@@ -379,25 +379,25 @@ async function handleLogin() {
 .code-btn {
   background: transparent;
   border: none;
-  color: #667eea;
+  color: var(--theme-primary);
   font-size: 13px;
   padding: 0 16px;
   min-width: 90px;
 }
 
 .code-btn:hover {
-  color: #764ba2;
+  color: var(--theme-primary);
 }
 
 .code-btn:disabled {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--theme-text-placeholder);
 }
 
 /* 登录按钮 */
 .login-btn {
   width: 100%;
   height: 48px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--theme-gradient);
   border: none;
   border-radius: 12px;
   font-size: 16px;
@@ -408,7 +408,7 @@ async function handleLogin() {
 
 .login-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+  box-shadow: var(--theme-shadow);
 }
 
 /* 底部链接 */
@@ -418,12 +418,12 @@ async function handleLogin() {
 }
 
 .footer-text {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--theme-text-muted);
   font-size: 14px;
 }
 
 .footer-link {
-  color: #667eea;
+  color: var(--theme-primary);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -432,7 +432,7 @@ async function handleLogin() {
 }
 
 .footer-link:hover {
-  color: #764ba2;
+  color: var(--theme-primary);
 }
 
 /* 响应式 */

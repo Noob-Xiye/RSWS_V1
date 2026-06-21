@@ -27,6 +27,10 @@
                   <el-icon><Document /></el-icon>
                   <span>我的订单</span>
                 </button>
+                <button class="menu-item" :class="{ active: activeMenu === 'theme' }" @click="activeMenu = 'theme'">
+                  <el-icon><Brush /></el-icon>
+                  <span>主题设置</span>
+                </button>
               </nav>
             </div>
           </div>
@@ -83,7 +87,26 @@
               </el-form>
             </div>
 
-            <!-- 我的订单 -->
+            <!-- 主题设置 -->
+            <div class="content-card" v-else-if="activeMenu === 'theme'">
+              <h2 class="card-title">主题设置</h2>
+              <div class="theme-grid">
+                <div 
+                  v-for="theme in themeList" 
+                  :key="theme.name" 
+                  class="theme-card"
+                  :class="{ active: currentTheme === theme.name }"
+                  @click="handleSetTheme(theme.name)"
+                >
+                  <div class="theme-preview" :style="{ background: theme.preview }"></div>
+                  <div class="theme-info">
+                    <span class="theme-icon">{{ theme.icon }}</span>
+                    <span class="theme-label">{{ theme.label }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="content-card" v-else-if="activeMenu === 'orders'">
               <div class="card-title-row">
                 <h2 class="card-title">我的订单</h2>
@@ -125,6 +148,7 @@ import { useUserStore } from '@/stores/user'
 import { updateProfile, changePassword, uploadAvatar } from '@/api/user'
 import { listOrders, type Order } from '@/api/order'
 import ModernLayout from '@/components/ModernLayout.vue'
+import { useTheme, THEMES } from '@/composables/useTheme'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -134,6 +158,23 @@ const savingProfile = ref(false)
 const savingPassword = ref(false)
 const loadingOrders = ref(false)
 const recentOrders = ref<Order[]>([])
+
+// 主题切换逻辑
+const { currentTheme, setTheme } = useTheme()
+
+const themeList = THEMES.map(theme => ({
+  ...theme,
+  preview: theme.name === 'dark'
+    ? 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)'
+    : theme.name === 'light'
+      ? 'linear-gradient(135deg, #e8ecf1 0%, #d5dbe4 50%, #c8cfd8 100%)'
+      : 'linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #333333 100%)'
+}))
+
+function handleSetTheme(theme: string) {
+  setTheme(theme as 'dark' | 'light' | 'high-contrast-dark')
+  ElMessage.success(`已切换至${THEMES.find(t => t.name === theme)?.label || theme}`)
+}
 
 const profileFormRef = ref<FormInstance>()
 const passwordFormRef = ref<FormInstance>()
@@ -433,6 +474,47 @@ onMounted(() => {
 
 .order-right { display: flex; align-items: center; gap: 12px; }
 .order-amount { font-weight: 600; color: #f093fb; }
+
+/* 主题设置 */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.theme-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.theme-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.theme-card.active {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
+}
+
+.theme-preview {
+  height: 80px;
+  transition: all 0.3s;
+}
+
+.theme-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.theme-icon { font-size: 20px; }
+.theme-label { font-size: 14px; font-weight: 500; }
 
 /* 响应式 */
 @media (max-width: 768px) {
